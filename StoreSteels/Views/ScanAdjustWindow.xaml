@@ -1,0 +1,137 @@
+<Window x:Class="CIMS.Views.ScanAdjustWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Adjust Scan" Width="1380" Height="840"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- ✏️ ADJUST SCAN (Level 1 admin): เลือกรายการสแกนแล้วแก้จำนวน / ลบ (ยกเลิก) - ยอดคลังปรับย้อนให้อัตโนมัติ ต้องระบุหมายเหตุทุกครั้ง -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="#B3261E" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="✏️ ADJUST SCAN" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock Text="ADMIN ONLY  •  Edit the qty of a scan or delete it - the stock balance is corrected automatically and the reason is recorded"
+                                   Foreground="#FFDAD6" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Close_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <!-- ตัวกรอง -->
+            <Grid Grid.Row="1" Margin="24,16,24,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="txtSearch" Style="{StaticResource StkInput}" Height="42" Tag="Search Product Code, Part A, Part No, Name, Barcode or User..." TextChanged="Filter_Changed"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                    <TextBlock Text="FROM" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <DatePicker x:Name="dpFrom" Width="150" SelectedDateChanged="Date_Changed"/>
+                    <TextBlock Text="TO" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                    <DatePicker x:Name="dpTo" Width="150" SelectedDateChanged="Date_Changed"/>
+                    <ComboBox x:Name="cbStock" Width="190" Height="42" Margin="12,0,0,0" Style="{StaticResource StkCombo}" SelectionChanged="Combo_Changed"/>
+                    <ComboBox x:Name="cbType" Width="120" Height="42" Margin="8,0,0,0" Style="{StaticResource StkCombo}" SelectionChanged="Combo_Changed">
+                        <ComboBoxItem Content="ALL TYPES" Tag=""/>
+                        <ComboBoxItem Content="IN" Tag="IN"/>
+                        <ComboBoxItem Content="OUT" Tag="OUT"/>
+                        <ComboBoxItem Content="RETURN" Tag="RETURN"/>
+                    </ComboBox>
+                </StackPanel>
+            </Grid>
+
+            <DataGrid x:Name="dgScan" Grid.Row="2" Margin="24,0,24,0"
+                      AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
+                      Background="Transparent" BorderThickness="0" RowHeight="44" FontSize="13" FontWeight="SemiBold"
+                      GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#F2F0F5" SelectionUnit="FullRow"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="FontWeight" Value="ExtraBold"/>
+                        <Setter Property="Padding" Value="10,8"/>
+                        <Setter Property="Height" Value="46"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCancel}" Value="True">
+                                <Setter Property="Foreground" Value="#B0AAB8"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Resources>
+                    <Style x:Key="Cell" TargetType="TextBlock">
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                    </Style>
+                </DataGrid.Resources>
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Width="50">
+                        <DataGridTemplateColumn.Header>
+                            <CheckBox x:Name="chkAll" HorizontalAlignment="Center" Click="SelectAll_Click" ToolTip="Select all"/>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Click="Row_Checked" IsEnabled="{Binding CanSelect}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="DATE TIME" Binding="{Binding DateText}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="STOCK" Binding="{Binding StockCode}" Width="1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="TYPE" Binding="{Binding TxType}" Width="0.7*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="1.7*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="QTY" Binding="{Binding Qty, StringFormat=N0}" Width="0.6*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="USER" Binding="{Binding UserText}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="PR" Binding="{Binding PrText}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTemplateColumn Header="STATUS" Width="0.8*" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding StatusText}" ToolTip="{Binding AdjNote}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Black">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#E65100"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCancel}" Value="True">
+                                                    <Setter Property="Foreground" Value="#C62828"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+            <TextBlock x:Name="txtEmpty" Grid.Row="2" Text="NO SCAN RECORD" FontSize="15" FontWeight="Bold" Foreground="#AAA"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+
+            <Grid Grid.Row="3" Margin="24,10,24,18">
+                <TextBlock x:Name="txtStatus" FontSize="12" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="btnEdit" Content="✏️ EDIT QTY" Style="{StaticResource StkButton}" Background="#1976D2" Margin="0,0,10,0" Click="EditQty_Click"/>
+                    <Button x:Name="btnDelete" Content="🗑 DELETE" Style="{StaticResource StkButton}" Background="#C62828" Click="Delete_Click"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

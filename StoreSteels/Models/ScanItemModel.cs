@@ -1,0 +1,75 @@
+﻿using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace CIMS.Models
+{
+    public enum TransactionType { IN, OUT }
+
+    public class ScanItemModel : INotifyPropertyChanged
+    {
+        private int _inCount;
+        private int _totalInQty;
+        private int _outCount;
+        private int _totalOutQty;
+        private int _finalStock;
+        private string _partNo;
+        private string _partACode;
+        private string _partCode;
+        private string _partName;
+        private System.Windows.Media.ImageSource _productImagePath;
+
+        public int PartId { get; set; }
+
+        // คลังที่รายการนี้ลงจริง (สแกนร่วมหลายคลัง / AUTO ระบบเลือกคลังให้ -> ตารางสรุปแยกยอดตามคลัง)
+        public int StkId { get; set; }
+        public string StockCode { get; set; }
+
+        // ข้อความรหัสในตาราง: สแกนร่วมหลายคลังต่อท้ายรหัสคลังบรรทัดล่าง (สินค้าเดียวกันคนละคลังจะได้แยกออก)
+        public bool ShowStockInCode { get; set; }
+        public string CodeLabel => ShowStockInCode && !string.IsNullOrEmpty(StockCode) ? $"{PartACode}\n{StockCode}" : PartACode;
+
+        // เปลี่ยนมารับเป็น ImageSource เพื่อรองรับภาพจาก UI Thread โดยตรง
+        public System.Windows.Media.ImageSource ProductImagePath
+        {
+            get => _productImagePath;
+            set { _productImagePath = value; OnPropertyChanged(); }
+        }
+
+        // ปรับเป็น Full Properties + OnPropertyChanged เพื่อให้ UI ตารางสรุปอัปเดต Real-time
+        public string PartCode
+        {
+            get => _partCode;
+            set { _partCode = value; OnPropertyChanged(); }
+        }
+        public string PartName
+        {
+            get => _partName;
+            set { _partName = value; OnPropertyChanged(); }
+        }
+        public string PartNo
+        {
+            get => _partNo;
+            set { _partNo = value; OnPropertyChanged(); }
+        }
+        public string PartACode
+        {
+            get => _partACode;
+            set { _partACode = value; OnPropertyChanged(); }
+        }
+
+        public int Qty { get; set; }
+        public string Status { get; set; }
+        public DateTime UpdateTime { get; set; }
+
+        public int InCount { get => _inCount; set { _inCount = value; OnPropertyChanged(); } }
+        public int TotalInQty { get => _totalInQty; set { _totalInQty = value; OnPropertyChanged(); } }
+        public int OutCount { get => _outCount; set { _outCount = value; OnPropertyChanged(); } }
+        public int TotalOutQty { get => _totalOutQty; set { _totalOutQty = value; OnPropertyChanged(); } }
+        public int FinalStock { get => _finalStock; set { _finalStock = value; OnPropertyChanged(); } }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+}

@@ -1,0 +1,160 @@
+<Page x:Class="CIMS.Views.UserManagementView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="User Management" Background="Transparent">
+
+    <!-- 👥 จัดการผู้ใช้งาน: การ์ดตาม UserID / ดู / เพิ่ม / แก้ไข / ลบ / กำหนดสิทธิ์ทุกระบบ -->
+    <Page.Resources>
+        <Style x:Key="CardBtn" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="3,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" CornerRadius="10" Background="{TemplateBinding Background}" Padding="10,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="b" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Border Background="White" CornerRadius="25" Padding="30" Margin="20" BorderBrush="#F0F0F0" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="👥 USER MANAGEMENT" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                    <TextBlock Text="View, add, edit and delete users and set the permissions of every system" FontSize="12" FontWeight="Bold" Foreground="#8A8490" Margin="0,4,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Border Background="#F3E5F5" CornerRadius="12" Padding="14,6" Margin="0,0,8,0">
+                        <TextBlock x:Name="txtTotal" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                    </Border>
+                    <Border Background="#E8F5E9" CornerRadius="12" Padding="14,6" Margin="0,0,8,0">
+                        <TextBlock x:Name="txtOnline" FontWeight="Black" Foreground="#2E7D32"/>
+                    </Border>
+                    <Border Background="#FFEBEE" CornerRadius="12" Padding="14,6" Margin="0,0,16,0">
+                        <TextBlock x:Name="txtLocked" FontWeight="Black" Foreground="#C62828"/>
+                    </Border>
+                    <Button x:Name="btnImport" Content="📥 IMPORT USER" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,0,8,0"/>
+                    <Button x:Name="btnAdd" Content="＋ ADD USER" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Add_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBox x:Name="txtSearch" Grid.Row="1" Style="{StaticResource StkInput}" Height="42" Margin="0,0,0,16"
+                     Tag="Search User ID, name, position, department or level..." TextChanged="Search_Changed"/>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="icUsers">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="card" Width="330" Height="214" Margin="0,0,16,16" CornerRadius="18" Padding="16"
+                                    Background="White" BorderBrush="#ECE9F1" BorderThickness="1.5">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.12" Color="Black"/>
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="58"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="avatar" Width="50" Height="50" CornerRadius="25" Background="#6750A4">
+                                            <TextBlock Text="{Binding Initials}" Foreground="White" FontSize="17" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0">
+                                            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Black" Foreground="#2D2A32" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding UserId, StringFormat=ID : {0}}" FontSize="12" FontWeight="Bold" Foreground="#8A8490"/>
+                                        </StackPanel>
+                                        <Border x:Name="status" Grid.Column="2" CornerRadius="8" Padding="8,3" VerticalAlignment="Top" Background="#9E9E9E">
+                                            <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Black" Foreground="White"/>
+                                        </Border>
+                                    </Grid>
+
+                                    <WrapPanel Grid.Row="1" Margin="0,12,0,0">
+                                        <Border x:Name="lvl" CornerRadius="8" Padding="8,3" Margin="0,0,6,0" Background="#EDE7F6">
+                                            <TextBlock x:Name="lvlText" Text="{Binding LevelText}" FontSize="10" FontWeight="Black" Foreground="#6750A4"/>
+                                        </Border>
+                                        <Border CornerRadius="8" Padding="8,3" Background="#F4F4F9">
+                                            <TextBlock Text="{Binding PermCount, StringFormat={}{0} SYSTEMS}" FontSize="10" FontWeight="Black" Foreground="#49454F"/>
+                                        </Border>
+                                    </WrapPanel>
+
+                                    <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                                        <TextBlock Text="{Binding SubText}" FontSize="12" FontWeight="SemiBold" Foreground="#49454F" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding SubText2}" FontSize="12" FontWeight="SemiBold" Foreground="#49454F" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding LastLoginText}" FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" Margin="0,4,0,0"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Button Content="VIEW" Style="{StaticResource CardBtn}" Background="#49454F" Click="View_Click" Tag="{Binding}"/>
+                                        <Button Content="EDIT" Style="{StaticResource CardBtn}" Background="#1976D2" Click="Edit_Click" Tag="{Binding}" Loaded="EditBtn_Loaded"/>
+                                        <Button Content="🔑 PERMISSION" Style="{StaticResource CardBtn}" Background="#6750A4" Click="Perm_Click" Tag="{Binding}" Loaded="PermBtn_Loaded"/>
+                                        <Button Content="DEL" Style="{StaticResource CardBtn}" Background="#C62828" Click="Delete_Click" Tag="{Binding}" Loaded="DelBtn_Loaded"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Level}" Value="1">
+                                    <Setter TargetName="avatar" Property="Background" Value="#C62828"/>
+                                    <Setter TargetName="lvl" Property="Background" Value="#FFEBEE"/>
+                                    <Setter TargetName="lvlText" Property="Foreground" Value="#C62828"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Level}" Value="2">
+                                    <Setter TargetName="avatar" Property="Background" Value="#1976D2"/>
+                                    <Setter TargetName="lvl" Property="Background" Value="#E3F2FD"/>
+                                    <Setter TargetName="lvlText" Property="Foreground" Value="#1565C0"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsOnline}" Value="True">
+                                    <Setter TargetName="status" Property="Background" Value="#2E7D32"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsLocked}" Value="True">
+                                    <Setter TargetName="status" Property="Background" Value="#C62828"/>
+                                    <Setter TargetName="card" Property="Background" Value="#FFF8F8"/>
+                                    <Setter TargetName="card" Property="BorderBrush" Value="#FFCDD2"/>
+                                </DataTrigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="card" Property="BorderBrush" Value="#B39DDB"/>
+                                </Trigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            <TextBlock x:Name="txtEmpty" Grid.Row="2" Text="NO USER" FontSize="15" FontWeight="Bold" Foreground="#AAA"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+        </Grid>
+    </Border>
+</Page>

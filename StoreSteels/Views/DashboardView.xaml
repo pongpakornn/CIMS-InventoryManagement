@@ -1,0 +1,393 @@
+﻿<Page x:Class="CIMS.Views.DashboardView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+      xmlns:gif="clr-namespace:XamlAnimatedGif;assembly=XamlAnimatedGif"
+      xmlns:local="clr-namespace:CIMS.Helpers"
+      Title="Dashboard" Background="#F4F6F9">
+
+    <Page.Resources>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#4A5568"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="MenuBorder" 
+                                Background="Transparent" 
+                                CornerRadius="8" 
+                                Margin="4,2" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="MenuBorder" Property="Background" Value="#EBF8FF"/>
+                                <Setter Property="Foreground" Value="#2B6CB0"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#718096"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="MinWidth" Value="180"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border CornerRadius="12" 
+                        Background="White" 
+                        Padding="4" 
+                        Margin="0,0,10,10">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" 
+                                          Color="#000000" 
+                                          Opacity="0.15" 
+                                          ShadowDepth="3" 
+                                          Direction="315"/>
+                            </Border.Effect>
+                            <ItemsPresenter KeyboardNavigation.TabNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="25">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 📊 หัวข้อ Dashboard: ไล่สีเคลื่อนไหว + เส้นใต้ขยายตอนเปิดหน้า + ไฟ LIVE กระพริบ -->
+        <Grid Grid.Row="0" Margin="10,0,10,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Width="58" Height="58" CornerRadius="18" VerticalAlignment="Center" Margin="0,0,16,0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#6750A4" Offset="0"/>
+                        <GradientStop Color="#9C7BE0" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.3" Color="#6750A4"/>
+                </Border.Effect>
+                <TextBlock Text="📊" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="txtDashTitle" Text="DASHBOARD" FontSize="36" FontWeight="Black">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop x:Name="gsA" Color="#49454F" Offset="0"/>
+                            <GradientStop x:Name="gsB" Color="#9C7BE0" Offset="0.5"/>
+                            <GradientStop x:Name="gsC" Color="#49454F" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                    <TextBlock.RenderTransform>
+                        <TranslateTransform x:Name="titleShift" X="-20"/>
+                    </TextBlock.RenderTransform>
+                    <TextBlock.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="titleShift" Storyboard.TargetProperty="X" From="-20" To="0" Duration="0:0:0.6">
+                                        <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetName="gsB" Storyboard.TargetProperty="Offset" From="-0.2" To="1.2"
+                                                     Duration="0:0:3" RepeatBehavior="Forever"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </TextBlock.Triggers>
+                </TextBlock>
+                <Border x:Name="titleBar" Height="4" Width="0" CornerRadius="2" HorizontalAlignment="Left" Margin="2,2,0,4">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#6750A4" Offset="0"/>
+                            <GradientStop Color="#D0BCFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Border.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Width" From="0" To="150" Duration="0:0:0.8" BeginTime="0:0:0.2">
+                                        <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Border.Triggers>
+                </Border>
+                <TextBlock Text="CIMS  •  CHR Inventory Management System  •  Overview of every stock" FontSize="13" FontWeight="SemiBold" Foreground="#8A8490" Margin="2,0,0,0"/>
+            </StackPanel>
+
+            <Border Grid.Column="2" VerticalAlignment="Center" CornerRadius="14" Padding="14,7" Background="White" BorderBrush="#EFF2F6" BorderThickness="1">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" Fill="#2F8247" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.25" Duration="0:0:0.9"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                    <TextBlock Text="LIVE" FontWeight="Black" FontSize="12" Foreground="#2F8247" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock Text="{Binding LastUpdateText}" FontWeight="SemiBold" FontSize="12" Foreground="#8A8490" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- 🏬 การ์ดแยกตามคลัง: คลิกขวา (หรือดับเบิ้ลคลิก) เลือกคลังเข้าไปดู -->
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Cards}" Margin="0,0,0,10">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="White"
+                            CornerRadius="16"
+                            Margin="10"
+                            Padding="18,14"
+                            Height="236"
+                            HorizontalAlignment="Stretch"
+                            BorderBrush="#EFF2F6"
+                            BorderThickness="1"
+                            Cursor="Hand"
+                            MouseDown="Card_MouseDown"
+                            ContextMenuOpening="StockMenu_ContextMenuOpening"
+                            ToolTip="🖱️ Right click: เลือกคลังที่ต้องการเข้าไปดู"
+                            RenderTransformOrigin="0.5,0.5">
+
+                        <Border.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="⏳ Loading..." IsEnabled="False"/>
+                            </ContextMenu>
+                        </Border.ContextMenu>
+
+                        <Border.RenderTransform>
+                            <TranslateTransform Y="0"/>
+                        </Border.RenderTransform>
+
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="ToolTipService.InitialShowDelay" Value="300"/>
+                                <Style.Triggers>
+                                    <EventTrigger RoutedEvent="MouseEnter">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(TranslateTransform.Y)" To="-8" Duration="0:0:0.25">
+                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)" To="25" Duration="0:0:0.25"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" To="0.3" Duration="0:0:0.25"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                    <EventTrigger RoutedEvent="MouseLeave">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.2"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)" To="15" Duration="0:0:0.2"/>
+                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" To="0.15" Duration="0:0:0.2"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Color="#A0AEC0" Opacity="0.15" ShadowDepth="3" Direction="270"/>
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- รูป + หัวข้อ + ยอดรวม -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="78"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Image Width="72" Height="72" Stretch="Uniform"
+                                       gif:AnimationBehavior.SourceUri="{Binding GifPath, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
+                                       gif:AnimationBehavior.AutoStart="True"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0">
+                                    <TextBlock Text="{Binding Title}" Foreground="#4A5568" FontSize="17" FontWeight="Black" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Value}" Foreground="#1A202C" FontSize="30" FontWeight="Black" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- แถวละ 1 คลัง -->
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,4">
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="8" Padding="10,4" Margin="0,0,0,4" Background="#F7F5FA">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Code}" FontSize="12" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Right}" FontSize="12" FontWeight="Bold" Foreground="#4A5568"
+                                                               HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <TextBlock Grid.Row="2" Text="{Binding Hint}" FontSize="10" FontWeight="Bold" Foreground="#A0AEC0"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Grid Grid.Row="2" Margin="0,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.3*"/>
+                <ColumnDefinition Width="2*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="White" CornerRadius="16" Margin="10" Padding="25" BorderBrush="#EFF2F6" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="15" Color="#A0AEC0" Opacity="0.12" ShadowDepth="3" Direction="270"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Order (Monthly Share)" FontSize="18" FontWeight="Bold" Foreground="#1A202C" Margin="0,0,0,20"/>
+                    <Grid Grid.Row="1">
+                        <!-- แสดงทุกลูกค้าถ้าเอาเมาส์ะชี้ -->
+                        <!--<lvc:PieChart Series="{Binding PieSeriesCollection}" 
+                          LegendLocation="Right" 
+                          Hoverable="True">
+                            <lvc:PieChart.DataTooltip>
+                                <lvc:DefaultTooltip BulletSize="12" 
+                            Foreground="#1A202C"
+                            Background="#FFFFFF"/>
+                            </lvc:PieChart.DataTooltip>
+                            <lvc:PieChart.ChartLegend>
+                                <lvc:DefaultLegend BulletSize="12" Foreground="#4A5568"/>
+                            </lvc:PieChart.ChartLegend>
+                        </lvc:PieChart>-->
+                        <!-- แสดงเฉพาะลูกค้าถ้าเอาเมาส์ะชี้ -->
+                        <lvc:PieChart Series="{Binding PieSeriesCollection}" 
+                          LegendLocation="Right" 
+                          Hoverable="True">
+
+                            <lvc:PieChart.DataTooltip>
+                                <lvc:DefaultTooltip SelectionMode="OnlySender" 
+                            BulletSize="12" 
+                            Background="#F8FAFC" 
+                            BorderBrush="#E2E8F0" 
+                            BorderThickness="1"
+                            Foreground="#1A202C">
+                                    <lvc:DefaultTooltip.ContentTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Vertical" Margin="5">
+                                                <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="13" Foreground="#1A202C" Margin="0,0,0,4"/>
+                                                <TextBlock Text="{Binding Point.AsItem.Label}" FontSize="12" Foreground="#4A5568"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </lvc:DefaultTooltip.ContentTemplate>
+                                </lvc:DefaultTooltip>
+                            </lvc:PieChart.DataTooltip>
+
+                            <lvc:PieChart.ChartLegend>
+                                <lvc:DefaultLegend BulletSize="12" Foreground="#4A5568"/>
+                            </lvc:PieChart.ChartLegend>
+                        </lvc:PieChart>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!--<Border Grid.Column="1" Background="White" CornerRadius="16" Margin="10" Padding="25" BorderBrush="#EFF2F6" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="15" Color="#A0AEC0" Opacity="0.12" ShadowDepth="3" Direction="270"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Forecast &amp; Order" FontSize="18" FontWeight="Bold" Foreground="#1A202C" Margin="0,0,0,20"/>
+                    <Grid Grid.Row="1">
+                        <lvc:CartesianChart Series="{Binding BarSeriesCollection}" LegendLocation="Top">
+                            <lvc:CartesianChart.AxisX>
+                                <lvc:Axis Title="Months" Labels="{Binding ChartLabels}" Foreground="#718096">
+                                    <lvc:Axis.Separator>
+                                        <lvc:Separator Step="1" IsEnabled="False"/>
+                                    </lvc:Axis.Separator>
+                                </lvc:Axis>
+                            </lvc:CartesianChart.AxisX>
+                            <lvc:CartesianChart.AxisY>
+                                <lvc:Axis Title="Amount" LabelFormatter="{Binding ValuesFormatter}" Foreground="#718096"/>
+                            </lvc:CartesianChart.AxisY>
+                        </lvc:CartesianChart>
+                    </Grid>
+                </Grid>
+            </Border>-->
+            <Border Grid.Column="1" Background="White" CornerRadius="16" Margin="10" Padding="25" BorderBrush="#EFF2F6" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="15" Color="#A0AEC0" Opacity="0.12" ShadowDepth="3" Direction="270"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Forecast, Order &amp; Delivery" FontSize="18" FontWeight="Bold" Foreground="#1A202C" Margin="0,0,0,20"/>
+                    <Grid Grid.Row="1">
+                        <lvc:CartesianChart Series="{Binding BarSeriesCollection}" LegendLocation="Top">
+                            <lvc:CartesianChart.AxisX>
+                                <lvc:Axis Title="Months" Labels="{Binding ChartLabels}" Foreground="#718096">
+                                    <lvc:Axis.Separator>
+                                        <lvc:Separator Step="1" IsEnabled="False"/>
+                                    </lvc:Axis.Separator>
+                                </lvc:Axis>
+                            </lvc:CartesianChart.AxisX>
+                            <lvc:CartesianChart.AxisY>
+                                <lvc:Axis Title="Amount" LabelFormatter="{Binding ValuesFormatter}" Foreground="#718096" MinValue="0" MaxValue="{Binding AxisMax, TargetNullValue=NaN}"/>
+                            </lvc:CartesianChart.AxisY>
+                        </lvc:CartesianChart>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

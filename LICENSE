@@ -1,0 +1,103 @@
+PROPRIETARY SOFTWARE LICENSE
+
+Copyright © 2026 Non-Pongpakorn Urang
+All Rights Reserved.
+
+1. OWNERSHIP
+
+This software, including its source code, object code, database scripts,
+designs, documentation, and all related materials (collectively, the
+"Software"), is the proprietary intellectual property of Non-Pongpakorn
+Urang (the "Copyright Holder"). The Software is protected by copyright and
+other applicable intellectual property laws. All rights not expressly
+granted in this license are reserved by the Copyright Holder.
+
+2. PERMITTED INTERNAL USE BY THE ORGANIZATION
+
+The company or organization for which the Software was developed (the
+"Organization") is permitted to install and use the Software for its own
+internal business operations without payment of any licensing fee.
+
+This permission:
+
+  (a) is non-exclusive and non-transferable;
+  (b) does not include the right to sell, sublicense, distribute,
+      redistribute, publish, or otherwise make the Software available to
+      any third party; and
+  (c) does not transfer to the Organization any copyright, ownership,
+      source-code ownership, or other intellectual property rights in the
+      Software.
+
+3. THIRD PARTIES
+
+Any person or entity other than the Organization (a "Third Party") must
+obtain prior written permission from the Copyright Holder before
+downloading, accessing, copying, modifying, deploying, distributing,
+redistributing, publishing, or using the Software, in whole or in part.
+
+Any such permission may be granted, limited, or refused at the sole
+discretion of the Copyright Holder, and may be granted free of charge. No
+licensing fee is required unless the Copyright Holder specifies otherwise
+in writing.
+
+4. NO LICENSE BY ACCESS
+
+The availability of the Software in any repository, including a public
+GitHub repository, and the act of downloading, cloning, forking, viewing,
+or otherwise accessing it, do not by themselves grant any license or
+permission to use the Software. No license or right is granted by
+implication, estoppel, or otherwise, except as expressly stated in this
+license or in a written permission from the Copyright Holder.
+
+5. RESTRICTIONS
+
+Except as expressly permitted under Section 2 or by prior written
+permission of the Copyright Holder, no one may:
+
+  (a) copy, reproduce, modify, adapt, translate, or create derivative
+      works of the Software;
+  (b) distribute, redistribute, sublicense, sell, rent, lease, lend,
+      publish, or otherwise make the Software available to others;
+  (c) deploy or operate the Software for any purpose; or
+  (d) remove, alter, or obscure any copyright notice or proprietary
+      marking contained in the Software.
+
+6. COPYRIGHT NOTICE
+
+The copyright notice above and this license must be retained in all
+copies or portions of the Software that are made with permission.
+
+7. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT, TO THE EXTENT
+PERMITTED BY APPLICABLE LAW.
+
+8. LIMITATION OF LIABILITY
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OF OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+9. TERMINATION
+
+Any permission granted under this license terminates automatically if its
+terms are breached. Upon termination, all use of the Software must cease
+and all copies obtained without permission must be destroyed.
+
+10. APPLICABLE LAW AND OTHER AGREEMENTS
+
+This license is subject to applicable law. Nothing in this license is
+intended to limit any right or obligation that cannot be limited under
+applicable law, or to override any written employment, service, or other
+agreement between the Copyright Holder and the Organization. Where such
+an agreement exists, it governs to the extent of any conflict with this
+license.
+
+11. CONTACT
+
+Requests for permission to use the Software should be directed to the
+Copyright Holder in writing.

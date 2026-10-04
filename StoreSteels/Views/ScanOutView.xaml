@@ -1,0 +1,923 @@
+﻿<!--<Page x:Class="CIMS.Views.ScanOutView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Multi-Scanner ( OUT )" Background="Transparent"
+      RenderTransformOrigin="0.5,0.5">
+
+    --><!-- Style --><!--
+    <Page.Resources>
+        <SolidColorBrush x:Key="MainPurple" Color="#49454F"/>
+        <SolidColorBrush x:Key="AccentPurple" Color="#6750A4"/>
+        <SolidColorBrush x:Key="DangerRed" Color="#C62828"/>
+        <SolidColorBrush x:Key="WarningOrange" Color="#EF6C00"/>
+
+        --><!-- Style TextBox --><!--
+        <Style x:Key="CyberInput" TargetType="TextBox">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Background" Value="#FAFAFA"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" CornerRadius="10" Background="{TemplateBinding Background}" BorderBrush="#E0E0E0" BorderThickness="1.5">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource DangerRed}"/>
+                                <Setter TargetName="border" Property="Background" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        --><!-- Style AnimationButton --><!--
+        <Style x:Key="AnimatedButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="btnBorder" CornerRadius="12" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        --><!-- Style : DataGridView เหมือนกับ ตารางแรก --><!--
+        <Style x:Key="CenterBoldColumnStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        --><!-- Style DataGridView : SummaryStock --><!--
+        <Style x:Key="SummaryStockStyle" TargetType="TextBlock" BasedOn="{StaticResource CenterBoldColumnStyle}">
+            <Setter Property="Foreground" Value="{StaticResource DangerRed}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        
+    </Page.Resources>
+    --><!-- End Function -->
+
+    <!-- Function Animation Control --><!--
+    <Page.RenderTransform>
+        <TranslateTransform x:Name="PageTransform" Y="30"/>
+    </Page.RenderTransform>
+    --><!-- End Function -->
+    
+    <!-- Function ContainerBody Control --><!--
+    <Border x:Name="MainBorder" 
+            Background="White" 
+            CornerRadius="25" 
+            Padding="30" 
+            Margin="20"
+            BorderBrush="#F0F0F0"
+            BorderThickness="1">
+
+        <Grid>
+            
+            --><!-- ResponSive Function --><!--
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            --><!-- End Function -->
+
+            <!-- Function Multi-Scanner --><!--
+            <StackPanel Grid.Row="0">
+                <TextBlock Text="║▌║║▌║ MULTI-SCANNER ( OUT )" FontSize="26" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,10"/>
+                <Separator Background="#EEE" Margin="0,0,0,0" Height="1.5"/>
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="350"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="SCAN BARCODE" FontWeight="Bold" Foreground="#999" Margin="5,10,0,6" FontSize="13"/>
+                        <TextBox x:Name="txtBarcodeInput" Style="{StaticResource CyberInput}" 
+             Text="{Binding BarcodeInput, UpdateSourceTrigger=PropertyChanged}" 
+             KeyDown="txtBarcodeInput_KeyDown" 
+             TextChanged="txtBarcodeInput_TextChanged"
+             HorizontalContentAlignment="Center" FontSize="18" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+            --><!-- End Function -->
+            
+            <!-- Function Grid : TextBlock Sceen --><!--
+            <Border Grid.Row="1" Background="#FFF5F5" CornerRadius="15" Padding="15" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Width="100" Height="100" Background="White" CornerRadius="12" Margin="5,0,20,0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="8" Color="#000" Opacity="0.06" ShadowDepth="1"/>
+                        </Border.Effect>
+
+                        <Image Source="{Binding ShowProductImage, UpdateSourceTrigger=PropertyChanged}" 
+                   Stretch="Uniform" 
+                   Margin="8"
+                   HorizontalAlignment="Center" 
+                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="PART DESCRIPTION" FontSize="12" Foreground="#C62828" FontWeight="ExtraBold" Margin="0,0,0,3"/>
+                        <TextBlock Text="{Binding ShowName, FallbackValue='Waiting for scan...'}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource MainPurple}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding ShowCode, FallbackValue='Code: -'}" FontSize="14" Foreground="#666" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="QTY OUT" FontSize="11" Foreground="#666" HorizontalAlignment="Right" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding ShowQty, FallbackValue='0'}" FontSize="42" FontWeight="Black" Foreground="{StaticResource DangerRed}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            --><!-- End Function -->
+            
+            <!-- Function Grid : DataGridView --><!--
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0">
+                    <TextBlock DockPanel.Dock="Top" Text="DAILY OUTGOING" FontWeight="ExtraBold" Foreground="#888" Margin="5,0,0,10"/>
+                    <DataGrid x:Name="dgTodayOut" ItemsSource="{Binding ScannedItems}" AutoGenerateColumns="False" FontSize="14" 
+              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell"
+              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single" Focusable="False"  
+              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*">
+
+                        --><!-- Function DataGrid : HeaderColumn --><!--
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="BorderBrush" Value="#66FFFFFF"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+                        --><!-- End Function -->
+
+                        <!-- Function HeaderColumn --><!--
+                        <DataGrid.Columns>
+                            
+                            --><!-- Function HeaderColumn : Product Code --><!--
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+                            
+                            <!-- Function HeaderColumn : QTY --><!--
+                            <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+                            
+                            <!-- Function HeaderColumn : STATUS --><!--
+                            <DataGridTemplateColumn Header="STATUS" Width="0.8*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="15" Padding="13,6" Background="#FFEBEE" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="OUT" Foreground="{StaticResource DangerRed}" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            --><!-- End Function -->
+                            
+                            <!-- Function HeaderColumn : DATETIME --><!--
+                            <DataGridTextColumn Header="DATETIME" Binding="{Binding UpdateTime, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Width="1.5*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function --><!--
+                            
+                        </DataGrid.Columns>
+                        --><!-- End Function --><!--
+
+                    </DataGrid>
+                </DockPanel>
+
+                <DockPanel Grid.Column="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Daily Stock Movement Summary" FontWeight="ExtraBold" Foreground="#888" Margin="5,0,0,10" FontSize="13"/>
+                    <DataGrid x:Name="dgHistory" ItemsSource="{Binding HistoryItems}" AutoGenerateColumns="False" FontSize="14" 
+              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell" 
+              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA"  SelectionMode="Single"
+              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*">
+
+                        --><!-- Function DataGrid : HeaderColumn --><!--
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+                        --><!-- End Function -->
+                        
+                        <!-- Function HeaderColumn --><!--
+                        <DataGrid.Columns>
+                            
+                            --><!-- Function HeaderColumn : Product Code --><!--
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.9*" 
+                        ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+
+                            <!-- Function HeaderColumn : IN (FREQ.) --><!--
+                            <DataGridTextColumn Header="IN (FREQ.)" Binding="{Binding InCount}" Width="0.9*" 
+                        ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+
+                            <!-- Function HeaderColumn : OUT (FREQ.) --><!--
+                            <DataGridTextColumn Header="OUT (FREQ.)" Binding="{Binding OutCount}" Width="1.1*" 
+                        ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+
+                            <!-- Function HeaderColumn : IN (QTY) --><!--
+                            <DataGridTextColumn Header="IN (QTY)" Binding="{Binding TotalInQty}" Width="0.9*" 
+                        ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+
+                            <!-- Function HeaderColumn : OUT (QTY) --><!--
+                            <DataGridTextColumn Header="OUT (QTY)" Binding="{Binding TotalOutQty}" Width="1.0*" 
+                        ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            --><!-- End Function -->
+                            
+                            <!-- Function HeaderColumn : INVENTORY BALANCE --><!--
+                            <DataGridTextColumn Header="INVENTORY BALANCE" Binding="{Binding FinalStock}" Width="1.8*" 
+                        ElementStyle="{StaticResource SummaryStockStyle}"/>
+                            --><!-- End Function --><!--
+                            
+                        </DataGrid.Columns>
+                        --><!-- End Function --><!--
+                        
+                    </DataGrid>
+                </DockPanel>
+            </Grid>
+            --><!-- End Function --><!--
+        </Grid>
+    </Border>
+    --><!-- End Function --><!--
+</Page>-->
+
+
+
+<!--<Page x:Class="CIMS.Views.ScanOutView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:helpers="clr-namespace:CIMS.Helpers"
+      Title="Multi-Scanner ( OUT )" Background="Transparent"
+      RenderTransformOrigin="0.5,0.5">
+
+    --><!-- Style --><!--
+    <Page.Resources>
+        <helpers:BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+
+        <SolidColorBrush x:Key="MainPurple" Color="#49454F"/>
+        <SolidColorBrush x:Key="AccentPurple" Color="#6750A4"/>
+        <SolidColorBrush x:Key="DangerRed" Color="#C62828"/>
+        <SolidColorBrush x:Key="WarningOrange" Color="#EF6C00"/>
+
+        --><!-- Style TextBox --><!--
+        <Style x:Key="CyberInput" TargetType="TextBox">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Background" Value="#FAFAFA"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" CornerRadius="10" Background="{TemplateBinding Background}" BorderBrush="#E0E0E0" BorderThickness="1.5">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource DangerRed}"/>
+                                <Setter TargetName="border" Property="Background" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        --><!-- Style AnimationButton --><!--
+        <Style x:Key="AnimatedButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="btnBorder" CornerRadius="12" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CenterBoldColumnStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style x:Key="SummaryStockStyle" TargetType="TextBlock" BasedOn="{StaticResource CenterBoldColumnStyle}">
+            <Setter Property="Foreground" Value="{StaticResource DangerRed}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+    </Page.Resources>
+
+    <Page.RenderTransform>
+        <TranslateTransform x:Name="PageTransform" Y="30"/>
+    </Page.RenderTransform>
+
+    <Border x:Name="MainBorder" 
+            Background="White" 
+            CornerRadius="25" 
+            Padding="30" 
+            Margin="20"
+            BorderBrush="#F0F0F0"
+            BorderThickness="1">
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            --><!-- Function Multi-Scanner --><!--
+            <StackPanel Grid.Row="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="║▌║║▌║ MULTI-SCANNER ( OUT )" FontSize="26" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,15,10" VerticalAlignment="Center"/>
+
+                        --><!-- 🚀 ป้ายไฟแจ้งเตือนโหมด Test --><!--
+                        <Border Background="#ED6C02" CornerRadius="8" Padding="10,4" Height="28" VerticalAlignment="Center" Visibility="{Binding TestBannerVisibility}">
+                            <TextBlock Text="⚠️ TEST MODE ACTIVE (บันทึกลอย)" Foreground="White" FontWeight="Bold" FontSize="12"/>
+                        </Border>
+                    </StackPanel>
+
+                    --><!-- 🚀 ปุ่มสลับโหมด Test / ยกเลิก Test --><!--
+                    <Button Grid.Column="1" Content="{Binding TestButtonText}" 
+                            Command="{Binding ToggleTestModeCommand}"
+                            Background="{Binding TestButtonBackground}" 
+                            Style="{StaticResource AnimatedButton}" 
+                            Width="160" Height="38" FontSize="13"/>
+                </Grid>
+
+                <Separator Background="#EEE" Margin="0,5,0,0" Height="1.5"/>
+
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="350"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="SCAN BARCODE" FontWeight="Bold" Foreground="#999" Margin="5,10,0,6" FontSize="13"/>
+                        <TextBox x:Name="txtBarcodeInput" Style="{StaticResource CyberInput}" 
+                                 Text="{Binding BarcodeInput, UpdateSourceTrigger=PropertyChanged}" 
+                                 KeyDown="txtBarcodeInput_KeyDown" 
+                                 TextChanged="txtBarcodeInput_TextChanged"
+                                 HorizontalContentAlignment="Center" FontSize="18" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            --><!-- Function Grid : TextBlock Sceen --><!--
+            <Border Grid.Row="1" Background="#FFF5F5" CornerRadius="15" Padding="15" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Width="100" Height="100" Background="White" CornerRadius="12" Margin="5,0,20,0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="8" Color="#000" Opacity="0.06" ShadowDepth="1"/>
+                        </Border.Effect>
+
+                        <Image Source="{Binding ShowProductImage, UpdateSourceTrigger=PropertyChanged}" 
+                               Stretch="Uniform" 
+                               Margin="8"
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="PART DESCRIPTION" FontSize="12" Foreground="#C62828" FontWeight="ExtraBold" Margin="0,0,0,3"/>
+                        <TextBlock Text="{Binding ShowName, FallbackValue='Waiting for scan...'}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource MainPurple}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding ShowCode, FallbackValue='Code: -'}" FontSize="14" Foreground="#666" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="QTY OUT" FontSize="11" Foreground="#666" HorizontalAlignment="Right" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding ShowQty, FallbackValue='0'}" FontSize="42" FontWeight="Black" Foreground="{StaticResource DangerRed}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            --><!-- Function Grid : DataGridView --><!--
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0">
+                    <Grid DockPanel.Dock="Top" Margin="5,0,0,10">
+                        --><!-- หัวตารางโหมดปกติ --><!--
+                        <TextBlock Text="DAILY OUTGOING" FontWeight="ExtraBold" Foreground="#888">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTestMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        --><!-- หัวตารางโหมด Test --><!--
+                        <TextBlock Text="TEST SCAN RESULT (ตารางสแกนบันทึกลอย)" FontWeight="ExtraBold" Foreground="#ED6C02" Visibility="{Binding TestBannerVisibility}"/>
+                    </Grid>
+
+                    --><!-- 1. ตารางสแกนออกจริง (แสดงเมื่อไม่ได้อยู่ในโหมด Test) --><!--
+                    <DataGrid x:Name="dgTodayOut" ItemsSource="{Binding ScannedItems}" AutoGenerateColumns="False" FontSize="14" 
+                              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single" Focusable="False"  
+                              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*">
+                        <DataGrid.Style>
+                            <Style TargetType="DataGrid">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTestMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Style>
+
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="BorderBrush" Value="#66FFFFFF"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTemplateColumn Header="STATUS" Width="0.8*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="15" Padding="13,6" Background="#FFEBEE" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="OUT" Foreground="{StaticResource DangerRed}" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="DATETIME" Binding="{Binding UpdateTime, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Width="1.5*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    --><!-- 2. 🚀 ตารางที่ 2: ตารางแสดงผลเฉพาะโหมด TEST (บันทึกลอย) สลับขึ้นมาแทนเมื่อกด Test --><!--
+                    <DataGrid x:Name="dgTestOut" ItemsSource="{Binding TestScannedItems}" AutoGenerateColumns="False" FontSize="14" 
+                              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single" Focusable="False"  
+                              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*" Visibility="{Binding TestBannerVisibility}">
+
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#ED6C02"/>
+                                --><!-- หัวตารางสีส้มสำหรับแยกแยะโหมด Test --><!--
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="BorderBrush" Value="#66FFFFFF"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTemplateColumn Header="STATUS" Width="0.8*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="15" Padding="13,6" Background="#FFF3E0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="TEST" Foreground="#ED6C02" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="DATETIME" Binding="{Binding UpdateTime, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Width="1.5*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+
+                --><!-- Daily Stock Movement Summary (ตารางฝั่งขวา) --><!--
+                <DockPanel Grid.Column="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Daily Stock Movement Summary" FontWeight="ExtraBold" Foreground="#888" Margin="5,0,0,10" FontSize="13"/>
+                    <DataGrid x:Name="dgHistory" ItemsSource="{Binding HistoryItems}" AutoGenerateColumns="False" FontSize="14" 
+                              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell" 
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single"
+                              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*">
+
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="IN (FREQ.)" Binding="{Binding InCount}" Width="0.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="OUT (FREQ.)" Binding="{Binding OutCount}" Width="1.1*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="IN (QTY)" Binding="{Binding TotalInQty}" Width="0.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="OUT (QTY)" Binding="{Binding TotalOutQty}" Width="1.0*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="INVENTORY BALANCE" Binding="{Binding FinalStock}" Width="1.8*" ElementStyle="{StaticResource SummaryStockStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Page>-->
+    
+    
+    
+    
+    
+    
+    
+    
+<Page x:Class="CIMS.Views.ScanOutView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:helpers="clr-namespace:CIMS.Helpers"
+      Title="Multi-Scanner ( OUT )" Background="Transparent"
+      RenderTransformOrigin="0.5,0.5">
+
+    <!-- Style -->
+    <Page.Resources>
+        <!-- Style TextBox -->
+        <Style x:Key="CyberInput" TargetType="TextBox">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Background" Value="#FAFAFA"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" CornerRadius="10" Background="{TemplateBinding Background}" BorderBrush="#E0E0E0" BorderThickness="1.5">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource DangerRed}"/>
+                                <Setter TargetName="border" Property="Background" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style AnimationButton -->
+        <Style x:Key="AnimatedButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="btnBorder" CornerRadius="12" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CenterBoldColumnStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style x:Key="SummaryStockStyle" TargetType="TextBlock" BasedOn="{StaticResource CenterBoldColumnStyle}">
+            <Setter Property="Foreground" Value="{StaticResource DangerRed}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+    </Page.Resources>
+
+    <Page.RenderTransform>
+        <TranslateTransform x:Name="PageTransform" Y="30"/>
+    </Page.RenderTransform>
+
+    <Border x:Name="MainBorder" 
+            Background="White" 
+            CornerRadius="25" 
+            Padding="30" 
+            Margin="20"
+            BorderBrush="#F0F0F0"
+            BorderThickness="1">
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Function Multi-Scanner -->
+            <StackPanel Grid.Row="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="║▌║║▌║ MULTI-SCANNER ( OUT )" FontSize="26" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,15,10" VerticalAlignment="Center"/>
+
+                        <!-- ป้ายไฟแจ้งเตือนโหมด Test -->
+                        <Border Background="#ED6C02" CornerRadius="8" Padding="10,4" Height="28" VerticalAlignment="Center" Visibility="{Binding TestBannerVisibility}">
+                            <TextBlock Text="⚠️ TEST MODE ACTIVE (บันทึกลอย)" Foreground="White" FontWeight="Bold" FontSize="12"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ปุ่มสลับโหมด Test / ยกเลิก Test -->
+                    <Button Grid.Column="1" Content="{Binding TestButtonText}" 
+                            Command="{Binding ToggleTestModeCommand}"
+                            Background="{Binding TestButtonBackground}" 
+                            Style="{StaticResource AnimatedButton}" 
+                            Width="160" Height="38" FontSize="13"/>
+                </Grid>
+
+                <Separator Background="#EEE" Margin="0,5,0,0" Height="1.5"/>
+
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="350"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="SCAN BARCODE" FontWeight="Bold" Foreground="#999" Margin="5,10,0,6" FontSize="13"/>
+                        <TextBox x:Name="txtBarcodeInput" Style="{StaticResource CyberInput}" 
+                                 Text="{Binding BarcodeInput, UpdateSourceTrigger=PropertyChanged}" 
+                                 KeyDown="txtBarcodeInput_KeyDown" 
+                                 TextChanged="txtBarcodeInput_TextChanged"
+                                 HorizontalContentAlignment="Center" FontSize="18" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <!-- Function Grid : TextBlock Screen -->
+            <Border Grid.Row="1" Background="#FFF5F5" CornerRadius="15" Padding="15" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ปรับปรุงจุดนี้: ถอด DropShadowEffect ออก และใช้ BorderBrush/Thickness แทนเพื่อให้เสถียรเหมือน ScanIn -->
+                    <Border Grid.Column="0" Width="100" Height="100" Background="White" CornerRadius="12" Margin="5,0,20,0" BorderBrush="#E0E0E0" BorderThickness="1">
+                        <Image Source="{Binding ShowProductImage, UpdateSourceTrigger=PropertyChanged}" 
+                               Stretch="Uniform" 
+                               Margin="8"
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="PART DESCRIPTION" FontSize="12" Foreground="#C62828" FontWeight="ExtraBold" Margin="0,0,0,3"/>
+                        <TextBlock Text="{Binding ShowName, FallbackValue='Waiting for scan...'}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource MainPurple}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding ShowCode, FallbackValue='Code: -'}" FontSize="14" Foreground="#666" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="QTY OUT" FontSize="11" Foreground="#666" HorizontalAlignment="Right" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding ShowQty, FallbackValue='0'}" FontSize="42" FontWeight="Black" Foreground="{StaticResource DangerRed}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Function Grid : DataGridView -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0">
+                    <Grid DockPanel.Dock="Top" Margin="5,0,0,10">
+                        <!-- หัวตารางโหมดปกติ -->
+                        <TextBlock Text="DAILY OUTGOING" FontWeight="ExtraBold" Foreground="#888">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsTestMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <!-- หัวตารางโหมด Test -->
+                        <TextBlock Text="TEST SCAN RESULT (ตารางสแกนบันทึกลอย)" FontWeight="ExtraBold" Foreground="#ED6C02" Visibility="{Binding TestBannerVisibility}"/>
+                    </Grid>
+
+                    <!-- 1. ตารางสแกนออกจริง (แสดงเมื่อไม่ได้อยู่ในโหมด Test) -->
+                    <DataGrid x:Name="dgTodayOut" ItemsSource="{Binding ScannedItems}" AutoGenerateColumns="False" FontSize="14" 
+                              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single" Focusable="False"  
+                              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*">
+                        <DataGrid.Style>
+                            <Style TargetType="DataGrid">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTestMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Style>
+
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="BorderBrush" Value="#66FFFFFF"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTemplateColumn Header="STATUS" Width="0.8*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="15" Padding="13,6" Background="#FFEBEE" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="OUT" Foreground="{StaticResource DangerRed}" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="DATETIME" Binding="{Binding UpdateTime, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Width="1.5*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- 2. ตารางแสดงผลเฉพาะโหมด TEST (บันทึกลอย) -->
+                    <DataGrid x:Name="dgTestOut" ItemsSource="{Binding TestScannedItems}" AutoGenerateColumns="False" FontSize="14" 
+                              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single" Focusable="False"  
+                              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*" Visibility="{Binding TestBannerVisibility}">
+
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#ED6C02"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                <Setter Property="BorderBrush" Value="#66FFFFFF"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTemplateColumn Header="STATUS" Width="0.8*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="15" Padding="13,6" Background="#FFF3E0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="TEST" Foreground="#ED6C02" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="DATETIME" Binding="{Binding UpdateTime, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Width="1.5*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+
+                <!-- Daily Stock Movement Summary (ตารางฝั่งขวา) -->
+                <DockPanel Grid.Column="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Daily Stock Movement Summary" FontWeight="ExtraBold" Foreground="#888" Margin="5,0,0,10" FontSize="13"/>
+                    <DataGrid x:Name="dgHistory" ItemsSource="{Binding HistoryItems}" AutoGenerateColumns="False" FontSize="14" 
+                              IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" HeadersVisibility="Column" SelectionUnit="Cell" 
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" VerticalGridLinesBrush="#EAEAEA" SelectionMode="Single"
+                              HorizontalScrollBarVisibility="Disabled" ColumnWidth="*">
+
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Height" Value="50"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="Padding" Value="10,12"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartACode}" Width="1.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="IN (FREQ.)" Binding="{Binding InCount}" Width="0.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="OUT (FREQ.)" Binding="{Binding OutCount}" Width="1.1*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="IN (QTY)" Binding="{Binding TotalInQty}" Width="0.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="OUT (QTY)" Binding="{Binding TotalOutQty}" Width="1.0*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn Header="INVENTORY BALANCE" Binding="{Binding FinalStock}" Width="1.8*" ElementStyle="{StaticResource SummaryStockStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Page>

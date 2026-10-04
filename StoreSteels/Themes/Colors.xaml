@@ -1,0 +1,49 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Shared "Cyber" theme color tokens, collected from the per-page copies that used
+        to be redeclared in every View's Resources block (MainView, PRView, ScanInView,
+        ScanOutView, StoreMaxMinView, ManageUserView, ProductControlView,
+        UserDetailWindow). Kept here so every window/page in the app shares one palette.
+    -->
+
+    <SolidColorBrush x:Key="MainPurple" Color="#49454F"/>
+    <SolidColorBrush x:Key="AccentPurple" Color="#6750A4"/>
+    <SolidColorBrush x:Key="CyberPurple" Color="#6750A4"/>
+    <SolidColorBrush x:Key="CyberPink" Color="#D0BCFF"/>
+    <SolidColorBrush x:Key="DeepDark" Color="#1A1C1E"/>
+    <SolidColorBrush x:Key="SoftGray" Color="#F4F4F9"/>
+
+    <SolidColorBrush x:Key="SuccessGreen" Color="#2E7D32"/>
+    <SolidColorBrush x:Key="ResultGreen" Color="#2E7D32"/>
+    <SolidColorBrush x:Key="DangerRed" Color="#C62828"/>
+    <SolidColorBrush x:Key="DestructiveRed" Color="#C62828"/>
+    <SolidColorBrush x:Key="WarningOrange" Color="#EF6C00"/>
+
+    <SolidColorBrush x:Key="ExcelOrange" Color="#D84315"/>
+    <SolidColorBrush x:Key="ExcelBlue" Color="#1565C0"/>
+    <SolidColorBrush x:Key="ActionBlue" Color="#1976D2"/>
+
+    <!-- Was referenced by MainView.xaml (Window Background="{StaticResource BgLight}") but never
+         defined anywhere in the project, which would throw a XamlParseException the first time
+         MainView loaded. Restored here using the same light neutral DashboardView already uses. -->
+    <SolidColorBrush x:Key="BgLight" Color="#F4F6F9"/>
+
+    <!-- Also referenced only by MainView.xaml's sidebar/header (PrimaryColor, PrimaryDark,
+         AccentColor). Sidebar/header use the requested "MainPurple" tone (#49454F). PrimaryDark
+         is a darkened shade of it for the logo strip, AccentColor is White to match the same
+         white-icon-via-OpacityMask trick already used elsewhere in MainView.xaml (the down-arrow
+         and logout icons). -->
+    <SolidColorBrush x:Key="PrimaryColor" Color="#49454F"/>
+    <SolidColorBrush x:Key="PrimaryDark" Color="#332F38"/>
+    <SolidColorBrush x:Key="AccentColor" Color="White"/>
+
+    <!--
+        NOTE: "MintGreen" is intentionally NOT centralized here. ManageUserView.xaml defines it as
+        #4CAF50 and ProductControlView.xaml defines it as #2DFFB4 - two different colors sharing the
+        same key name. Merging them would silently change one page's look, so each page keeps its
+        own local MintGreen declaration.
+    -->
+
+</ResourceDictionary>

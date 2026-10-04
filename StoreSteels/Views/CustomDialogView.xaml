@@ -1,0 +1,89 @@
+﻿<Window x:Class="CIMS.Views.CustomDialogView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Notification" Width="380" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Topmost="True">
+
+    <Window.Resources>
+        <Style x:Key="DialogButton" TargetType="Button">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="8" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="MainBorder" Background="#212121" CornerRadius="20" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Color="Black" Opacity="0.6"/>
+        </Border.Effect>
+
+        <Border.RenderTransform>
+            <ScaleTransform x:Name="WindowScale" CenterX="190" CenterY="100" ScaleX="0.8" ScaleY="0.8"/>
+        </Border.RenderTransform>
+
+        <Grid Margin="25">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Ellipse x:Name="StatusCircle" Width="60" Height="60" Fill="Transparent" VerticalAlignment="Top"
+         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform x:Name="CircleRotate" Angle="0"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <TextBlock x:Name="txtIcon" Text="" Foreground="White" FontSize="32" FontWeight="Bold" 
+           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-12,0,0"
+           RenderTransformOrigin="0.5,0.5">
+                    <TextBlock.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="IconScale" ScaleX="1" ScaleY="1"/>
+                            <TranslateTransform x:Name="IconTranslate" X="0" Y="0"/>
+                        </TransformGroup>
+                    </TextBlock.RenderTransform>
+                </TextBlock>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Margin="0,20,0,15">
+                <TextBlock x:Name="lblTitle" Text="Title" Foreground="White" FontSize="20" 
+                           FontWeight="Black" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="lblMessage" Text="Message content here..." Foreground="#AAAAAA" 
+                           FontSize="13" HorizontalAlignment="Center" TextAlignment="Center" 
+                           TextWrapping="Wrap" Margin="0,8,0,0"/>
+            </StackPanel>
+
+            <Grid Grid.Row="2">
+                <StackPanel x:Name="ButtonPanel" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="btnConfirm" Content="CONFIRM" Style="{StaticResource DialogButton}" 
+                            Background="#6750A4" Click="Confirm_Click" Margin="5"/>
+                    <Button x:Name="btnCancel" Content="CANCEL" Style="{StaticResource DialogButton}" 
+                            Background="#424242" Click="Cancel_Click" Margin="5"/>
+                </StackPanel>
+
+                <ProgressBar x:Name="progTime" Height="3" VerticalAlignment="Bottom" Background="Transparent" 
+                             Foreground="#4CAF50" BorderThickness="0" Minimum="0" Maximum="100" 
+                             Value="100" Visibility="Collapsed"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

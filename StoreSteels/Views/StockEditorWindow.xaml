@@ -1,0 +1,160 @@
+﻿<Window x:Class="CIMS.Views.StockEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Stock Settings" Width="780" SizeToContent="Height" MaxHeight="900"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+
+    <!-- ตั้งค่าคลัง (เพิ่ม / แก้ไข): ชื่อ-รหัส-หน่วย, คอลัมน์ที่แสดง, ช่องทางรับเข้า/จ่ายออก, รูปแบบบาร์โค้ด Supplier -->
+
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header (ลากหน้าต่างได้) -->
+            <Border Grid.Row="0" Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,18" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel>
+                    <TextBlock x:Name="txtTitle" Text="ADD STOCK" Foreground="White" FontSize="20" FontWeight="Black"/>
+                    <TextBlock x:Name="txtSubtitle" Text="Create a new stock" Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="26,20,26,6">
+                <StackPanel>
+
+                    <!-- 1) ข้อมูลคลัง -->
+                    <Border Style="{StaticResource StkSection}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="1.4*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="130"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="STOCK CODE" Style="{StaticResource StkLabel}"/>
+                                <TextBox x:Name="txtCode" Style="{StaticResource StkInput}" MaxLength="30" Tag="e.g. Stock-OUT01"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="STOCK NAME" Style="{StaticResource StkLabel}"/>
+                                <TextBox x:Name="txtName" Style="{StaticResource StkInput}" MaxLength="100" Tag="e.g. Outside Warehouse"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="UNIT" Style="{StaticResource StkLabel}"/>
+                                <ComboBox x:Name="cbUnit" Style="{StaticResource StkCombo}">
+                                    <ComboBoxItem Content="KG"/>
+                                    <ComboBoxItem Content="PCS"/>
+                                    <ComboBoxItem Content="SHEET"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 2) คอลัมน์ในตาราง -->
+                    <Border Style="{StaticResource StkSection}">
+                        <StackPanel>
+                            <TextBlock Text="TABLE COLUMNS" Style="{StaticResource StkLabel}"/>
+                            <WrapPanel>
+                                <CheckBox x:Name="chkColNo" Content="NO." Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColImage" Content="IMAGE" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColCustomer" Content="CUSTOMER" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColCode" Content="PD CODE" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColPartA" Content="PART A" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColPartNo" Content="PART NO" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColModel" Content="MODEL" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColName" Content="PRODUCT NAME" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkMaxMin" Content="MAX / MIN" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColQty" Content="QTY" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColStockBox" Content="STOCK (BOX)" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColStockPcs" Content="STOCK (PCS)" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColRemark" Content="REMARK" Style="{StaticResource StkChip}"/>
+                            </WrapPanel>
+                            <TextBlock Text="NO. = running number inside each group.  MAX / MIN also controls the STATUS column and the MAX Stock / MIN Stock filters.  STOCK (BOX) = QTY / PACKSIZE."
+                                       FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" Margin="2,2,0,10" TextWrapping="Wrap"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="GROUP TABLE BY" Style="{StaticResource StkLabel}"/>
+                                    <ComboBox x:Name="cbGroupBy" Style="{StaticResource StkCombo}">
+                                        <ComboBoxItem Content="CATEGORY"/>
+                                        <ComboBoxItem Content="CUSTOMER"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="MAX / MIN UNIT" Style="{StaticResource StkLabel}"/>
+                                    <ComboBox x:Name="cbMaxMinBasis" Style="{StaticResource StkCombo}">
+                                        <ComboBoxItem Content="KG"/>
+                                        <ComboBoxItem Content="PCS"/>
+                                        <ComboBoxItem Content="SHEET"/>
+                                        <ComboBoxItem Content="BOX"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 3) ช่องทางรับเข้า / จ่ายออก -->
+                    <Border Style="{StaticResource StkSection}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="RECEIVE ( IN )" Style="{StaticResource StkLabel}"/>
+                                <WrapPanel>
+                                    <CheckBox x:Name="chkInPickList" Content="PICK LIST QR" Style="{StaticResource StkChip}"/>
+                                    <CheckBox x:Name="chkInSupplier" Content="SUPPLIER LABEL" Style="{StaticResource StkChip}" Checked="Channel_Changed" Unchecked="Channel_Changed"/>
+                                    <CheckBox x:Name="chkInSysQr" Content="SYSTEM QR" Style="{StaticResource StkChip}"/>
+                                    <CheckBox x:Name="chkInExcel" Content="IMPORT EXCEL" Style="{StaticResource StkChip}"/>
+                                </WrapPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="ISSUE ( OUT )" Style="{StaticResource StkLabel}"/>
+                                <WrapPanel>
+                                    <CheckBox x:Name="chkOutPickList" Content="PICK LIST QR" Style="{StaticResource StkChip}"/>
+                                    <CheckBox x:Name="chkOutSupplier" Content="SUPPLIER LABEL" Style="{StaticResource StkChip}" Checked="Channel_Changed" Unchecked="Channel_Changed"/>
+                                    <CheckBox x:Name="chkOutSysQr" Content="SYSTEM QR" Style="{StaticResource StkChip}"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 4) รูปแบบป้าย Supplier ที่คลังนี้รับ -->
+                    <Border x:Name="pnlFormats" Style="{StaticResource StkSection}">
+                        <StackPanel>
+                            <Grid>
+                                <TextBlock Text="SUPPLIER LABEL FORMATS" Style="{StaticResource StkLabel}" VerticalAlignment="Center"/>
+                                <Button x:Name="btnManageFormats" Content="🏷 MANAGE FORMATS" Style="{StaticResource StkCardButton}"
+                                        HorizontalAlignment="Right" Click="ManageFormats_Click"/>
+                            </Grid>
+                            <WrapPanel x:Name="wpFormats" Margin="0,6,0,0"/>
+                            <TextBlock x:Name="txtNoFormats" Text="No barcode format yet - click MANAGE FORMATS to add one."
+                                       FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="26,6,26,22">
+                <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Margin="0,0,10,0" Click="Cancel_Click"/>
+                <Button x:Name="btnSave" Content="SAVE" Style="{StaticResource StkButton}" Background="{StaticResource AccentPurple}" MinWidth="140" Click="Save_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

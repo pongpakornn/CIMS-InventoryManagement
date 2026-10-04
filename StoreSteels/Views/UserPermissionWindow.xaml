@@ -1,0 +1,174 @@
+<Window x:Class="CIMS.Views.UserPermissionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="User Permission" Width="1000" Height="820"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 🔑 กำหนดสิทธิ์ผู้ใช้ทุกระบบ + ทุกคลัง (VIEW / ADD / EDIT / DEL / APPROVE) - โหมดดูอย่างเดียวใช้กับปุ่ม VIEW -->
+    <Window.Resources>
+        <!-- 🔘 Toggle switch: ON = ม่วง + ปุ่มกลมเลื่อนไปขวา / OFF = เทา -->
+        <Style x:Key="PermCheck" TargetType="CheckBox">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="track" Width="46" Height="24" CornerRadius="12" Background="#D9D4E0" BorderBrush="#C9C2D3" BorderThickness="1">
+                            <Grid>
+                                <Ellipse x:Name="knob" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3" Color="Black"/>
+                                    </Ellipse.Effect>
+                                    <Ellipse.RenderTransform>
+                                        <TranslateTransform x:Name="knobShift" X="0"/>
+                                    </Ellipse.RenderTransform>
+                                </Ellipse>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="track" Property="Background" Value="#6750A4"/>
+                                <Setter TargetName="track" Property="BorderBrush" Value="#6750A4"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="knobShift" Storyboard.TargetProperty="X" To="22" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="knobShift" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="track" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="track" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="#6750A4" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock x:Name="txtTitle" Text="🔑 PERMISSION" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock x:Name="txtUser" Foreground="#E8DEF8" FontSize="13" FontWeight="Bold" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Cancel_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <!-- ข้อมูลผู้ใช้ (โหมด VIEW) -->
+            <WrapPanel x:Name="pnlProfile" Grid.Row="1" Margin="26,14,26,0"/>
+
+            <Border x:Name="pnlLevel1" Grid.Row="2" Background="#FFF3E0" CornerRadius="12" Padding="14,8" Margin="26,12,26,0" Visibility="Collapsed">
+                <TextBlock Text="LEVEL 1 (ADMIN) can see and do everything without these settings."
+                           FontWeight="Bold" FontSize="12" Foreground="#E65100" TextWrapping="Wrap"/>
+            </Border>
+
+            <Grid Grid.Row="3" Margin="26,12,26,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border Background="{StaticResource MainPurple}" CornerRadius="10" Padding="14,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="90"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="SYSTEM" Foreground="White" FontWeight="Black"/>
+                        <TextBlock Grid.Column="1" Text="VIEW" Foreground="White" FontWeight="Black" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="ADD" Foreground="White" FontWeight="Black" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="EDIT" Foreground="White" FontWeight="Black" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="4" Text="DEL" Foreground="White" FontWeight="Black" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="5" Text="APPROVE" Foreground="White" FontWeight="Black" HorizontalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
+                    <ItemsControl x:Name="icPerms">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding GroupTitle}" FontWeight="Black" FontSize="12" Foreground="#6750A4" Margin="6,10,0,4">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding GroupTitle}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Border Padding="14,8" BorderBrush="#F2F0F5" BorderThickness="0,0,0,1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="90"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                                <TextBlock Text="{Binding Hint}" FontWeight="SemiBold" FontSize="11" Foreground="#8A8490" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <CheckBox Grid.Column="1" Style="{StaticResource PermCheck}" IsChecked="{Binding View, Mode=TwoWay}"/>
+                                            <CheckBox Grid.Column="2" Style="{StaticResource PermCheck}" IsChecked="{Binding Add, Mode=TwoWay}"/>
+                                            <CheckBox Grid.Column="3" Style="{StaticResource PermCheck}" IsChecked="{Binding Edit, Mode=TwoWay}"/>
+                                            <CheckBox Grid.Column="4" Style="{StaticResource PermCheck}" IsChecked="{Binding Delete, Mode=TwoWay}"/>
+                                            <CheckBox Grid.Column="5" Style="{StaticResource PermCheck}" IsChecked="{Binding Approve, Mode=TwoWay}"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid Grid.Row="4" Margin="26,12,26,20">
+                <StackPanel x:Name="pnlQuick" Orientation="Horizontal">
+                    <Button Content="VIEW ALL" Style="{StaticResource StkButton}" Background="#49454F" Click="ViewAll_Click" Margin="0,0,8,0"/>
+                    <Button Content="SELECT ALL" Style="{StaticResource StkButton}" Background="#49454F" Click="All_Click" Margin="0,0,8,0"/>
+                    <Button Content="CLEAR" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Clear_Click"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="btnCancel" Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="btnSave" Content="SAVE PERMISSION" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Save_Click"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

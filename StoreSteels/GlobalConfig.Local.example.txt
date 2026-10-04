@@ -1,0 +1,13 @@
+// ตัวอย่างไฟล์ตั้งค่าเครื่อง: คัดลอกไฟล์นี้เป็น "GlobalConfig.Local.cs" (โฟลเดอร์เดียวกับ GlobalConfig.cs) แล้วใส่ค่าจริง
+// GlobalConfig.Local.cs ไม่ขึ้น GitHub (.gitignore) - ห้าม commit ค่าจริง
+namespace CIMS.Core
+{
+    public static partial class GlobalConfig
+    {
+        static partial void ApplyLocal(ref string connStr, ref string erpConnStr)
+        {
+            connStr = @"Server=<DB-SERVER>; Database=<DATABASE>; User ID=<USER>; Password=<PASSWORD>; TrustServerCertificate=True;";
+            erpConnStr = @"Server=<ERP-SERVER>; Database=<ERP-DATABASE>; User ID=<USER>; Password=<PASSWORD>; TrustServerCertificate=True; Encrypt=False; ApplicationIntent=ReadOnly;";
+        }
+    }
+}

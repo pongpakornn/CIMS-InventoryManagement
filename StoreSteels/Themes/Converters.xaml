@@ -1,0 +1,24 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:conv="clr-namespace:CIMS.Converters"
+                    xmlns:helpers="clr-namespace:CIMS.Helpers">
+
+    <!--
+        Shared converter instances. Converters are stateless, so one instance per type can be
+        reused by every window/page instead of each view re-declaring its own copy. Key names
+        match what the views already used, so existing StaticResource references keep working
+        unchanged.
+    -->
+
+    <helpers:BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+    <helpers:BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
+    <conv:PermissionToVisibilityConverter x:Key="PermissionToVisibilityConverter"/>
+    <conv:StatusToColorConverter x:Key="StatusToColorConverter"/>
+    <conv:PathToImageConverter x:Key="PathToImageConverter"/>
+    <conv:RowToIndexConverter x:Key="RowToIndexConverter"/>
+    <conv:BoolToShowHideConverter x:Key="BoolToShowHide"/>
+    <conv:BoolToShowColorConverter x:Key="BoolToShowColor"/>
+
+</ResourceDictionary>

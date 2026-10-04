@@ -1,0 +1,93 @@
+﻿<Page x:Class="CIMS.Views.ActivityLogView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Activity Log" Background="Transparent">
+
+    <!-- 🕘 การเคลื่อนไหวของผู้ใช้งานทั้งระบบ (SYS_LOGS): ค้นหา / วันที่ / ผู้ใช้ / ประเภท / Export
+         1 หน้า = 50 รายการ: แสดง 20 แถวแรก เลื่อนลงเพิ่มทีละ 15 แล้ว NEXT / PREV -->
+    <Border Background="White" CornerRadius="25" Padding="30" Margin="20" BorderBrush="#F0F0F0" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="🕘 ACTIVITY LOG" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                    <TextBlock Text="Every action in the system: login / logout, pages opened, add / edit / delete, scans, import / export" FontSize="12" FontWeight="Bold" Foreground="#8A8490" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Button x:Name="btnExport" Content="📤 EXPORT" Style="{StaticResource StkButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Export_Click"/>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="txtSearch" Style="{StaticResource StkInput}" Height="42" Tag="Search action, detail, product code, user or computer..." TextChanged="Search_Changed"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                    <TextBlock Text="FROM" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <DatePicker x:Name="dpFrom" Width="150" SelectedDateChanged="Filter_Changed"/>
+                    <TextBlock Text="TO" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                    <DatePicker x:Name="dpTo" Width="150" SelectedDateChanged="Filter_Changed"/>
+                    <ComboBox x:Name="cbUser" Width="210" Height="42" Margin="12,0,0,0" Style="{StaticResource StkCombo}" SelectionChanged="Filter_Changed"/>
+                    <ComboBox x:Name="cbAction" Width="210" Height="42" Margin="8,0,0,0" Style="{StaticResource StkCombo}" SelectionChanged="Filter_Changed"/>
+                </StackPanel>
+            </Grid>
+
+            <DataGrid x:Name="dgLog" Grid.Row="2"
+                      AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserAddRows="False"
+                      Background="Transparent" BorderThickness="0" RowHeight="44" FontSize="13" FontWeight="SemiBold"
+                      GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#F2F0F5" SelectionUnit="FullRow"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                      EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.ScrollChanged="dgLog_ScrollChanged" PreviewMouseWheel="dgLog_PreviewMouseWheel">
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="FontWeight" Value="ExtraBold"/>
+                        <Setter Property="Padding" Value="10,8"/>
+                        <Setter Property="Height" Value="46"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+                <DataGrid.Resources>
+                    <Style x:Key="Cell" TargetType="TextBlock">
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                    </Style>
+                    <Style x:Key="LeftCell" TargetType="TextBlock">
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Margin" Value="8,0"/>
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                        <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </Style>
+                </DataGrid.Resources>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="DATE TIME" Binding="{Binding DateText}" Width="1.1*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="USER" Binding="{Binding UserText}" Width="1.2*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="ACTION" Binding="{Binding Action}" Width="1.1*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="DETAIL" Binding="{Binding Detail}" Width="3.2*" ElementStyle="{StaticResource LeftCell}"/>
+                    <DataGridTextColumn Header="REF" Binding="{Binding RefCode}" Width="1*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="COMPUTER" Binding="{Binding Computer}" Width="0.9*" ElementStyle="{StaticResource Cell}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <TextBlock x:Name="txtEmpty" Grid.Row="2" Text="NO ACTIVITY" FontSize="15" FontWeight="Bold" Foreground="#AAA"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+
+            <Grid Grid.Row="3" Margin="0,12,0,0">
+                <TextBlock x:Name="txtStatus" FontSize="12" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="btnPrev" Content="◀ PREV" Style="{StaticResource StkButton}" Click="Prev_Click"/>
+                    <TextBlock x:Name="txtPage" FontSize="13" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center" Margin="14,0"/>
+                    <Button x:Name="btnNext" Content="NEXT ▶" Style="{StaticResource StkButton}" Click="Next_Click"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Page>

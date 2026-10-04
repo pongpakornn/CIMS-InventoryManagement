@@ -1,0 +1,80 @@
+﻿<Window x:Class="CIMS.Views.QuantityInputDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Quantity" Width="380" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Topmost="True">
+
+    <Window.Resources>
+        <Style x:Key="DialogButton" TargetType="Button">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" CornerRadius="8" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="MainBorder" Background="#212121" CornerRadius="20" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Color="Black" Opacity="0.6"/>
+        </Border.Effect>
+
+        <Border.RenderTransform>
+            <ScaleTransform x:Name="WindowScale" CenterX="190" CenterY="100" ScaleX="0.8" ScaleY="0.8"/>
+        </Border.RenderTransform>
+
+        <Grid Margin="25">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Ellipse x:Name="StatusCircle" Width="60" Height="60" Fill="#0288D1" VerticalAlignment="Top"/>
+                <TextBlock Text="🔄" FontSize="28" Foreground="White" FontWeight="Bold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-12,0,0"/>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Margin="0,20,0,15">
+                <TextBlock x:Name="lblTitle" Text="Title" Foreground="White" FontSize="20"
+                           FontWeight="Black" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="lblMessage" Text="Message content here..." Foreground="#AAAAAA"
+                           FontSize="13" HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,8,0,0"/>
+            </StackPanel>
+
+            <Border Grid.Row="2" Background="#2C2C2C" CornerRadius="10" Padding="5" Margin="0,0,0,20">
+                <TextBox x:Name="txtQuantity" Height="46" FontSize="22" FontWeight="Bold"
+                         Foreground="White" Background="Transparent" BorderThickness="0"
+                         CaretBrush="White" TextAlignment="Center" VerticalContentAlignment="Center"
+                         PreviewTextInput="txtQuantity_PreviewTextInput"
+                         KeyDown="txtQuantity_KeyDown"/>
+            </Border>
+
+            <Grid Grid.Row="3">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="CONFIRM" Style="{StaticResource DialogButton}"
+                            Background="#0288D1" Click="Confirm_Click" Margin="5"/>
+                    <Button Content="CANCEL" Style="{StaticResource DialogButton}"
+                            Background="#424242" Click="Cancel_Click" Margin="5"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

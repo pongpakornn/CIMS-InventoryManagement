@@ -1,0 +1,233 @@
+﻿<Window x:Class="CIMS.Views.BarcodeFormatWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Barcode Formats" Width="1000" Height="720"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+
+    <!-- ตั้งค่ารูปแบบป้ายบาร์โค้ด Supplier (เช่น Panta): ตัวคั่น + ช่องรหัสสินค้า / รหัสสำรอง / จำนวน
+         พร้อมช่อง TEST SCAN ให้ยิงบาร์โค้ดจริงแล้วเห็นทันทีว่าแต่ละช่องคืออะไร -->
+
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,18" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel>
+                    <TextBlock Text="🏷 SUPPLIER BARCODE FORMATS" Foreground="White" FontSize="20" FontWeight="Black"/>
+                    <TextBlock Text="Field numbers start at 1 (the first field = 1)" Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="22,18,22,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="230"/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- รายชื่อรูปแบบ -->
+                <Border Grid.Column="0" Style="{StaticResource StkSection}" Margin="0">
+                    <DockPanel>
+                        <Button x:Name="btnNew" DockPanel.Dock="Bottom" Content="＋ NEW FORMAT" Style="{StaticResource StkButton}" Margin="0,10,0,0" Click="New_Click"/>
+                        <TextBlock DockPanel.Dock="Top" Text="FORMATS" Style="{StaticResource StkLabel}"/>
+                        <ListBox x:Name="lstFormats" BorderThickness="0" Background="Transparent" SelectionChanged="lstFormats_SelectionChanged">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="bd" CornerRadius="10" Padding="12,9" Margin="0,0,0,6" Background="White" Cursor="Hand">
+                                                    <ContentPresenter/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="bd" Property="Background" Value="#6750A4"/>
+                                                        <Setter Property="Foreground" Value="White"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="Foreground" Value="#49454F"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+
+                <!-- ตัวแก้ไข -->
+                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="pnlEditor">
+                        <Border Style="{StaticResource StkSection}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="FORMAT NAME" Style="{StaticResource StkLabel}"/>
+                                    <TextBox x:Name="txtName" Style="{StaticResource StkInput}" MaxLength="50" Tag="e.g. Panta"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="DELIMITER" Style="{StaticResource StkLabel}"/>
+                                    <TextBox x:Name="txtDelimiter" Style="{StaticResource StkInput}" MaxLength="5" Tag=";" TextChanged="Field_TextChanged"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" VerticalAlignment="Bottom">
+                                    <CheckBox x:Name="chkActive" Content="ACTIVE" Style="{StaticResource StkChip}" Margin="0,0,0,2"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource StkSection}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="CODE FIELD #" Style="{StaticResource StkLabel}"/>
+                                    <TextBox x:Name="txtCodePos" Style="{StaticResource StkInput}" MaxLength="3" Tag="required" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="ALT CODE FIELD #" Style="{StaticResource StkLabel}"/>
+                                    <TextBox x:Name="txtAltPos" Style="{StaticResource StkInput}" MaxLength="3" Tag="optional" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="QTY FIELD #" Style="{StaticResource StkLabel}"/>
+                                    <TextBox x:Name="txtQtyPos" Style="{StaticResource StkInput}" MaxLength="3" Tag="optional" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="6">
+                                    <TextBlock Text="MIN FIELDS" Style="{StaticResource StkLabel}"/>
+                                    <TextBox x:Name="txtMinFields" Style="{StaticResource StkInput}" MaxLength="3" Tag="auto" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- ตัวกรองป้าย: แยกช่องด้วยช่องว่าง / ตัดตัวอักษรหัว-ท้าย / ตัดหัวรหัส / ระบุชนิดป้ายด้วยคำขึ้นต้น-ลงท้าย -->
+                        <Border Style="{StaticResource StkSection}">
+                            <StackPanel>
+                                <TextBlock Text="LABEL FILTERS" Style="{StaticResource StkLabel}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.3*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="1.5*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="0.7*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="SPLIT FIELDS BY" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="2,0,0,4"/>
+                                        <ComboBox x:Name="cbDelimMode" Style="{StaticResource StkCombo}" SelectionChanged="Filter_Changed">
+                                            <ComboBoxItem Content="DELIMITER"/>
+                                            <ComboBoxItem Content="ANY SPACES"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="TRIM CHARS (ENDS)" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="2,0,0,4"/>
+                                        <TextBox x:Name="txtTrimChars" Style="{StaticResource StkInput}" MaxLength="20" Tag="e.g. |" TextChanged="Field_TextChanged"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="CODE PREFIX" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="2,0,0,4"/>
+                                        <ComboBox x:Name="cbCodePrefix" Style="{StaticResource StkCombo}" SelectionChanged="Filter_Changed">
+                                            <ComboBoxItem Content="KEEP AS IS"/>
+                                            <ComboBoxItem Content="DROP LEADING DIGIT (2A250 → A250)"/>
+                                            <ComboBoxItem Content="CUT FIRST N CHARS"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="6">
+                                        <TextBlock Text="N" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="2,0,0,4"/>
+                                        <TextBox x:Name="txtCodeCut" Style="{StaticResource StkInput}" MaxLength="2" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="LABEL STARTS WITH" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="2,0,0,4"/>
+                                        <TextBox x:Name="txtMatchStart" Style="{StaticResource StkInput}" MaxLength="30" Tag="optional, e.g. |" TextChanged="Field_TextChanged"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="LABEL ENDS WITH" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="2,0,0,4"/>
+                                        <TextBox x:Name="txtMatchEnd" Style="{StaticResource StkInput}" MaxLength="30" Tag="optional, e.g. piece" TextChanged="Field_TextChanged"/>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="ANY SPACES: many spaces / tabs count as one separator.  STARTS / ENDS WITH tells this label apart from other labels (not case-sensitive)."
+                                           FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" Margin="2,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- แสกนป้ายรูปแบบนี้รับเข้าคลังหลัก -> ตัดยอดคลังนี้อัตโนมัติ (เช่น Panta -> STOCK-PANTA) -->
+                        <Border Style="{StaticResource StkSection}">
+                            <StackPanel>
+                                <TextBlock Text="AUTO DEDUCT FROM STOCK  (when this label is scanned IN to the main stock)" Style="{StaticResource StkLabel}"/>
+                                <ComboBox x:Name="cbSourceStock" Style="{StaticResource StkCombo}" Width="360" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource StkSection}">
+                            <StackPanel>
+                                <TextBlock Text="TEST SCAN  (scan or paste a real label here)" Style="{StaticResource StkLabel}"/>
+                                <TextBox x:Name="txtSample" Style="{StaticResource StkInput}" Height="44" FontSize="12" TextChanged="Field_TextChanged"/>
+
+                                <Border Background="White" CornerRadius="10" Padding="12,10" Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <TextBlock x:Name="txtParseResult" FontSize="14" FontWeight="Black" Foreground="{StaticResource MainPurple}" TextWrapping="Wrap"/>
+                                        <ItemsControl x:Name="icFields" Margin="0,8,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="8" Padding="8,4" Margin="0,0,6,6" Background="{Binding Background}">
+                                                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="{Binding Foreground}">
+                                                            <Run Text="{Binding Number, Mode=OneWay, StringFormat=#{0}}"/>
+                                                            <Run Text="{Binding Text, Mode=OneWay}"/>
+                                                        </TextBlock>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="22,10,22,22">
+                <Button x:Name="btnDelete" Content="🗑 DELETE" Style="{StaticResource StkButton}" Background="#C62828" HorizontalAlignment="Left" Click="Delete_Click"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="CLOSE" Style="{StaticResource StkButton}" Background="#9E9E9E" Margin="0,0,10,0" Click="Close_Click"/>
+                    <Button x:Name="btnSave" Content="SAVE FORMAT" Style="{StaticResource StkButton}" Background="{StaticResource AccentPurple}" MinWidth="150" Click="Save_Click"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

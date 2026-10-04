@@ -1,0 +1,363 @@
+﻿<Page x:Class="CIMS.Views.ProductControlView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:vm="clr-namespace:CIMS.ViewModels"
+      xmlns:conv="clr-namespace:CIMS.Converters"
+      Title="QR Code Generator" Background="Transparent"
+      RenderTransformOrigin="0.5,0.5">
+
+    <Page.DataContext>
+        <vm:ProductControlViewModel />
+    </Page.DataContext>
+
+    <Page.Resources>
+        <!-- MintGreen is page-specific: ManageUserView.xaml uses the same key name for a
+             different color (#4CAF50), so it is intentionally not centralized. -->
+        <SolidColorBrush x:Key="MintGreen" Color="#2DFFB4"/>
+
+        <Style x:Key="CyberButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CyberPurple}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="btnBorder" CornerRadius="12" Background="{TemplateBinding Background}" RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="buttonScale" ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.85"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleX" To="1.03" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleY" To="1.03" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernInput" TargetType="TextBox">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Background" Value="{StaticResource SoftGray}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" CornerRadius="8" Background="{TemplateBinding Background}" BorderBrush="#EEE" BorderThickness="1.5">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource CyberPurple}"/>
+                                <Setter TargetName="border" Property="Background" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CenterCellStyle" TargetType="DataGridCell">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource CyberPink}"/>
+                    <Setter Property="Foreground" Value="{StaticResource DeepDark}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Page.Resources>
+
+    <Page.RenderTransform>
+        <TranslateTransform x:Name="PageTransform" Y="30"/>
+    </Page.RenderTransform>
+
+    <Border x:Name="MainBorder" Background="White" CornerRadius="25" Padding="30" Margin="20" BorderBrush="#F0F0F0" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5,0,0,20">
+                <TextBlock Text="📥 Inventory Registration" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+            </StackPanel>
+
+            <Grid Grid.Row="1" Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,20,0" VerticalAlignment="Top">
+                    <Border Width="150" Height="150" Background="{StaticResource SoftGray}" 
+                            CornerRadius="15" BorderBrush="#EEE" BorderThickness="1.5">
+                        <Image Source="{Binding SelectedProduct.FullImagePath, UpdateSourceTrigger=PropertyChanged}" 
+                               Stretch="Uniform" Margin="5"/>
+                    </Border>
+                    <Button Content="Select IMAGE" 
+                            Click="btnSelectImage_Click" Visibility="{Binding ImageVisibility}" 
+                            Style="{StaticResource CyberButton}" 
+                            Background="{StaticResource MainPurple}" 
+                            Width="160" Height="40" Margin="0,12,0,0" FontSize="13"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="5">
+                            <TextBlock Text="SUPPLIER" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtSupplier" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.CustomerCode, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="5">
+                            <TextBlock Text="CATEGORY" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtCategory" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.Category, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="5">
+                            <TextBlock Text="PRODUCT CODE" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtProductCode" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PartCode, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="3" Margin="5">
+                            <TextBlock Text="PRODUCT NAME" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtProductName" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PartName, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="5">
+                            <TextBlock Text="PACKSIZE" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtPcs" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PackSize, UpdateSourceTrigger=PropertyChanged}"
+                                     PreviewTextInput="txtPcs_PreviewTextInput" DataObject.Pasting="txtPcs_Pasting" InputMethod.IsInputMethodEnabled="False" MaxLength="9"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="5">
+                            <TextBlock Text="BIN" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtBin" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.Location, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="5">
+                            <TextBlock Text="QRCODE" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtQRCode" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.QRCodeData, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <!-- ข้อมูลเสริม: แสดง/จัดกลุ่มในหน้า Store (Max-Min) ตามที่ตั้งค่าคลังไว้ -->
+                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="5">
+                            <TextBlock Text="CUSTOMER" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtCustomer" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.Customer, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="5">
+                            <TextBlock Text="PART A" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtPartA" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartA, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="2" Margin="5">
+                            <TextBlock Text="PART NO" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtPartNo" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartNo, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3" Grid.Column="0" Margin="5">
+                            <TextBlock Text="MODEL" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBox x:Name="txtModel" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.Model, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <!-- 🏬 สินค้านี้อยู่คลังไหนบ้าง (Stock-CHR = แสดงในตารางคลังหลัก / คลังอื่น = เพิ่มเข้าคลังนั้น ยอดเริ่ม 0) -->
+                        <StackPanel Grid.Row="1" Grid.RowSpan="2" Grid.Column="3" Margin="5">
+                            <TextBlock Text="STOCK" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <WrapPanel x:Name="wpStocks"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Margin="5,13,0,0">
+                        <!--<Button x:Name="btnGenerate" Content="GENERATE QR" Style="{StaticResource CyberButton}" Width="150" Height="42" Click="GenerateQR_Click"
+                                FontSize="12" FontWeight="ExtraBlack" />-->
+                        <Button x:Name="btnRegister" Content="PART REGISTRATION" Style="{StaticResource CyberButton}" Width="180" Height="42" Background="{StaticResource MintGreen}" 
+                        Foreground="{StaticResource DeepDark}" Click="RegisterPart_Click" Visibility="Visible" FontSize="12" FontWeight="ExtraBlack" />
+
+                        <Button x:Name="btnSave" Content="SAVE CHANGES" Style="{StaticResource CyberButton}" Width="180" Height="42" Background="{StaticResource CyberPink}" 
+                        Foreground="{StaticResource DeepDark}" Click="SaveEdit_Click" Visibility="Collapsed" FontSize="12" FontWeight="ExtraBlack" />
+                        <Grid Margin="10,0,0,0">
+                            
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="5,0,5,15">
+                <!-- ช่องค้นหายืดเต็มพื้นที่ที่เหลือ (เดิมล็อกกว้าง 1200 จนดันปุ่ม FIND ไปซ่อนใต้ปุ่มด้านขวา) -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="txtSearch" Grid.Column="0" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Tag="Search by name or code..." TextChanged="txtSearch_TextChanged" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
+                <Button Grid.Column="1" Style="{StaticResource CyberButton}" Width="80" Height="42" Margin="10,0,20,0" Click="Find_Click" FontSize="12" FontWeight="ExtraBold" >
+                    <TextBlock Text="FIND" VerticalAlignment="Center"/>
+                </Button>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- 🏬 กรองตารางตามคลัง -->
+                    <ComboBox x:Name="cbStockFilter" Width="190" Height="45" Margin="0,0,10,0" Style="{StaticResource StkCombo}"
+                              SelectionChanged="cbStockFilter_SelectionChanged" ToolTip="Show only the products in this stock" Visibility="Collapsed"/>
+                    <Button Content="📥 IMPORT EXCEL" Style="{StaticResource CyberButton}" Background="{StaticResource MainPurple}" Width="170" Height="45" Margin="0,0,10,0" Click="Import_Click" Visibility="{Binding AddVisibility}" FontSize="12" FontWeight="ExtraBold" />
+                    <Button Content="EXPORT QR SELECT" Style="{StaticResource CyberButton}" Width="200" Height="45" Click="Export_Click" FontSize="12" FontWeight="ExtraBold" />
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="3" CornerRadius="20" Background="#FDFDFD" BorderBrush="#F0F0F0" BorderThickness="1" ClipToBounds="True">
+                <DataGrid x:Name="dgQRHistory" 
+                          EnableRowVirtualization="True"
+                          EnableColumnVirtualization="True"
+                          VirtualizingStackPanel.IsVirtualizing="True"
+                          VirtualizingStackPanel.VirtualizationMode="Recycling"
+                          HorizontalScrollBarVisibility="Disabled"
+                          ScrollViewer.CanContentScroll="True"
+                          ScrollViewer.ScrollChanged="dgQRHistory_ScrollChanged"
+                          ItemsSource="{Binding Products}"
+                          HeadersVisibility="Column" IsReadOnly="True" 
+                          AutoGenerateColumns="False" 
+                          Background="Transparent" 
+                          BorderThickness="0" 
+                          RowHeight="90"
+                          FontSize="13"
+                          FontWeight="Bold"
+                          CellStyle="{StaticResource CenterCellStyle}"
+                          GridLinesVisibility="Horizontal" 
+                          HorizontalGridLinesBrush="#F5F5F5">
+
+                    <DataGrid.ColumnHeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Padding" Value="15,0"/>
+                            <Setter Property="FontSize" Value="14"/>
+                            <Setter Property="FontWeight" Value="ExtraBold"/>
+                            <Setter Property="Height" Value="50"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        </Style>
+                    </DataGrid.ColumnHeaderStyle>
+
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="60">
+                            <DataGridTemplateColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <CheckBox x:Name="chkSelectAll" 
+                                              HorizontalAlignment="Center" 
+                                              VerticalAlignment="Center"
+                                              Click="SelectAll_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.HeaderTemplate>
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" 
+                                              HorizontalAlignment="Center" 
+                                              VerticalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="IMAGE" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="White" Width="75" Height="75" CornerRadius="6" BorderBrush="#F0F0F0" BorderThickness="1" Margin="5">
+                                        <Image Source="{Binding ProductImage, UpdateSourceTrigger=PropertyChanged}" Stretch="Uniform" MaxHeight="75"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="SUPPLIER" Binding="{Binding CustomerCode}" Width="1*"/>
+                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="1*"/>
+                        <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.2*"/>
+                        <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="2*"/>
+                        <DataGridTextColumn Header="PACKSIZE" Binding="{Binding PackSize}" Width="0.8*"/>
+                        <DataGridTextColumn Header="BIN" Binding="{Binding Location}" Width="1*"/>
+                        <DataGridTextColumn Header="QRCODE" Binding="{Binding QRCodeData}" Width="1.2*"/>
+
+                        <DataGridTemplateColumn Header="ACTION" Width="260">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Button Content="VIEW" 
+                                                Click="ViewAction_Click" 
+                                                Style="{StaticResource CyberButton}" 
+                                                Background="{StaticResource CyberPink}" 
+                                                Foreground="{StaticResource DeepDark}" FontWeight="Black"
+                                                Height="28" Width="55" Margin="0,0,5,0" FontSize="11"/>
+
+                                        <Button Style="{StaticResource CyberButton}" 
+                                                Width="55" Height="28" Margin="0,0,5,0" FontSize="11"
+                                                Click="ToggleVisibility_Click" FontWeight="Black" Visibility="{Binding DataContext.EditVisibility, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                Content="{Binding IsShow, Converter={StaticResource BoolToShowHide}}"
+                                                Background="{Binding IsShow, Converter={StaticResource BoolToShowColor}}">
+                                        </Button>
+
+                                        <Button Content="EDIT" 
+                                                Style="{StaticResource CyberButton}" 
+                                                Background="{StaticResource CyberPurple}" FontWeight="Black"
+                                                Width="55" Height="28" Margin="0,0,5,0" FontSize="11"
+                                                Click="EditPD_Click" Visibility="{Binding DataContext.EditVisibility, RelativeSource={RelativeSource AncestorType=Page}}"/>
+
+                                        <Button Content="DEL" 
+                                                Style="{StaticResource CyberButton}" 
+                                                Background="#FF5252" FontWeight="Black"
+                                                Width="55" Height="28" FontSize="11"
+                                                Click="DeletePD_Click" Visibility="{Binding DataContext.DeleteVisibility, RelativeSource={RelativeSource AncestorType=Page}}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
+    </Border>
+</Page>

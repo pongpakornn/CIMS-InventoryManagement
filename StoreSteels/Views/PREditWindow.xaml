@@ -1,0 +1,39 @@
+<Window x:Class="CIMS.Views.PREditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit PR" Width="560" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- ✏ แก้ไข PR ที่ Approve แล้ว: จำนวน / แผนก / ส่งถึง / หมายเหตุ -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <StackPanel>
+            <Border Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel>
+                    <TextBlock Text="✏ EDIT PR" Foreground="White" FontSize="20" FontWeight="Black"/>
+                    <TextBlock x:Name="txtPrNo" Foreground="#D0BCFF" FontSize="13" FontWeight="Bold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+            <StackPanel Margin="28,18,28,8">
+                <TextBlock Text="PRODUCT" FontSize="11" FontWeight="Bold" Foreground="#8A8490"/>
+                <TextBlock x:Name="txtProduct" FontSize="15" FontWeight="Black" Foreground="#2D2A32" TextWrapping="Wrap" Margin="0,2,0,10"/>
+
+                <TextBlock Text="QTY" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,4,0,4"/>
+                <TextBox x:Name="txtQty" Style="{StaticResource StkInput}" Height="40" PreviewTextInput="Digits_PreviewTextInput"/>
+                <TextBlock Text="DEPARTMENT" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,10,0,4"/>
+                <TextBox x:Name="txtDept" Style="{StaticResource StkInput}" Height="40"/>
+                <TextBlock Text="TARGET DEPT" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,10,0,4"/>
+                <TextBox x:Name="txtTarget" Style="{StaticResource StkInput}" Height="40"/>
+                <TextBlock Text="REMARK" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,10,0,4"/>
+                <TextBox x:Name="txtRemark" Style="{StaticResource StkInput}" Height="40"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="28,10,28,22">
+                <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                <Button Content="SAVE" Style="{StaticResource StkButton}" Click="Save_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

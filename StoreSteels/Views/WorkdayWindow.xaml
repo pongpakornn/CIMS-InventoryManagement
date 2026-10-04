@@ -1,0 +1,60 @@
+﻿<Window x:Class="CIMS.Views.WorkdayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Customer Workdays" Width="1180" Height="860"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- วันทำงานของลูกค้า: การ์ดลูกค้า -> ปฏิทิน 12 เดือน (กด = วันทำงาน / กดซ้ำ = ยกเลิก บันทึกทันที) -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock x:Name="txtTitle" Text="📅 CUSTOMER WORKDAYS" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock x:Name="txtSubtitle" Text="Select a customer to set the working days of each month" Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Close_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <!-- แถบเครื่องมือ: ย้อนกลับ / ปี / Import -->
+            <Grid Grid.Row="1" Margin="26,16,26,8">
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="btnBack" Content="← ALL CUSTOMERS" Style="{StaticResource StkButton}" Margin="0,0,12,0" Click="Back_Click" Visibility="Collapsed"/>
+                    <Button Content="◀" Style="{StaticResource StkButton}" MinWidth="44" Click="PrevYear_Click"/>
+                    <TextBlock x:Name="txtYear" Text="2026" FontSize="22" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center" Margin="14,0"/>
+                    <Button Content="▶" Style="{StaticResource StkButton}" MinWidth="44" Click="NextYear_Click"/>
+                    <TextBlock x:Name="txtTotal" FontSize="14" FontWeight="Black" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="18,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="txtSaved" FontSize="12" FontWeight="Bold" Foreground="#2E7D32" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                    <Button x:Name="btnImport" Content="📥 IMPORT WORKDAYS" Style="{StaticResource StkButton}" Background="{StaticResource AccentPurple}" Click="Import_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- การ์ดลูกค้า -->
+            <ScrollViewer x:Name="pnlCustomers" Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="26,4,12,4">
+                <WrapPanel x:Name="wpCustomers"/>
+            </ScrollViewer>
+
+            <!-- ปฏิทิน 12 เดือน -->
+            <ScrollViewer x:Name="pnlCalendar" Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="20,4,12,4" Visibility="Collapsed">
+                <UniformGrid x:Name="ugMonths" Columns="4"/>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="3" Margin="26,6,26,18" FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" TextWrapping="Wrap"
+                       Text="Click a day = working day, click again = not working. Saved automatically.  MON-FRI fills the month with weekdays.  IMPORT: CUSTOMER + DATE (1 row per working day) - months in the file replace the old days."/>
+        </Grid>
+    </Border>
+</Window>

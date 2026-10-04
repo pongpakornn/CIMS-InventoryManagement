@@ -1,0 +1,91 @@
+<Window x:Class="CIMS.Views.UserEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="User" Width="640" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 👤 เพิ่ม / แก้ไขผู้ใช้งาน -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <StackPanel>
+            <Border Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel>
+                    <TextBlock x:Name="txtTitle" Text="＋ ADD USER" Foreground="White" FontSize="20" FontWeight="Black"/>
+                    <TextBlock x:Name="txtSub" Text="Fill in the user profile - set the permissions afterwards" Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Grid Margin="28,18,28,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0">
+                    <TextBlock Text="USER ID *" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtId" Style="{StaticResource StkInput}" Height="40" MaxLength="20"/>
+                </StackPanel>
+                <StackPanel Grid.Row="0" Grid.Column="2">
+                    <TextBlock Text="NAME *" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtName" Style="{StaticResource StkInput}" Height="40" MaxLength="200"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0">
+                    <TextBlock Text="POSITION  (ตำแหน่ง)" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtPos" Style="{StaticResource StkInput}" Height="40" MaxLength="100"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,0,0">
+                    <TextBlock Text="UNIT  (หน่วยงาน)" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtDept" Style="{StaticResource StkInput}" Height="40" MaxLength="100"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,12,0,0">
+                    <TextBlock Text="SECTION  (แผนก)" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtSection" Style="{StaticResource StkInput}" Height="40" MaxLength="100"/>
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,12,0,0">
+                    <TextBlock Text="DIVISION  (ฝ่าย)" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtDivision" Style="{StaticResource StkInput}" Height="40" MaxLength="100"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,12,0,0">
+                    <TextBlock Text="LEVEL *" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <ComboBox x:Name="cbLevel" Height="40" Style="{StaticResource StkCombo}">
+                        <ComboBoxItem Content="LEVEL 1  •  ADMIN (all systems)" Tag="1"/>
+                        <ComboBoxItem Content="LEVEL 2  •  MANAGER" Tag="2"/>
+                        <ComboBoxItem Content="LEVEL 3  •  STAFF (by permission)" Tag="3"/>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,12,0,0" VerticalAlignment="Bottom">
+                    <CheckBox x:Name="chkLocked" Content="LOCKED  (cannot log in)" FontWeight="Bold" Foreground="#C62828" Margin="4,0,0,10" Cursor="Hand"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="4" Grid.Column="0" Margin="0,12,0,0">
+                    <TextBlock x:Name="lblPwd" Text="PASSWORD *" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <PasswordBox x:Name="txtPwd" Height="40" Padding="12,0" VerticalContentAlignment="Center" FontSize="14" BorderBrush="#E0E0E0" BorderThickness="1.5"/>
+                </StackPanel>
+                <StackPanel Grid.Row="4" Grid.Column="2" Margin="0,12,0,0">
+                    <TextBlock Text="CONFIRM PASSWORD" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="0,0,0,4"/>
+                    <PasswordBox x:Name="txtPwd2" Height="40" Padding="12,0" VerticalContentAlignment="Center" FontSize="14" BorderBrush="#E0E0E0" BorderThickness="1.5"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="txtError" Foreground="#C62828" FontWeight="Bold" FontSize="12" Margin="30,6,28,0" Visibility="Collapsed" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="28,14,28,22">
+                <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                <Button x:Name="btnSave" Content="SAVE" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Save_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

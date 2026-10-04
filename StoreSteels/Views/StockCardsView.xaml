@@ -1,0 +1,114 @@
+﻿<Page x:Class="CIMS.Views.StockCardsView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Stocks" Background="Transparent">
+
+    <!-- หน้าแรกของ Store ( Max - Min ): การ์ดคลังทั้งหมด กดการ์ดเพื่อเข้าตารางของคลังนั้น -->
+
+    <Page.RenderTransform>
+        <TranslateTransform x:Name="PageTransform" Y="30"/>
+    </Page.RenderTransform>
+
+    <Border Background="White" CornerRadius="25" Padding="30" Margin="20" BorderBrush="#F0F0F0" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="📦 STORE ( MAX - MIN )" FontSize="25" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,0"/>
+                    <TextBlock x:Name="txtSubtitle" Text="SELECT A STOCK" FontSize="13" FontWeight="Bold" Foreground="#8A8490" Margin="7,4,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="btnFormats" Content="🏷 BARCODE FORMATS" Style="{StaticResource StkButton}" Margin="0,0,10,0" Click="Formats_Click"/>
+                    <Button x:Name="btnAddStock" Content="＋ ADD STOCK" Style="{StaticResource StkButton}" Background="{StaticResource AccentPurple}" Click="AddStock_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="icStocks">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="card" Width="320" Height="200" CornerRadius="20" Margin="0,0,20,20"
+                                    Background="White" BorderBrush="#ECE9F1" BorderThickness="1.5" Cursor="Hand"
+                                    MouseLeftButtonUp="Card_MouseLeftButtonUp" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <TranslateTransform/>
+                                </Border.RenderTransform>
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.08" Color="Black"/>
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- แถบสีด้านบน: คลังหลักสีเข้ม คลังอื่นสีม่วง -->
+                                    <Border Grid.Row="0" CornerRadius="20,20,0,0" Background="{Binding AccentBrush}"/>
+
+                                    <StackPanel Grid.Row="1" Margin="22,16,22,0">
+                                        <Grid>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🏬" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <TextBlock Text="{Binding Stock.Code}" FontSize="20" FontWeight="Black" Foreground="{StaticResource MainPurple}"
+                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="170"/>
+                                            </StackPanel>
+                                            <Border HorizontalAlignment="Right" VerticalAlignment="Center" CornerRadius="10" Padding="10,3"
+                                                    Background="{StaticResource MainPurple}" Visibility="{Binding MainBadgeVisibility}">
+                                                <TextBlock Text="MAIN" Foreground="White" FontSize="10" FontWeight="Black"/>
+                                            </Border>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Stock.Name}" FontSize="13" FontWeight="SemiBold" Foreground="#6B6770"
+                                                   Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                            <TextBlock Text="{Binding Stock.ItemCount, StringFormat={}{0:N0}}" FontSize="38" FontWeight="Black"
+                                                       Foreground="{StaticResource AccentPurple}" VerticalAlignment="Bottom"/>
+                                            <TextBlock Text="ITEMS" FontSize="13" FontWeight="ExtraBold" Foreground="#8A8490"
+                                                       VerticalAlignment="Bottom" Margin="8,0,0,9"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <Grid Grid.Row="2" Margin="22,0,16,14">
+                                        <Border CornerRadius="9" Padding="10,4" Background="#F1EEF6" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Stock.Unit, StringFormat=UNIT : {0}}" FontSize="11" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                                        </Border>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="✎ EDIT" Style="{StaticResource StkCardButton}" Margin="0,0,6,0"
+                                                    Visibility="{Binding EditVisibility}" Click="EditStock_Click" Tag="{Binding}"/>
+                                            <Button Content="🗑 DELETE" Style="{StaticResource StkCardButton}" Foreground="#C62828" Background="#FDECEC"
+                                                    Visibility="{Binding DeleteVisibility}" Click="DeleteStock_Click" Tag="{Binding}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <Trigger SourceName="card" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
+                                </Trigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock x:Name="txtEmpty" Grid.Row="1" Text="NO STOCK AVAILABLE" FontSize="16" FontWeight="Bold" Foreground="#AAA"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+        </Grid>
+    </Border>
+</Page>

@@ -1,0 +1,369 @@
+﻿<Page x:Class="CIMS.Views.PackingCardView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:vm="clr-namespace:CIMS.ViewModels"
+      Title="Packing Card" Background="Transparent"
+      RenderTransformOrigin="0.5,0.5">
+
+    <Page.DataContext>
+        <vm:PackingCardViewModel />
+    </Page.DataContext>
+
+    <Page.Resources>
+        <!-- Style ชุดเดียวกับ ProductControlView.xaml (CyberButton / ModernInput / CenterCellStyle)
+             คัดลอกมาตามแบบเดิมของโปรเจกต์ (แต่ละหน้าประกาศ Style ของตัวเองในลักษณะนี้อยู่แล้ว
+             ไม่ได้รวมศูนย์ไว้ที่ Themes/Styles.xaml) ไม่มีการสร้างสีหรือ Style ใหม่ -->
+        <Style x:Key="CyberButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CyberPurple}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="btnBorder" CornerRadius="12" Background="{TemplateBinding Background}" RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="buttonScale" ScaleX="1" ScaleY="1"/>
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.85"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleX" To="1.03" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleY" To="1.03" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="buttonScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernInput" TargetType="TextBox">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Background" Value="{StaticResource SoftGray}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" CornerRadius="8" Background="{TemplateBinding Background}" BorderBrush="#EEE" BorderThickness="1.5">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource CyberPurple}"/>
+                                <Setter TargetName="border" Property="Background" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CenterCellStyle" TargetType="DataGridCell">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                            <!-- Stretch แทน Center: ปล่อยให้ ElementStyle ของแต่ละคอลัมน์ (TextAlignment=Center)
+                                 เป็นตัวจัดข้อความให้อยู่กลางแทน ไม่ให้ ContentPresenter บีบตัวเองจนคอลัมน์
+                                 เพี้ยนความกว้างเวลามีหลาย Group/แถวเยอะๆ -->
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource DeepDark}"/>
+                    <Setter Property="Foreground" Value="{StaticResource DangerRed}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Group header ("Group : 4H") สำหรับตารางแบบจัดกลุ่มคลัง - ปรับให้เหมือนหน้า StoreMaxMinView
+             (CategoryHeaderStyle): พื้นหลังม่วงอ่อน ขอบซ้ายเน้นสีม่วงเข้ม + badge นับจำนวนรายการ -
+             Expander ในตัวมีปุ่ม expand/collapse (▲/▼) มาให้อยู่แล้วโดยไม่ต้องเขียนเพิ่ม -->
+        <Style x:Key="GroupHeaderStyle" TargetType="GroupItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupItem">
+                        <Expander IsExpanded="True" Background="Transparent" BorderThickness="0" Margin="0,0,0,5">
+                            <!-- ให้แถบหัวกลุ่มยาวเต็มความกว้างตาราง ไม่มีปุ่มลูกศรกลม (เหมือน StorePC) - คลิกแถบเพื่อพับ/ขยายได้ -->
+                            <Expander.Template>
+                                <ControlTemplate TargetType="{x:Type Expander}">
+                                    <DockPanel>
+                                        <ToggleButton DockPanel.Dock="Top" Focusable="False" Cursor="Hand"
+                                                      HorizontalContentAlignment="Stretch"
+                                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                            <ToggleButton.Template>
+                                                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                                    <ContentPresenter Content="{Binding Header, RelativeSource={RelativeSource AncestorType={x:Type Expander}}}"
+                                                                      HorizontalAlignment="Stretch"/>
+                                                </ControlTemplate>
+                                            </ToggleButton.Template>
+                                        </ToggleButton>
+                                        <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed"/>
+                                    </DockPanel>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsExpanded" Value="True">
+                                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Expander.Template>
+                            <Expander.Header>
+                                <Border Background="#F3E5F5" CornerRadius="5" Height="38" Margin="0" BorderBrush="{StaticResource MainPurple}" BorderThickness="2,0,0,0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
+                                        <TextBlock Text="Group : " FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource MainPurple}" FontSize="14"/>
+                                        <TextBlock Text="{Binding Name, Mode=OneWay}" FontWeight="ExtraBold" VerticalAlignment="Center" Foreground="{StaticResource MainPurple}" FontSize="15" Margin="5,0,0,0"/>
+                                        <Border Background="{StaticResource MainPurple}" CornerRadius="12" Padding="12,6" Margin="15,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding ItemCount, Mode=OneWay, StringFormat='{}{0} ITEMS'}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </Expander.Header>
+                            <ItemsPresenter Margin="0,5,0,5"/>
+                        </Expander>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- เฉพาะ REMARK (ข้อความยาวๆ) เท่านั้นที่ตัดขึ้นบรรทัดใหม่ - คอลัมน์อื่นเป็น NoWrap ตัดชื่อ/รหัส
+             พอดีความกว้างจริงแทน การใช้ Wrap ร่วมกับคอลัมน์ Star ที่แคบเกินไปคือสาเหตุที่ตัวอักษรตัด
+             ขึ้นบรรทัดใหม่ทีละตัวจนแถวสูงผิดปกติ -->
+        <Style x:Key="WrapCellTextStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="4"/>
+        </Style>
+
+        <Style x:Key="NoWrapCellTextStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="4"/>
+        </Style>
+    </Page.Resources>
+
+    <Page.RenderTransform>
+        <TranslateTransform x:Name="PageTransform" Y="30"/>
+    </Page.RenderTransform>
+
+    <Border x:Name="MainBorder" Background="White" CornerRadius="25" Padding="30" Margin="20" BorderBrush="#F0F0F0" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5,0,0,20">
+                <TextBlock Text="🖨️ PICK LIST" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+            </StackPanel>
+
+            <!-- Responsive: ค้นหา (ซ้าย) + พรีวิวการ์ด (ขวา) ยืดหด/ตกบรรทัดตามความกว้างหน้าจอ -->
+            <Grid Grid.Row="1" Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="260"/>
+                    <ColumnDefinition Width="*" MinWidth="320"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource SoftGray}" CornerRadius="15" Padding="15" Margin="0,0,10,0">
+                    <StackPanel VerticalAlignment="Top">
+                        <TextBlock Text="SEARCH (ANY FIELD)" FontSize="13" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,8"/>
+                        <TextBox x:Name="txtSearch" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="SEARCH" Style="{StaticResource CyberButton}" Width="110" Height="40" FontSize="13" Click="Search_Click"/>
+                            <Button Content="CLEAR" Style="{StaticResource CyberButton}" Background="#9E9E9E" Width="110" Height="40" FontSize="13" Margin="10,0,0,0" Click="Clear_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- พรีวิวการ์ด: เลย์เอาต์ตามการ์ดตัวอย่าง (โลโก้+ชื่อบริษัท / QR มุมขวาบน / ฟิลด์คู่ Bill-Group,
+                     Work Order-Lot No. / Part Name เต็มแถว / Quantity-TicketDate) - ไม่มีข้อมูลตอนยังไม่เลือกแถว -->
+                <Border Grid.Column="1" Background="{StaticResource SoftGray}" CornerRadius="15" Padding="18" Margin="10,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="LABEL PREVIEW" FontSize="13" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,10"/>
+
+                        <Border Background="White" CornerRadius="10" BorderBrush="#EEE" BorderThickness="1.5" Padding="16"
+                                MaxWidth="450" HorizontalAlignment="Left" DataContext="{Binding PreviewItem}" Width="420">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- หัวการ์ด: "CH" ตัวใหญ่หนาเฉยๆ (ไม่มีกล่องพื้นหลัง) + ชื่อบริษัท (ซ้าย), QR Code (ขวา) -->
+                                <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                    <TextBlock Text="CH" Foreground="{StaticResource DeepDark}" FontWeight="Black" FontSize="40" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="CH. RADIATORS CO.LTD." FontWeight="Black" FontSize="14" Foreground="{StaticResource DeepDark}"/>
+                                        <TextBlock Text="บริษัท ซีเอชเรดิเอเตอร์ จำกัด" FontSize="11" Foreground="{StaticResource DeepDark}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <Border Grid.Row="0" Grid.Column="3" Width="48" Height="48" BorderBrush="#CCC" BorderThickness="1" HorizontalAlignment="Right">
+                                    <Image Source="{Binding QrImage}" Stretch="Uniform" Margin="2"/>
+                                </Border>
+
+                                <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Height="1" Background="#E0E0E0" Margin="0,10,0,10"/>
+
+                                <!-- Bill | Group -->
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Bill" FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,4"/>
+                                <Border Grid.Row="2" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="28,0,14,4" Grid.ColumnSpan="2">
+                                    <TextBlock Text="{Binding TicketNo}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" Padding="0,0,0,2"/>
+                                </Border>
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Group" FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,4"/>
+                                <Border Grid.Row="2" Grid.Column="2" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="40,0,0,4" Grid.ColumnSpan="2">
+                                    <TextBlock Text="{Binding GroupCode}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" Padding="0,0,0,2"/>
+                                </Border>
+
+                                <!-- Work Order | LOT NO. -->
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Work Order" FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,4"/>
+                                <Border Grid.Row="3" Grid.Column="1" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="0,0,14,4">
+                                    <TextBlock Text="{Binding WorkOrder}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" Padding="0,0,0,2"/>
+                                </Border>
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="LOT NO." FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,4"/>
+                                <Border Grid.Row="3" Grid.Column="2" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="51,0,0,4" Grid.ColumnSpan="2">
+                                    <TextBlock Text="{Binding LotNo}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" Padding="0,0,0,2"/>
+                                </Border>
+
+                                <!-- Part Name เต็มแถว -->
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Part Name" FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,4"/>
+                                <Border Grid.Row="4" Grid.ColumnSpan="4" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="66,0,0,4">
+                                    <TextBlock Text="{Binding JobName}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" TextWrapping="Wrap" Padding="0,0,0,2"/>
+                                </Border>
+
+                                <!-- Quantity | TicketDate -->
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Quantity" FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
+                                <Border Grid.Row="5" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="53,0,14,0" Grid.ColumnSpan="2">
+                                    <TextBlock Text="{Binding Qty, StringFormat='{}{0:0.##}'}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" Padding="0,0,0,2"/>
+                                </Border>
+                                <TextBlock Grid.Row="5" Grid.Column="2" Text="TicketDate" FontSize="12" FontWeight="Bold" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
+                                <Border Grid.Row="5" Grid.Column="3" BorderBrush="#AAA" BorderThickness="0,0,0,1" Margin="0,0,0,0">
+                                    <TextBlock Text="{Binding TicketDate, StringFormat='dd-MM-yyyy'}" FontSize="12" HorizontalAlignment="Center" FontWeight="SemiBold" Padding="0,0,0,2"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="5,0,5,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="txtItemCount" Grid.Column="0" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#888"/>
+
+                <Button Grid.Column="1" Content="PRINT SELECTED" Style="{StaticResource CyberButton}" Width="220" Height="45" FontSize="13" FontWeight="ExtraBold" Click="PrintSelected_Click"/>
+            </Grid>
+
+            <Border Grid.Row="3" CornerRadius="20" Background="#FDFDFD" BorderBrush="#F0F0F0" BorderThickness="1" ClipToBounds="True">
+                <DataGrid x:Name="dgPackingCards"
+                          EnableRowVirtualization="False"
+                          EnableColumnVirtualization="False"
+                          HorizontalScrollBarVisibility="Disabled"
+                          ScrollViewer.CanContentScroll="False"
+                          Loaded="dgPackingCards_Loaded"
+                          ScrollViewer.ScrollChanged="dgPackingCards_ScrollChanged"
+                          ItemsSource="{Binding GroupedItems}"
+                          SelectionMode="Extended" SelectionUnit="FullRow"
+                          SelectionChanged="dgPackingCards_SelectionChanged"
+                          HeadersVisibility="Column" IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          MinRowHeight="42"
+                          FontSize="13"
+                          FontWeight="Bold"
+                          CellStyle="{StaticResource CenterCellStyle}"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#F5F5F5">
+
+                    <DataGrid.GroupStyle>
+                        <GroupStyle ContainerStyle="{StaticResource GroupHeaderStyle}"/>
+                    </DataGrid.GroupStyle>
+
+                    <DataGrid.ColumnHeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="{StaticResource MainPurple}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Padding" Value="15,0"/>
+                            <Setter Property="FontSize" Value="14"/>
+                            <Setter Property="FontWeight" Value="ExtraBold"/>
+                            <Setter Property="Height" Value="50"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        </Style>
+                    </DataGrid.ColumnHeaderStyle>
+
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="60">
+                            <DataGridTemplateColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <CheckBox x:Name="chkSelectAll"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Click="SelectAll_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.HeaderTemplate>
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Click="RowCheckBox_Click"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- คอลัมน์ข้อความหลักใช้ Width แบบ Star (เหมือน PD CODE/PRODUCT NAME/REMARK ในหน้า Store Max-Min)
+                             เพื่อให้กระจายพื้นที่ที่เหลือแล้วเต็มตารางพอดี แทน Fixed px เดิมที่ทำให้เกิด Scrollbar
+                             แนวนอนเวลาหน้าต่างกว้างกว่าผลรวมความกว้างคอลัมน์ ส่วนคอลัมน์รหัส/ตัวเลขสั้นๆ
+                             (GROUP/QTY/LOT) ยังคงเป็น Fixed px เหมือน MAX/MIN ในหน้า Store Max-Min -->
+                        <DataGridTextColumn Header="BILL NO." Binding="{Binding TicketNo}" Width="1.3*" MinWidth="150" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="GROUP" Binding="{Binding GroupCode}" Width="90" MinWidth="80" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="PD CODE" Binding="{Binding MaterialCode}" Width="1.1*" MinWidth="130" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="QTY" Binding="{Binding Qty, StringFormat='{}{0:0.##}'}" Width="80" MinWidth="70" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="WORKORDER" Binding="{Binding WorkOrder}" Width="1.3*" MinWidth="150" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="LOT" Binding="{Binding LotNo}" Width="90" MinWidth="80" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="REMARK" Binding="{Binding JobName}" Width="1.8*" MinWidth="200" ElementStyle="{StaticResource WrapCellTextStyle}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
+    </Border>
+</Page>

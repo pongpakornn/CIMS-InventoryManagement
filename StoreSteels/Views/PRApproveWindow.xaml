@@ -1,0 +1,60 @@
+<Window x:Class="CIMS.Views.PRApproveWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Approve PR" Width="560" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- ✅ Approve PR: อนุมัติทั้งหมด / กำหนดยอด (ยอดน้อยกว่าที่ขอ -> เลือกว่าจะเก็บยอดที่เหลือเป็น PR ใหม่หรือไม่) -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <StackPanel>
+            <Border Background="#2E7D32" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel>
+                    <TextBlock Text="✅ APPROVE PR" Foreground="White" FontSize="20" FontWeight="Black"/>
+                    <TextBlock x:Name="txtPrNo" Foreground="#C8E6C9" FontSize="13" FontWeight="Bold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Margin="28,20,28,8">
+                <TextBlock Text="PRODUCT" FontSize="11" FontWeight="Bold" Foreground="#8A8490"/>
+                <TextBlock x:Name="txtProduct" FontSize="15" FontWeight="Black" Foreground="#2D2A32" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                <TextBlock x:Name="txtRequested" FontSize="13" FontWeight="Bold" Foreground="#49454F" Margin="0,6,0,0"/>
+
+                <Border Background="#F7F5FA" CornerRadius="14" Padding="16,12" Margin="0,16,0,0">
+                    <StackPanel>
+                        <RadioButton x:Name="rbAll" GroupName="mode" IsChecked="True" FontSize="14" FontWeight="Bold" Foreground="#2D2A32" Checked="Mode_Changed" Cursor="Hand">
+                            <TextBlock x:Name="txtAll" Text="APPROVE ALL"/>
+                        </RadioButton>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <RadioButton x:Name="rbSet" GroupName="mode" FontSize="14" FontWeight="Bold" Foreground="#2D2A32" VerticalAlignment="Center" Checked="Mode_Changed" Cursor="Hand"
+                                         Content="SET QUANTITY"/>
+                            <TextBox x:Name="txtQty" Width="120" Height="38" Margin="14,0,0,0" Style="{StaticResource StkInput}" HorizontalContentAlignment="Center"
+                                     IsEnabled="False" PreviewTextInput="Digits_PreviewTextInput" TextChanged="Qty_TextChanged"/>
+                            <TextBlock x:Name="txtUnit" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ยอดน้อยกว่าที่ขอ -> ยอดที่เหลือ -->
+                <Border x:Name="pnlRemain" Background="#FFF3E0" CornerRadius="14" Padding="16,12" Margin="0,12,0,0" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock x:Name="txtRemain" FontSize="13" FontWeight="Black" Foreground="#E65100"/>
+                        <RadioButton x:Name="rbKeep" GroupName="rest" IsChecked="True" FontSize="13" FontWeight="Bold" Margin="0,10,0,0" Cursor="Hand"
+                                     Content="KEEP THE REMAINING QTY AS A NEW PR (WAITING)"/>
+                        <RadioButton x:Name="rbDrop" GroupName="rest" FontSize="13" FontWeight="Bold" Margin="0,8,0,0" Cursor="Hand"
+                                     Content="DO NOT KEEP THE REMAINING QTY"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock x:Name="txtError" Foreground="#C62828" FontWeight="Bold" FontSize="12" Margin="2,8,0,0" Visibility="Collapsed"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="28,8,28,22">
+                <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                <Button x:Name="btnConfirm" Content="CONFIRM APPROVE" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Confirm_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
