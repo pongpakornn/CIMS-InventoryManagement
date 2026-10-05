@@ -3,7 +3,7 @@
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             xmlns:local="clr-namespace:CIMS.Converters"
             xmlns:helpers="clr-namespace:CIMS.Helpers"
-            Title="CIMS - CHR Inventory Management System" Height="800" Width="1400" 
+            Title="CIMS - CHR Inventory Management System" Height="800" Width="1400" MinWidth="960" MinHeight="600" SizeChanged="MainView_SizeChanged"
             Background="{StaticResource BgLight}">
 
     <Grid>
@@ -326,7 +326,18 @@
                 </Grid>
             </Border>
 
-            <Frame x:Name="MainFrame" Grid.Row="1" NavigationUIVisibility="Hidden" Margin="15"/>
+            <!-- 📐 Responsive: ทุกหน้าออกแบบไว้สำหรับพื้นที่กว้างอย่างน้อย DesignWidth (MainView.xaml.cs)
+                 จอเล็กกว่านั้น -> จัดหน้าที่ขนาดเดิมแล้วย่อทั้งหน้าให้พอดีจอ (เหมือนซูม เลย์เอาต์ไม่เพี้ยน)
+                 ย่อได้ไม่ต่ำกว่า MinScale (ตัวหนังสือยังอ่านได้) เล็กกว่านั้นเลื่อนดูได้ -->
+            <ScrollViewer x:Name="PageScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                          Focusable="False" SizeChanged="PageScroll_SizeChanged">
+                <Grid x:Name="PageHost" RequestBringIntoView="PageHost_RequestBringIntoView">
+                    <Grid.LayoutTransform>
+                        <ScaleTransform x:Name="PageScale" ScaleX="1" ScaleY="1"/>
+                    </Grid.LayoutTransform>
+                    <Frame x:Name="MainFrame" NavigationUIVisibility="Hidden" Margin="15"/>
+                </Grid>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </Window>

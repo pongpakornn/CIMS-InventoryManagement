@@ -197,17 +197,29 @@ namespace CIMS.Views
         }
 
         // 📄 แบบฟอร์ม Import (ชีท USERS / PERMISSIONS / SYSTEM IDS)
-        private void Template_Click(object sender, RoutedEventArgs e)
+        // รูปแบบเดียวกับ Template ทั้งระบบ: ยืนยันก่อน -> Desktop\CIMS_Export -> เปิดไฟล์ขึ้นมาเลย
+        private async void Template_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new Microsoft.Win32.SaveFileDialog { Title = "Save Import Template", Filter = "Excel Files (*.xlsx)|*.xlsx", FileName = "CIMS_User_Permission_Template.xlsx" };
-            if (dlg.ShowDialog() != true) return;
+            if (!DialogHelper.ShowConfirm(
+                    "ต้องการสร้างไฟล์ Template สำหรับนำเข้าผู้ใช้และสิทธิ์ใช่หรือไม่?\n\n" +
+                    "• ไฟล์มีชีท USERS และ PERMISSIONS พร้อมชีทวิธีกรอก และรายการรหัสระบบ / รหัสคลัง\n" +
+                    "• กรอกข้อมูลแล้วนำเข้าด้วยปุ่ม IMPORT USER / PERMISSION\n\n" +
+                    "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
+            btnTemplate.IsEnabled = false;
             try
             {
-                _service.CreateImportTemplate(dlg.FileName);
-                NotificationManager.Show("Template", "บันทึกแบบฟอร์ม Import แล้ว", true);
-                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dlg.FileName) { UseShellExecute = true }); } catch { }
+                string path = ImportTemplateService.NewPath("User_Permission_Template");
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+                    _service.CreateImportTemplate(path);
+                });
+                LogService.WriteLog(_session?.UserId, "USER_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)}", "");
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
+                ImportTemplateService.OpenFile(path);
             }
-            catch (Exception ex) { DialogHelper.ShowError("สร้างแบบฟอร์มไม่สำเร็จ (ปิดไฟล์ Excel เดิมก่อน)\n" + ex.Message); }
+            catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ (ปิดไฟล์ Excel เดิมก่อน)\n" + ex.Message); }
+            finally { btnTemplate.IsEnabled = true; }
         }
     }
 }

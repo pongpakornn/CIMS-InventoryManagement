@@ -27,6 +27,8 @@ namespace CIMS.Views
         public MainView(UserSession session)        // <-- รับ UserSession มาจาก LoginView
         {
             InitializeComponent();
+            // หน้าใหม่ (ทั้งจากเมนูและจากในหน้า เช่น การ์ดคลัง -> ตาราง) เริ่มที่มุมซ้ายบนเสมอ (จอเล็กที่เลื่อนหน้าได้)
+            MainFrame.Navigated += (s, e) => PageScroll.ScrollToHome();
             this.CurrentUser = session;             // เก็บข้อมูลคน Login
             this.DataContext = this;                // ทำให้ Binding {Binding CurrentUser.UserLevel} ทำงานได้
             this.Closing += MainView_Closing;       // [เพิ่ม] ดักจับการปิด Window ทุกกรณีรวมถึงกด X เพื่อให้ UserID อัพเดทสถานะเป็น Offline เสมอ
@@ -143,6 +145,12 @@ namespace CIMS.Views
 
         private void btnToggleSidebar_Click(object sender, RoutedEventArgs e)
         {
+            _sidebarByUser = true;   // ผู้ใช้กดเอง -> ไม่พับ/กางอัตโนมัติตามขนาดจออีก
+            ToggleSidebar();
+        }
+
+        private void ToggleSidebar()
+        {
             // Responsive Logic: 75px สำหรับไอคอนอย่างเดียว, 260px สำหรับเมนูเต็ม
             double targetWidth = IsSidebarOpen ? 80 : 260;
 
@@ -155,6 +163,52 @@ namespace CIMS.Views
 
             SidebarContainer.BeginAnimation(WidthProperty, animation);
             IsSidebarOpen = !IsSidebarOpen;
+        }
+
+        #endregion
+
+        #region === [ Responsive : รองรับทุกขนาดหน้าจอ ] ===
+
+        // พื้นที่ที่ทุกหน้าออกแบบไว้ (จอ Full HD ลบ Sidebar) - จอเล็กกว่านี้ย่อทั้งหน้าตามสัดส่วน
+        private const double DesignWidth = 1600;
+        private const double DesignHeight = 860;
+        private const double MinScale = 0.72;          // ย่อได้ไม่ต่ำกว่านี้ (ตัวหนังสือยังอ่านได้) เล็กกว่านี้ให้เลื่อนแทน
+        private const double SidebarAutoWidth = 1500;  // หน้าต่างแคบกว่านี้ -> พับ Sidebar ให้เหลือแต่ไอคอนเอง
+        private bool _sidebarByUser;                   // ผู้ใช้กด ☰ เอง -> ไม่พับ/กางอัตโนมัติอีก
+        private bool _sidebarAutoClosed;
+
+        private void MainView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_sidebarByUser || !e.WidthChanged) return;
+            bool narrow = ActualWidth < SidebarAutoWidth;
+            if (narrow && IsSidebarOpen) { _sidebarAutoClosed = true; ToggleSidebar(); }
+            else if (!narrow && !IsSidebarOpen && _sidebarAutoClosed) { _sidebarAutoClosed = false; ToggleSidebar(); }
+        }
+
+        private void PageScroll_SizeChanged(object sender, SizeChangedEventArgs e) => ApplyPageScale();
+
+        // จอเล็กที่ต้องเลื่อนหน้า: ไม่ให้หน้ากระโดดเลื่อนเองตอนช่องไหนได้ Focus / การ์ดที่เลื่อนวน (ผู้ใช้เลื่อนเอง)
+        private void PageHost_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e) => e.Handled = true;
+
+        private void ApplyPageScale()
+        {
+            double w = PageScroll.ActualWidth, h = PageScroll.ActualHeight;
+            if (w <= 0 || h <= 0) return;
+
+            double s = Math.Min(1, Math.Max(MinScale, w / DesignWidth));
+            // ต้องเลื่อนแนวตั้ง / แนวนอน -> เผื่อที่ของ Scrollbar ไม่ให้เกิดแถบเลื่อนซ้อนเพราะขาดไม่กี่ px
+            bool needV = h / s < DesignHeight - 0.5;
+            if (needV) { w -= SystemParameters.VerticalScrollBarWidth; s = Math.Min(1, Math.Max(MinScale, w / DesignWidth)); }
+            bool needH = s < 1 && DesignWidth * s > w + 0.5;
+            if (needH) { h -= SystemParameters.HorizontalScrollBarHeight; needV = h / s < DesignHeight - 0.5; }
+
+            PageScale.ScaleX = PageScale.ScaleY = s;
+            // แกนที่พอดีจอ: ปิดการเลื่อน หน้าขยายเต็มพื้นที่เอง (ไม่มี Scrollbar เกินมา)
+            // แกนที่ไม่พอ: เลื่อนได้ และกำหนดขนาดหน้าตายตัว - ตารางในหน้าจึงยังสร้างแถวเฉพาะที่เห็น (Virtualization) ไม่ช้าลง
+            PageScroll.HorizontalScrollBarVisibility = needH ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+            PageScroll.VerticalScrollBarVisibility = needV ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+            PageHost.Width = needH ? DesignWidth : double.NaN;
+            PageHost.Height = needV ? DesignHeight : double.NaN;
         }
 
         #endregion

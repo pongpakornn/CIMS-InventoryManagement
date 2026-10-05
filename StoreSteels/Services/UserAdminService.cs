@@ -437,36 +437,48 @@ namespace CIMS.Services
             return (add, upd, perms);
         }
 
-        // 📄 แบบฟอร์ม Import: ชีท USERS + ชีท PERMISSIONS (ตัวอย่าง 1 แถว) + ชีท SYSTEM IDS (รหัสที่ใช้ได้)
+        // 📄 แบบฟอร์ม Import (รูปแบบเดียวกับ Template อื่นทั้งระบบ): ชีท USERS + ชีท PERMISSIONS (ว่างพร้อมกรอก)
+        //    + ชีท HOW TO (วิธีกรอก + ตัวอย่าง) + ชีท SYSTEM IDS (รหัสระบบ / รหัสคลังที่ใช้ได้)
         public void CreateImportTemplate(string path)
         {
             using (var wb = new ClosedXML.Excel.XLWorkbook())
             {
-                void Head(ClosedXML.Excel.IXLWorksheet ws, string[] heads)
-                {
-                    for (int i = 0; i < heads.Length; i++) ws.Cell(1, i + 1).Value = heads[i];
-                    var rng = ws.Range(1, 1, 1, heads.Length);
-                    rng.Style.Font.Bold = true; rng.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
-                    rng.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#6750A4");
-                }
                 var u = wb.AddWorksheet("USERS");
-                Head(u, new[] { "NO", "USERID", "PASSWORD", "FULLNAME", "DIVISION", "DEPARTMENT", "SECTION", "POSITION", "USERLEVEL", "ISONLINE", "ISLOCKED", "ISMASTERADMIN" });
-                object[] ex = { 1, "EMP001", "1234", "Example Name", "Production", "Store", "Store PC", "Staff", 2, 0, 0, 0 };
-                for (int i = 0; i < ex.Length; i++) u.Cell(2, i + 1).Value = ClosedXML.Excel.XLCellValue.FromObject(ex[i]);
-                u.Columns().AdjustToContents();
+                ImportTemplateService.Header(u, new[] { "NO", "USERID", "PASSWORD", "FULLNAME", "DIVISION", "DEPARTMENT", "SECTION", "POSITION", "USERLEVEL", "ISONLINE", "ISLOCKED", "ISMASTERADMIN" },
+                                             new double[] { 6.4, 14, 14, 28, 16, 16, 16, 16, 12, 11, 11, 19 });
+                ImportTemplateService.Body(u, 31, 12);
+                for (int r = 2; r <= 31; r++) u.Cell(r, 1).Value = r - 1;
 
                 var p = wb.AddWorksheet("PERMISSIONS");
-                Head(p, new[] { "NO", "USERID", "SYSTEMID", "CANVIEW", "CANADD", "CANEDIT", "CANDELETE", "CANAPPROVE" });
-                object[] pe = { 1, "EMP001", "MultiScanner", "Y", "Y", "N", "N", "N" };
-                for (int i = 0; i < pe.Length; i++) p.Cell(2, i + 1).Value = ClosedXML.Excel.XLCellValue.FromObject(pe[i]);
-                p.Columns().AdjustToContents();
+                ImportTemplateService.Header(p, new[] { "NO", "USERID", "SYSTEMID", "CANVIEW", "CANADD", "CANEDIT", "CANDELETE", "CANAPPROVE" },
+                                             new double[] { 6.4, 14, 20, 11, 11, 11, 12, 13 });
+                ImportTemplateService.Body(p, 51, 8);
+                for (int r = 2; r <= 51; r++) p.Cell(r, 1).Value = r - 1;
+
+                ImportTemplateService.Guide(wb, "CIMS - Import User / Permission", new[]
+                {
+                    ("ชีท USERS", "1 แถว = 1 ผู้ใช้  •  ตัวอย่าง: USERID EMP001 / PASSWORD 1234 / FULLNAME Example Name / USERLEVEL 2 / ISLOCKED 0"),
+                    ("USERID * / FULLNAME *", "บังคับ - USERID ที่มีอยู่แล้ว = อัพเดทข้อมูล / ใหม่ = เพิ่มผู้ใช้ (ต้องมี PASSWORD)"),
+                    ("PASSWORD", "รหัสผ่าน - ผู้ใช้เดิมเว้นว่าง = ใช้รหัสเดิม"),
+                    ("DIVISION - POSITION", "สังกัด / ตำแหน่ง (ไม่บังคับ)"),
+                    ("USERLEVEL", "1 = Admin (ทำได้ทุกอย่าง) / 2 / 3 = ได้เฉพาะสิทธิ์ที่ติ๊ก"),
+                    ("ISLOCKED", "1 = ล็อก (เข้าระบบไม่ได้) / 0 = ใช้งานได้  •  ISONLINE ระบบจัดการเอง"),
+                    ("ISMASTERADMIN", "1 = Master Admin (นำเข้าได้เฉพาะ Admin)"),
+                    ("ชีท PERMISSIONS", "1 แถว = 1 ผู้ใช้ + 1 ระบบ  •  ตัวอย่าง: EMP001 / MultiScanner / Y / Y / N / N / N"),
+                    ("SYSTEMID", "รหัสระบบหรือรหัสคลัง ดูในชีท SYSTEM IDS - ระบบที่ไม่มีในไฟล์คงสิทธิ์เดิม"),
+                    ("CANVIEW - CANAPPROVE", "Y / N หรือ 1 / 0"),
+                    ("NO", "ลำดับ - ระบบไม่ได้ใช้"),
+                    ("", "กรอกในชีท USERS และ / หรือ PERMISSIONS แล้วกด IMPORT USER / PERMISSION ในหน้า User Management"),
+                });
 
                 var s = wb.AddWorksheet("SYSTEM IDS");
-                Head(s, new[] { "SYSTEMID", "SYSTEM", "VIEW / ADD / EDIT / DEL / APPROVE" });
+                ImportTemplateService.Header(s, new[] { "SYSTEMID", "SYSTEM", "VIEW / ADD / EDIT / DEL / APPROVE" }, new double[] { 20, 30, 90 });
                 int row = 2;
                 foreach (var sys in Systems) { s.Cell(row, 1).Value = sys.SysId; s.Cell(row, 2).Value = sys.Title; s.Cell(row, 3).Value = sys.Hint; row++; }
                 foreach (var code in ValidSystemIds().Skip(Systems.Length)) { s.Cell(row, 1).Value = code; s.Cell(row, 2).Value = "Stock"; s.Cell(row, 3).Value = "VIEW = see the stock  •  ADD = import excel  •  EDIT = edit Max / Min / Qty"; row++; }
-                s.Columns().AdjustToContents();
+                ImportTemplateService.Body(s, row - 1, 3);
+                s.Range(2, 3, Math.Max(2, row - 1), 3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Left;
+                wb.Worksheet(1).SetTabActive();
                 wb.SaveAs(path);
             }
         }

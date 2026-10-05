@@ -248,7 +248,7 @@ namespace CIMS.Views
                 LogService.WriteLog(_session?.UserId, days ? "MAXMIN_TEMPLATE" : "FORECAST_TEMPLATE",
                     $"Stock: {stock.Code} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", stock.Code);
                 NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
-                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+                ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
             }
             catch (System.IO.IOException) { DialogHelper.ShowError("บันทึกไฟล์ไม่สำเร็จ กรุณาปิดไฟล์ Excel ที่เปิดอยู่ก่อนแล้วลองใหม่"); }
             catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ\n" + ex.Message); }

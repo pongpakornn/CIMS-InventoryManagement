@@ -686,8 +686,8 @@
             <StackPanel Grid.Row="0">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
@@ -715,49 +715,50 @@
                     </StackPanel>
 
                     <!-- ปุ่มสลับโหมด สแกนออก / คืนเหล็ก / Test (Focusable=False: กดแล้วโฟกัสยังอยู่ที่ช่องสแกน ยิงต่อได้ทันที) -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- จอเล็ก: ชื่อหน้าแสดงเต็มเสมอ ปุ่มขึ้นแถวใหม่เองเมื่อที่ไม่พอ (จอ Full HD อยู่แถวเดียวเหมือนเดิม) -->
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
                         <Button Content="{Binding ScanOutButtonText}"
                                 Command="{Binding ToggleScanOutModeCommand}"
                                 Background="{Binding ScanOutButtonBackground}"
                                 Visibility="{Binding ScanOutButtonVisibility}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
-                                Width="160" Height="38" FontSize="13" Margin="0,0,10,0"/>
+                                Width="160" Height="38" FontSize="13" Margin="0,0,10,6"/>
 
                         <Button Content="{Binding ReturnButtonText}"
                                 Command="{Binding ToggleReturnModeCommand}"
                                 Background="{Binding ReturnButtonBackground}"
                                 Visibility="{Binding ReturnButtonVisibility}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
-                                Width="160" Height="38" FontSize="13" Margin="0,0,10,0"/>
+                                Width="160" Height="38" FontSize="13" Margin="0,0,10,6"/>
 
                         <Button Content="{Binding RemainderButtonText}"
                                 Command="{Binding ToggleRemainderModeCommand}"
                                 Background="{Binding RemainderButtonBackground}"
                                 Visibility="{Binding RemainderButtonVisibility}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False" ToolTip="Scan then type the qty yourself (no box count)"
-                                Width="170" Height="38" FontSize="13" Margin="0,0,10,0"/>
+                                Width="170" Height="38" FontSize="13" Margin="0,0,10,6"/>
 
                         <Button Content="{Binding TestButtonText}"
                                 Command="{Binding ToggleTestModeCommand}"
                                 Background="{Binding TestButtonBackground}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
-                                Width="160" Height="38" FontSize="13"/>
+                                Width="160" Height="38" FontSize="13" Margin="0,0,0,6"/>
                         <!-- 🕘 ประวัติการสแกน (TURBO ทำงานตลอด ไม่มีปุ่มแล้ว) -->
                         <Button Content="🕘 HISTORY" Click="History_Click"
                                 Background="{StaticResource MainPurple}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
-                                Width="130" Height="38" FontSize="13" Margin="10,0,0,0"/>
+                                Width="130" Height="38" FontSize="13" Margin="10,0,0,6"/>
                         <!-- 🏷️ เลือกค่าที่แสดงแทนรหัสต่อคลัง (PART A / PART NO / Barcode #n ...) -->
                         <Button Content="🏷️ DISPLAY" Click="ScanDisplay_Click"
                                 Background="#49454F" Visibility="{Binding DisplayButtonVisibility}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False" ToolTip="Choose what each stock shows as PRODUCT CODE"
-                                Width="120" Height="38" FontSize="13" Margin="10,0,0,0"/>
+                                Width="120" Height="38" FontSize="13" Margin="10,0,0,6"/>
                         <!-- ✏️ แก้ไข / ลบรายการสแกน (Admin Level 1 เท่านั้น) -->
                         <Button Content="✏️ ADJUST SCAN" Click="AdjustScan_Click"
                                 Background="#B3261E" Visibility="{Binding AdjustButtonVisibility}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
-                                Width="150" Height="38" FontSize="13" Margin="10,0,0,0"/>
-                    </StackPanel>
+                                Width="150" Height="38" FontSize="13" Margin="10,0,0,6"/>
+                    </WrapPanel>
                 </Grid>
 
                 <Separator Background="#EEE" Margin="0,5,0,0" Height="1.5"/>

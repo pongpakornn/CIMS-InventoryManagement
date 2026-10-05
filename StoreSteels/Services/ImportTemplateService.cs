@@ -14,11 +14,21 @@ namespace CIMS.Services
     {
         public static string ExportFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CIMS_Export");
 
+        // เปิดไฟล์ที่สร้างเสร็จขึ้นมาเลย (Excel) - เปิดไม่ได้ (เช่นเครื่องไม่มี Excel) -> เปิดโฟลเดอร์แล้วเลือกไฟล์ไว้ให้
+        public static void OpenFile(string path)
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+            catch
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+            }
+        }
+
         public static string NewPath(string name) =>
             Path.Combine(ExportFolder, $"{name}_{DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)}.xlsx");
 
         // หัวตารางแบบเดียวกับไฟล์ Template ของบริษัท (#002060 ตัวขาวหนา กึ่งกลาง)
-        private static void Header(IXLWorksheet ws, string[] heads, double[] widths)
+        public static void Header(IXLWorksheet ws, string[] heads, double[] widths)
         {
             for (int i = 0; i < heads.Length; i++) ws.Cell(1, i + 1).Value = heads[i];
             var h = ws.Range(1, 1, 1, heads.Length);
@@ -33,7 +43,7 @@ namespace CIMS.Services
             ws.SheetView.FreezeRows(1);
         }
 
-        private static void Body(IXLWorksheet ws, int lastRow, int cols)
+        public static void Body(IXLWorksheet ws, int lastRow, int cols)
         {
             if (lastRow < 2) return;
             var r = ws.Range(2, 1, lastRow, cols);
@@ -44,7 +54,7 @@ namespace CIMS.Services
             ws.Rows(2, lastRow).Height = 20.25;
         }
 
-        private static void Guide(XLWorkbook wb, string title, IEnumerable<(string Col, string Text)> lines)
+        public static void Guide(XLWorkbook wb, string title, IEnumerable<(string Col, string Text)> lines)
         {
             var g = wb.AddWorksheet("HOW TO");
             g.Cell(1, 1).Value = title;

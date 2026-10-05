@@ -47,6 +47,41 @@ namespace CIMS
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
             StartHangWatchdog();
+
+            // 📐 หน้าต่าง Popup ที่ใหญ่กว่าจอ (เช่น HISTORY 1320 x 820 บนจอ 1366 x 768) -> ย่อให้พอดีจอ + กลางจอ
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(FitWindowToScreen));
+        }
+
+        private static void FitWindowToScreen(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is Window w) || w is Views.MainView || !(w.Content is FrameworkElement content)) return;
+            var area = SystemParameters.WorkArea;
+
+            // ขนาดจริงที่หน้าต่างต้องการ: ด้านที่ปรับตามเนื้อหา (SizeToContent) วัดจากเนื้อหาแบบไม่จำกัด
+            // (Windows จำกัดหน้าต่างไม่ให้เกินจอไว้ก่อนแล้ว ActualHeight จึงไม่ใช่ขนาดจริง) / ด้านที่กำหนดตายตัวใช้ค่าที่ตั้งไว้
+            bool autoW = w.SizeToContent == SizeToContent.Width || w.SizeToContent == SizeToContent.WidthAndHeight || double.IsNaN(w.Width);
+            bool autoH = w.SizeToContent == SizeToContent.Height || w.SizeToContent == SizeToContent.WidthAndHeight || double.IsNaN(w.Height);
+            Size natural = new Size(0, 0);
+            if (autoW || autoH)
+            {
+                content.Measure(new Size(autoW ? double.PositiveInfinity : w.Width, double.PositiveInfinity));
+                natural = content.DesiredSize;
+            }
+            double needW = autoW ? natural.Width : w.Width, needH = autoH ? natural.Height : w.Height;
+            if (needW <= 0 || needH <= 0) return;
+            double s = Math.Min(1, Math.Min((area.Width - 8) / needW, (area.Height - 8) / needH));
+            if (s >= 0.999) { if (autoW || autoH) content.InvalidateMeasure(); return; }
+
+            content.LayoutTransform = new System.Windows.Media.ScaleTransform(s, s);
+            if (!autoW) w.Width = needW * s;
+            if (!autoH) w.Height = needH * s;
+            content.InvalidateMeasure();
+            // ขนาดใหม่มีผลหลังจัดหน้าเสร็จ -> จัดกลางจอให้อีกครั้ง
+            w.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                w.Left = area.Left + Math.Max(0, (area.Width - w.ActualWidth) / 2);
+                w.Top = area.Top + Math.Max(0, (area.Height - w.ActualHeight) / 2);
+            }));
         }
 
         protected override void OnExit(ExitEventArgs e)

@@ -192,7 +192,7 @@
                     });
                     LogService.WriteLog(_viewModel.CurrentUser?.UserId, "PART_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)}", "");
                     NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
-                    try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+                    ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
                 }
                 catch (Exception ex)
                 {

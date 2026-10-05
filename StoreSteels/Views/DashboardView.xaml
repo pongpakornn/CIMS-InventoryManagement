@@ -231,6 +231,17 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
+                            <!-- สีประจำการ์ด: ส่งต่อให้ตัวเลขในแถว + เส้นใต้ยอดรวม -->
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="TextElement.Foreground" Value="#6750A4"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Kind}" Value="PRODUCT"><Setter Property="TextElement.Foreground" Value="#1E88E5"/></DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="MAX"><Setter Property="TextElement.Foreground" Value="#2E7D32"/></DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="MIN"><Setter Property="TextElement.Foreground" Value="#D32F2F"/></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
 
                             <!-- รูป + หัวข้อ + ยอดรวม -->
                             <Grid>
@@ -244,22 +255,24 @@
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0">
                                     <TextBlock Text="{Binding Title}" Foreground="#4A5568" FontSize="17" FontWeight="Black" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{Binding Value}" Foreground="#1A202C" FontSize="30" FontWeight="Black" Margin="0,2,0,0"/>
+                                    <!-- เส้นสีประจำการ์ด (แบบเดียวกับเส้นใต้หัวข้อ DASHBOARD) -->
+                                    <Border Height="3" Width="44" CornerRadius="2" HorizontalAlignment="Left" Margin="1,4,0,0" Background="{Binding RelativeSource={RelativeSource AncestorType=Grid, AncestorLevel=2}, Path=(TextElement.Foreground)}"/>
                                 </StackPanel>
                             </Grid>
 
-                            <!-- แถวละ 1 คลัง -->
+                            <!-- แถวละ 1 คลัง: พื้นขาว + เส้นคั่นบาง / ตัวเลขใช้สีประจำการ์ด (Stock ม่วง · Product ฟ้า · Max เขียว · Min แดง) -->
                             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,4">
                                 <ItemsControl ItemsSource="{Binding Rows}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border CornerRadius="8" Padding="10,4" Margin="0,0,0,4" Background="#F7F5FA">
+                                            <Border Padding="4,5" Background="White" BorderBrush="#EEF0F5" BorderThickness="0,0,0,1">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="{Binding Code}" FontSize="12" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding Right}" FontSize="12" FontWeight="Bold" Foreground="#4A5568"
+                                                    <TextBlock Text="{Binding Code}" FontSize="12" FontWeight="Black" Foreground="#2D3748" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Right}" FontSize="12" FontWeight="Black"
                                                                HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" Margin="10,0,0,0" VerticalAlignment="Center"/>
                                                 </Grid>
                                             </Border>

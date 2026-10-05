@@ -244,7 +244,7 @@ namespace CIMS.Views
                 });
                 LogService.WriteLog(_session?.UserId, "FORECAST_TEMPLATE", $"Month: {month.ToString("yyyy-MM", CultureInfo.InvariantCulture)} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
                 NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\n{path}", true);
-                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+                ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
             }
             catch (Exception ex)
             {
