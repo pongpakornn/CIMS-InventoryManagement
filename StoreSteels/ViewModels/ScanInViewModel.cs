@@ -657,10 +657,10 @@ namespace CIMS.ViewModels
         private async Task<StockModel> ResolveStockAsync(bool isOut, bool isPickList, BarcodeFormatModel supplierFmt,
                                                          List<string> codes, string rawBarcode)
         {
-            var part = await Task.Run(() => FindPartByCodes(codes));
+            var part = await Task.Run(() => FindPartByCodes(supplierFmt, codes));
             if (part == null)
             {
-                ScanError($"[รายการไม่สำเร็จ] ไม่พบข้อมูลสินค้าในระบบ หรือบาร์โค้ดยังไม่ได้ลงทะเบียน\nCode: {codes.FirstOrDefault()}");
+                ScanError($"[รายการไม่สำเร็จ] ไม่พบข้อมูลสินค้าในระบบ หรือบาร์โค้ดยังไม่ได้ลงทะเบียน\nCode: {codes.FirstOrDefault()}{LookupNoteText}");
                 return null;
             }
 
@@ -899,10 +899,9 @@ namespace CIMS.ViewModels
             BarcodeFormatModel supplierFmt = null;
             if (!isPackingCardScan)
             {
-                foreach (var fmt in _allFormats)
-                {
-                    if (fmt.TryParse(finalSearchCode, out supplierCodes, out supplierQty)) { supplierFmt = fmt; break; }
-                }
+                string raw = finalSearchCode;
+                var r = await Task.Run(() => { var f = MatchSupplier(raw, multiScope ? null : stock, out var c, out var q); return (f, c, q); });
+                supplierFmt = r.f; supplierCodes = r.c; supplierQty = r.q;
             }
             bool isSupplierScan = supplierFmt != null;
 
@@ -957,7 +956,8 @@ namespace CIMS.ViewModels
             {
                 var result = await Task.Run(() =>
                 {
-                    var part = isSupplierScan ? FindPartByCodes(supplierCodes) : _scanService.GetPartByScan(finalSearchCode);
+                    _lookupNote = null;
+                    var part = isSupplierScan ? FindPartByCodes(supplierFmt, supplierCodes) : _scanService.GetPartByScan(finalSearchCode);
                     if (part == null) return null;
 
                     // สต็อก/Quantity เป็นจำนวนเต็ม ป้าย Supplier ที่มีทศนิยมจึงปัดเป็นจำนวนเต็มที่ใกล้ที่สุด
@@ -1075,11 +1075,11 @@ namespace CIMS.ViewModels
                 }
                 else if (isOut)
                 {
-                    ScanError($"[ระงับการทำรายการ] ไม่พบข้อมูลสินค้า หรือ สินค้าในระบบไม่เพียงพอสำหรับจ่ายออก (คลัง {stock.Code} มีไม่พอ)\nCode: {finalSearchCode}");
+                    ScanError($"[ระงับการทำรายการ] ไม่พบข้อมูลสินค้า หรือ สินค้าในระบบไม่เพียงพอสำหรับจ่ายออก (คลัง {stock.Code} มีไม่พอ)\nCode: {finalSearchCode}{LookupNoteText}");
                 }
                 else
                 {
-                    ScanError($"[รายการไม่สำเร็จ] ไม่พบข้อมูลสินค้าในระบบ หรือบาร์โค้ดยังไม่ได้ลงทะเบียน\nCode: {finalSearchCode}");
+                    ScanError($"[รายการไม่สำเร็จ] ไม่พบข้อมูลสินค้าในระบบ หรือบาร์โค้ดยังไม่ได้ลงทะเบียน\nCode: {finalSearchCode}{LookupNoteText}");
                 }
             }
             catch (Exception ex)
@@ -1125,10 +1125,8 @@ namespace CIMS.ViewModels
         {
             matchedFmt = null;
             if (string.IsNullOrWhiteSpace(raw)) return new List<string> { string.Empty };
-            foreach (var fmt in _allFormats)
-            {
-                if (fmt.TryParse(raw, out List<string> codes, out _)) { matchedFmt = fmt; return codes; }
-            }
+            matchedFmt = MatchSupplier(raw, SelectedStock, out List<string> codes, out _);
+            if (matchedFmt != null) return codes;
             string trimmed = raw.Trim();
             int pipeIndex = trimmed.IndexOf('|');
             return new List<string> { pipeIndex >= 0 ? trimmed.Substring(0, pipeIndex).Trim() : trimmed };
@@ -1155,15 +1153,35 @@ namespace CIMS.ViewModels
                 : $"คลัง {stock.Code} ไม่ได้เปิดให้{dir}ด้วย QR ระบบ";
         }
 
-        // ลองค้นหาสินค้าด้วยรหัสทีละตัวตามลำดับ คืนตัวแรกที่เจอ
-        private ScanItemModel FindPartByCodes(List<string> codes)
+        // ค้นสินค้าตามรูปแบบป้าย (ชื่อสินค้า หรือรหัสทีละตัว) - _lookupNote = เหตุผลที่ไม่เจอ ไว้ต่อท้ายข้อความแจ้งเตือน
+        private string _lookupNote;
+        private ScanItemModel FindPartByCodes(BarcodeFormatModel fmt, List<string> codes)
         {
-            foreach (var c in codes)
-            {
-                var part = _scanService.GetPartByScan(c);
-                if (part != null) return part;
-            }
-            return null;
+            var part = _scanService.FindPart(fmt, codes, out string note);
+            _lookupNote = note;
+            return part;
+        }
+
+        private string LookupNoteText => string.IsNullOrEmpty(_lookupNote) ? "" : "\n" + _lookupNote;
+
+        // 🏷️ ป้าย Supplier: ลองทุกรูปแบบที่เข้ากับป้าย (รูปแบบที่คลังที่เลือกรับก่อน) แล้วใช้รูปแบบแรกที่เจอสินค้าในระบบ
+        //    เช่น Panta (รหัส #11) กับ Panta-2 (ชื่อสินค้า #6 + #7) ป้ายหน้าตาเดียวกัน -> Panta หาไม่เจอก็ใช้ Panta-2
+        //    ไม่เจอเลย = ใช้รูปแบบแรกที่เข้ากับป้าย (ไว้แจ้งว่าไม่พบสินค้า)
+        private BarcodeFormatModel MatchSupplier(string raw, StockModel stock, out List<string> codes, out decimal? qty)
+        {
+            codes = null; qty = null;
+            var ordered = stock == null ? _allFormats : _allFormats.OrderBy(f => stock.FormatIds.Contains(f.FmtId) ? 0 : 1).ToList();
+            var hits = new List<(BarcodeFormatModel Fmt, List<string> Codes, decimal? Qty)>();
+            foreach (var fmt in ordered)
+                if (fmt.TryParse(raw, out List<string> c, out decimal? q)) hits.Add((fmt, c, q));
+            if (hits.Count == 0) return null;
+
+            var pick = hits[0];
+            if (hits.Count > 1)
+                foreach (var h in hits)
+                    if (_scanService.FindPart(h.Fmt, h.Codes, out _) != null) { pick = h; break; }
+            codes = pick.Codes; qty = pick.Qty;
+            return pick.Fmt;
         }
 
         // 🔄 [โหมดคืนเหล็ก] สแกน QR Export จากหน้า ProductControl -> ค้นหาสินค้า -> เด้ง Popup กรอกจำนวนรับคืน
@@ -1201,11 +1219,11 @@ namespace CIMS.ViewModels
 
             try
             {
-                var part = await Task.Run(() => FindPartByCodes(codes));
+                var part = await Task.Run(() => FindPartByCodes(matchedFmt, codes));
 
                 if (part == null)
                 {
-                    ScanError($"[รายการไม่สำเร็จ] ไม่พบข้อมูลสินค้าในระบบสำหรับคืนเหล็ก\nCode: {code}");
+                    ScanError($"[รายการไม่สำเร็จ] ไม่พบข้อมูลสินค้าในระบบสำหรับคืนเหล็ก\nCode: {code}{LookupNoteText}");
                     return;
                 }
 

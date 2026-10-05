@@ -53,7 +53,7 @@
 
             <DataGrid x:Name="dgHistory" Grid.Row="2" Margin="24,0,24,0"
                       AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserAddRows="False"
-                      Background="Transparent" BorderThickness="0" RowHeight="44" FontSize="13" FontWeight="SemiBold"
+                      Background="Transparent" BorderThickness="0" MinRowHeight="44" FontSize="13" FontWeight="SemiBold"
                       GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#F2F0F5" SelectionUnit="FullRow"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                       ScrollViewer.ScrollChanged="dgHistory_ScrollChanged" PreviewMouseWheel="dgHistory_PreviewMouseWheel" PreviewKeyDown="dgHistory_PreviewKeyDown">
@@ -73,16 +73,23 @@
                         <Setter Property="VerticalAlignment" Value="Center"/>
                         <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                     </Style>
+                    <!-- บาร์โค้ดเต็มทุกตัว: ตัวหนา ขึ้นบรรทัดใหม่เมื่อยาว (แถวสูงตามข้อความ) -->
+                    <Style x:Key="BarcodeCell" TargetType="TextBlock">
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Margin" Value="8,6"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                        <Setter Property="TextWrapping" Value="Wrap"/>
+                        <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </Style>
                 </DataGrid.Resources>
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="DATE TIME" Binding="{Binding DateText}" Width="1.3*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="STOCK" Binding="{Binding StockCode}" Width="1*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="TYPE" Binding="{Binding TxType}" Width="0.7*" ElementStyle="{StaticResource Cell}"/>
-                    <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding CodeText}" Width="1.2*" ElementStyle="{StaticResource Cell}"/>
-                    <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="1.8*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="1.6*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="QTY" Binding="{Binding Qty, StringFormat=N0}" Width="0.6*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="USER" Binding="{Binding UserText}" Width="1.1*" ElementStyle="{StaticResource Cell}"/>
-                    <DataGridTextColumn Header="BARCODE" Binding="{Binding RefNo}" Width="2*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="BARCODE" Binding="{Binding RefNo}" Width="3.6*" ElementStyle="{StaticResource BarcodeCell}"/>
                 </DataGrid.Columns>
             </DataGrid>
             <TextBlock x:Name="txtEmpty" Grid.Row="2" Text="NO SCAN RECORD" FontSize="15" FontWeight="Bold" Foreground="#AAA"

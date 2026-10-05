@@ -41,7 +41,10 @@ namespace CIMS.Models
         // จัดกลุ่มตาราง: CATEGORY (ค่าเดิม) หรือ CUSTOMER
         public string GroupBy { get; set; } = "CATEGORY";
         public bool GroupByCustomer => string.Equals(GroupBy, "CUSTOMER", System.StringComparison.OrdinalIgnoreCase);
-        public string GroupLabel => GroupByCustomer ? "CUSTOMER" : "CATEGORY";
+        public bool GroupBySupplier => string.Equals(GroupBy, "SUPPLIER", System.StringComparison.OrdinalIgnoreCase);
+        // CATEGORY (ค่าเริ่มต้น) / CUSTOMER / SUPPLIER
+        public string GroupCode => GroupByCustomer ? "CUSTOMER" : GroupBySupplier ? "SUPPLIER" : "CATEGORY";
+        public string GroupLabel => GroupCode;
 
         // หน่วยของ MAX / MIN เลือกแยกเอง: KG / PCS / SHEET / BOX (BOX เทียบกับ STOCK (BOX) ที่เหลือเทียบกับ QTY)
         // ค่าเดิม UNIT = ใช้หน่วยเดียวกับคลัง

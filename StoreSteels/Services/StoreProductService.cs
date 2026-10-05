@@ -35,7 +35,7 @@ namespace CIMS.Services
             {
                 string sql = @"SELECT DISTINCT GroupKey FROM CIMS.vw_StockMonitoring
                                WHERE StkId = @stk AND GroupKey IS NOT NULL AND GroupKey <> ''
-                               ORDER BY GroupKey";
+                               ORDER BY GroupKey OPTION (MAX_GRANT_PERCENT = 5)";
                 SqlCommand cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@stk", stock.StkId);
                 conn.Open();
@@ -52,6 +52,30 @@ namespace CIMS.Services
             if (!UseStockView(stock)) return GetMinimalStockUpdates(partCodes);
             return QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, partCodes);
         }
+
+        // ⚡ เรียลไทม์แบบเบา: ค่าเดียวที่เปลี่ยนเมื่อยอด / MAX / MIN / REMARK / SHOW ของคลังนี้เปลี่ยน (นับแถว + CHECKSUM)
+        //    ทุก 3 วินาทีถามแค่ค่านี้ (ไม่กี่ ms ไม่ส่งรหัสสินค้าไปเป็นพันตัว) - เปลี่ยนเมื่อไรค่อยดึงตัวเลขใหม่ทั้งคลังครั้งเดียว
+        public string GetChangeToken(StockModel stock)
+        {
+            if (!UseStockView(stock)) return null;   // ระบบเก่า (ไม่มี vw_StockMonitoring) -> ใช้วิธีเดิม
+            string sql = stock.IsMain
+                ? @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, StockQuantity, MaxQuantity, MinQuantity, Remark, IsShowInMaster, IsActive, PackSize))
+                    FROM CIMS.Parts"
+                : @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(ps.PartID, ps.Quantity, ps.BoxQuantity, ps.MaxQuantity, ps.MinQuantity, ps.Remark, ps.IsShow, p.PackSize, p.IsActive))
+                    FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = @stk";
+            using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+            using (var cmd = new SqlCommand(sql, conn))
+            {
+                cmd.Parameters.AddWithValue("@stk", stock.StkId);
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    return r.Read() ? $"{r.GetInt32(0)}|{(r.IsDBNull(1) ? 0 : r.GetInt32(1))}" : "";
+            }
+        }
+
+        // ตัวเลขล่าสุดของทั้งคลัง (เฉพาะคอลัมน์ที่เปลี่ยนได้) - ใช้ตอน GetChangeToken บอกว่ามีการเปลี่ยน
+        public List<StoreProductModel> GetStockNumbers(StockModel stock) =>
+            QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, null);
 
         // box: แก้ STOCK (BOX) -> คลังอื่นเก็บ BoxQuantity (Trigger คำนวณ QTY = BOX x Pack Size) / คลังหลักแปลงเป็นจำนวน x Pack Size
         // ptId: แถวที่แก้ (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - 0 = หาจากรหัสแบบเดิม
@@ -202,19 +226,21 @@ namespace CIMS.Services
         private List<StoreProductModel> QueryMinimalUpdates(string viewName, int stkId, List<string> partCodes)
         {
             var list = new List<StoreProductModel>();
-            if (partCodes == null || partCodes.Count == 0) return list;
+            // partCodes = null -> ทั้งคลัง / มีรายการ -> เฉพาะรหัสนั้น (SQL Server รับพารามิเตอร์ได้ไม่เกิน ~2,100 ตัว -> เกินนั้นดึงทั้งคลังแทน)
+            bool all = partCodes == null || partCodes.Count > 1000;
+            if (!all && partCodes.Count == 0) return list;
 
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
             {
-                var paramNames = partCodes.Select((s, i) => $"@p{i}").ToList();
+                var paramNames = all ? new List<string>() : partCodes.Select((s, i) => $"@p{i}").ToList();
                 string sql = $@"SELECT PartID, PartCode, ISNULL([Max], 0) AS [Max], ISNULL([Min], 0) AS [Min],
                                        ISNULL(QtyStkb, 0) AS QtyStkb, Remark, StockStatus, StockBox, StockPcs
-                                FROM {viewName} WHERE StkId = @stk AND PartCode IN ({string.Join(",", paramNames)})
+                                FROM {viewName} WHERE StkId = @stk {(all ? "" : $"AND PartCode IN ({string.Join(",", paramNames)})")}
                                 OPTION (MAX_GRANT_PERCENT = 5)";
 
                 SqlCommand cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@stk", stkId);
-                for (int i = 0; i < partCodes.Count; i++) cmd.Parameters.AddWithValue($"@p{i}", partCodes[i]);
+                if (!all) for (int i = 0; i < partCodes.Count; i++) cmd.Parameters.AddWithValue($"@p{i}", partCodes[i]);
 
                 conn.Open();
                 using (SqlDataReader rdr = cmd.ExecuteReader())

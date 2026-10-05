@@ -42,7 +42,7 @@ namespace CIMS.Views
             txtName.Text = s.Name ?? "";
             cbUnit.SelectedIndex = string.Equals(s.Unit, "PCS", StringComparison.OrdinalIgnoreCase) ? 1
                                  : string.Equals(s.Unit, "SHEET", StringComparison.OrdinalIgnoreCase) ? 2 : 0;
-            cbGroupBy.SelectedIndex = s.GroupByCustomer ? 1 : 0;
+            cbGroupBy.SelectedIndex = s.GroupByCustomer ? 1 : s.GroupBySupplier ? 2 : 0;
             // หน่วย MAX / MIN (ค่าเดิม UNIT = ตามหน่วยคลัง)
             cbMaxMinBasis.SelectedIndex = Math.Max(0, Array.IndexOf(MaxMinUnits, s.MaxMinUnit));
 
@@ -159,7 +159,7 @@ namespace CIMS.Views
             s.Code = code;
             s.Name = name;
             s.Unit = cbUnit.SelectedIndex == 1 ? "PCS" : cbUnit.SelectedIndex == 2 ? "SHEET" : "KG";
-            s.GroupBy = cbGroupBy.SelectedIndex == 1 ? "CUSTOMER" : "CATEGORY";
+            s.GroupBy = cbGroupBy.SelectedIndex == 1 ? "CUSTOMER" : cbGroupBy.SelectedIndex == 2 ? "SUPPLIER" : "CATEGORY";
             s.MaxMinBasis = MaxMinUnits[Math.Max(0, cbMaxMinBasis.SelectedIndex)];
             s.ColNo = chkColNo.IsChecked == true;
             s.ColModel = chkColModel.IsChecked == true;

@@ -189,23 +189,70 @@ namespace CIMS.Views
             catch (Exception ex) { DialogHelper.ShowError("บันทึกการตั้งค่าคลังไม่สำเร็จ\n" + ex.Message); }
         }
 
-        // 📤 Export รายการในตาราง (ตามคำค้นหา) -> Desktop\CIMS_Export แก้ใน Excel แล้ว IMPORT SET MAX MIN กลับได้
+        // 📄 TEMPLATE EXCEL: หน้านี้มี Import 2 ปุ่ม -> ให้เลือกก่อนว่าจะเตรียมไฟล์ของปุ่มไหน แล้วยืนยันก่อนสร้างไฟล์
+        //    SET MAX MIN = สินค้าในตาราง (ตามคำค้นหา) + MAX / MIN (DAY) ปัจจุบัน / FORECAST = ข้อมูลเดือนนี้รายลูกค้า
         private async void Export_Click(object sender, RoutedEventArgs e)
         {
-            if (_stock == null || _all.Count == 0) { NotificationManager.Show("Export", "ไม่มีรายการในตารางให้ Export", false); return; }
-            string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CIMS_Export");
-            string file = $"{_stock.Code}_Max-MinCal_{DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)}.xlsx";
+            if (_stock == null) return;
+            string mon = DateTime.Today.ToString("MMM yyyy", CultureInfo.InvariantCulture);
+            string pick = TemplateChoiceWindow.Choose($"Stock {_stock.Code}  •  choose the import you want to prepare a file for",
+                new TemplateChoiceWindow.Option
+                {
+                    Key = "DAYS", Title = "SET MAX / MIN",
+                    Detail = $"Products of the table ({_all.Count:N0}) with current MAX (DAY) / MIN (DAY). Fill MAX / MIN (DAY) or (BOX), FORECAST / ORDER / DELIVERY in any column.",
+                    UseWith = "USE WITH:  📥 IMPORT SET MAX MIN"
+                },
+                new TemplateChoiceWindow.Option
+                {
+                    Key = "FORECAST", Title = "FORECAST / ORDER / DELIVERY",
+                    Detail = $"One row per customer + part + month ({mon} rows already filled in). For forecast / order / delivery of any customer and month.",
+                    UseWith = "USE WITH:  📊 IMPORT FORECAST & ORDER"
+                });
+            if (pick == null) return;
+
+            bool days = pick == "DAYS";
+            if (days && _all.Count == 0) { DialogHelper.ShowWarning($"ยังไม่มีสินค้าในตารางของคลัง {_stock.Code} ให้สร้าง Template"); return; }
+            string confirm = days
+                ? $"ต้องการตั้งค่า MAX / MIN ของคลัง {_stock.Code} ด้วยไฟล์ Template นี้ใช่หรือไม่?\n\n" +
+                  $"• ไฟล์จะมีสินค้าตามตาราง {_all.Count:N0} รายการ พร้อมค่า MAX / MIN (DAY) ปัจจุบัน\n" +
+                  "• กรอกหรือแก้ค่าในไฟล์ แล้วนำเข้ากลับด้วยปุ่ม IMPORT SET MAX MIN\n\n" +
+                  "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก"
+                : "ต้องการสร้างไฟล์ Template สำหรับนำเข้า Forecast / Order / Delivery ใช่หรือไม่?\n\n" +
+                  $"• ไฟล์จะมีรายการของเดือน {mon} ที่มีอยู่แล้วให้ (ไม่มีจะเป็นตารางว่าง)\n" +
+                  "• กรอกหรือแก้ตัวเลขในไฟล์ แล้วนำเข้ากลับด้วยปุ่ม IMPORT FORECAST & ORDER\n\n" +
+                  "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก";
+            if (!DialogHelper.ShowConfirm(confirm, days ? "TEMPLATE • SET MAX MIN" : "TEMPLATE • FORECAST")) return;
+
+            var stock = _stock;
+            string path = ImportTemplateService.NewPath(days ? $"{stock.Code}_Max-MinCal_Template" : "ForecastOrder_Template_" + DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            btnExport.IsEnabled = false;
             try
             {
-                System.IO.Directory.CreateDirectory(folder);
-                string path = System.IO.Path.Combine(folder, file);
-                var rows = _all.ToList();
-                await Task.Run(() => _service.ExportDays(rows, path));
-                LogService.WriteLog(_session?.UserId, "MAXMIN_EXPORT", $"Stock: {_stock.Code} | Rows: {rows.Count} | File: {file}", _stock.Code);
-                NotificationManager.Show("Export complete", $"Export {rows.Count:N0} รายการ\nDesktop\\CIMS_Export\\{file}", true);
+                System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+                int count = 0;
+                if (days)
+                {
+                    var rows = _all.ToList(); count = rows.Count;
+                    await Task.Run(() => _service.ExportDays(rows, path));
+                }
+                else
+                {
+                    var month = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                    await Task.Run(() =>
+                    {
+                        var rows = new ForecastOrderService().GetRows(month, "", 0, 1000000);
+                        count = rows.Count;
+                        new ImportTemplateService().CreateForecastTemplate(path, month, rows);
+                    });
+                }
+                LogService.WriteLog(_session?.UserId, days ? "MAXMIN_TEMPLATE" : "FORECAST_TEMPLATE",
+                    $"Stock: {stock.Code} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", stock.Code);
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
             }
             catch (System.IO.IOException) { DialogHelper.ShowError("บันทึกไฟล์ไม่สำเร็จ กรุณาปิดไฟล์ Excel ที่เปิดอยู่ก่อนแล้วลองใหม่"); }
-            catch (Exception ex) { DialogHelper.ShowError("Export ไม่สำเร็จ\n" + ex.Message); }
+            catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ\n" + ex.Message); }
+            finally { btnExport.IsEnabled = true; }
         }
 
         // ให้คอลัมน์แบบ * ยืดเต็มความกว้างตาราง (แก้ตอนเปิดหน้าแล้วคอลัมน์กองรวมกันทางซ้าย)

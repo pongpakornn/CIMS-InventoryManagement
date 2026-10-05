@@ -92,6 +92,7 @@
                                     <ComboBox x:Name="cbGroupBy" Style="{StaticResource StkCombo}">
                                         <ComboBoxItem Content="CATEGORY"/>
                                         <ComboBoxItem Content="CUSTOMER"/>
+                                        <ComboBoxItem Content="SUPPLIER"/>
                                     </ComboBox>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">

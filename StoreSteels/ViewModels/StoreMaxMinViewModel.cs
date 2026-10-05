@@ -27,7 +27,7 @@ namespace CIMS.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        public ObservableCollection<StoreProductModel> Products { get; set; }
+        public BulkObservableCollection<StoreProductModel> Products { get; set; }
         public ObservableCollection<string> Categories { get; set; }
 
         private readonly StoreProductService _service = new StoreProductService();
@@ -52,8 +52,8 @@ namespace CIMS.ViewModels
         }
 
         // ตัวกรองกลุ่มด้านบน: CATEGORY (ค่าเดิม) หรือ CUSTOMER ตามที่คลังตั้งค่าจัดกลุ่มไว้
-        public string GroupLabel => Stock != null && Stock.GroupByCustomer ? "CUSTOMER" : "CATEGORY";
-        public string AllLabel => Stock != null && Stock.GroupByCustomer ? "ALL CUSTOMERS" : "ALL CATEGORIES";
+        public string GroupLabel => Stock != null ? Stock.GroupCode : "CATEGORY";
+        public string AllLabel => Stock != null && Stock.GroupByCustomer ? "ALL CUSTOMERS" : Stock != null && Stock.GroupBySupplier ? "ALL SUPPLIERS" : "ALL CATEGORIES";
         private bool IsAll(string value) => string.IsNullOrEmpty(value) || value == AllLabel || value == "ALL CATEGORIES";
 
         // เปิด SHOW PRODUCTION / การ์ดสินค้า -> โหลดทุกรายการ (ต้องวนครบทุกแถว ไม่ใช่แค่หน้าที่โหลดมา)
@@ -73,16 +73,28 @@ namespace CIMS.ViewModels
         public StoreMaxMinViewModel(StockModel stock)
         {
             Stock = stock;
-            Products = new ObservableCollection<StoreProductModel>();
-            var cats = _service.GetCategories(Stock);
-            if (cats.Count > 0) cats[0] = AllLabel;
-            Categories = new ObservableCollection<string>(cats);
+            Products = new BulkObservableCollection<StoreProductModel>();
+            // ตัวเลือกกลุ่มโหลดเบื้องหลัง - เปิดหน้าได้ทันทีไม่ต้องรอฐานข้อมูล
+            Categories = new ObservableCollection<string> { AllLabel };
             _selectedCategory = AllLabel;
+            LoadCategoriesAsync();
 
             // จัดกลุ่มตาม GroupKey (+ รอบวน) และไม่เรียงใหม่ในตาราง - ลำดับมาจาก SQL (GroupKey, PartCode) แล้ว
             // เพื่อให้ย้ายแถวไปต่อท้ายตอนวนแบบป้ายโฆษณาได้
             GroupedProducts = CollectionViewSource.GetDefaultView(Products);
             GroupedProducts.GroupDescriptions.Add(new PropertyGroupDescription(nameof(StoreProductModel.LoopGroup)));
+        }
+
+        private async void LoadCategoriesAsync()
+        {
+            try
+            {
+                var stock = Stock;
+                var cats = await Task.Run(() => _service.GetCategories(stock));
+                foreach (var c in cats.Skip(1))
+                    if (!Categories.Contains(c)) Categories.Add(c);
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Store categories: {ex.Message}"); }
         }
 
         #region === [ Function : ProcessUpdate ] ===
@@ -170,21 +182,22 @@ namespace CIMS.ViewModels
                 var newData = await Task.Run(() => _service.GetProducts(stock, searchKeyword, catFilter, filterType, offset, pageSize));
                 if (ver != _loadVersion) return;   // มีคำสั่งใหม่กว่าแล้ว ทิ้งผลนี้
 
+                // ใส่ทั้งชุดครั้งเดียว (แจ้งตาราง 1 ครั้ง) - ไม่ใส่ทีละแถวที่ทำให้ตารางจัดกลุ่มใหม่ทุกแถว
                 if (!isLoadMore)
                 {
                     _currentOffset = 0;
                     _hasMoreData = true;
-                    Products.Clear();
+                    _changeToken = null;   // โหลดใหม่ทั้งชุดแล้ว -> รอบเรียลไทม์ถัดไปเริ่มนับใหม่
+                    Products.ReplaceAll(newData ?? new List<StoreProductModel>());
                 }
+                else if (newData != null && newData.Count > 0)
+                    Products.AddRange(newData);
 
                 if (newData == null || newData.Count == 0)
                 {
                     _hasMoreData = false;
                     return;
                 }
-
-                foreach (var item in newData)
-                    Products.Add(item);
 
                 _currentOffset += newData.Count;
                 RenumberGroups();
@@ -231,6 +244,10 @@ namespace CIMS.ViewModels
 
         #region === [ Function : Real-Time Updates ] ===
 
+        // ค่าล่าสุดที่เห็น (จำนวนแถว + CHECKSUM ของคลัง) - เท่าเดิม = ไม่มีอะไรเปลี่ยน ไม่ต้องดึงข้อมูล
+        private string _changeToken;
+        private DateTime _lastFullCheck = DateTime.MinValue;
+
         public async Task UpdateStockFromDbAsync()
         {
             if (_isRealTimeUpdating || Products == null || Products.Count == 0)
@@ -239,18 +256,26 @@ namespace CIMS.ViewModels
             try
             {
                 _isRealTimeUpdating = true;
+                var stock = Stock;
 
-                var currentPartCodes = Products
-                    .Where(x => !string.IsNullOrWhiteSpace(x.PartCode))
-                    .Select(x => x.PartCode)
-                    .Distinct()
-                    .ToList();
-
-                if (currentPartCodes.Count == 0)
-                    return;
-
-                var freshData = await Task.Run(() =>
-                    _service.GetMinimalStockUpdates(Stock, currentPartCodes));
+                List<StoreProductModel> freshData;
+                string token = await Task.Run(() => _service.GetChangeToken(stock));
+                if (token != null)
+                {
+                    // ⚡ ถามแค่ "เปลี่ยนไหม" (ไม่กี่ ms) - ไม่เปลี่ยนก็จบ / เปลี่ยน (หรือครบ 1 นาที กันพลาด) ค่อยดึงตัวเลขทั้งคลังครั้งเดียว
+                    bool changed = token != _changeToken;
+                    if (!changed && DateTime.Now - _lastFullCheck < TimeSpan.FromMinutes(1)) return;
+                    freshData = await Task.Run(() => _service.GetStockNumbers(stock));
+                    _changeToken = token;
+                    _lastFullCheck = DateTime.Now;
+                }
+                else
+                {
+                    // ระบบเก่า (ไม่มี vw_StockMonitoring) -> วิธีเดิม
+                    var currentPartCodes = Products.Where(x => !string.IsNullOrWhiteSpace(x.PartCode)).Select(x => x.PartCode).Distinct().ToList();
+                    if (currentPartCodes.Count == 0) return;
+                    freshData = await Task.Run(() => _service.GetMinimalStockUpdates(stock, currentPartCodes));
+                }
 
                 if (freshData == null || freshData.Count == 0)
                     return;

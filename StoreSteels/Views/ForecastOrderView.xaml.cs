@@ -48,6 +48,7 @@ namespace CIMS.Views
             _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ForecastOrderRow.GroupKey)));
             dgRows.ItemsSource = _view;
             btnImport.Visibility = session?.CanImportForecastOrder == true ? Visibility.Visible : Visibility.Collapsed;
+            btnTemplate.Visibility = btnImport.Visibility;   // Template ใช้คู่กับปุ่ม Import
             Loaded += async (s, e) => { if (!_ready) await LoadMonthsAsync(); };
         }
 
@@ -216,6 +217,41 @@ namespace CIMS.Views
                 DialogHelper.ShowError("Export ไม่สำเร็จ\n" + msg);
             }
             finally { btnExport.IsEnabled = true; }
+        }
+
+        // 📄 Template สำหรับ IMPORT FORECAST / ORDER / DELIVERY: ใส่ข้อมูลของเดือนที่เลือกไว้ให้ (แก้ตัวเลขแล้ว Import กลับได้เลย)
+        private async void Template_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session?.CanImportForecastOrder != true) return;
+            var month = SelectedMonth ?? new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            string mon = month.ToString("MMM yyyy", CultureInfo.InvariantCulture);
+            if (!DialogHelper.ShowConfirm(
+                    $"ต้องการสร้างไฟล์ Template สำหรับนำเข้า Forecast / Order / Delivery ใช่หรือไม่?\n\n" +
+                    $"• ไฟล์จะมีรายการของเดือน {mon} ที่มีอยู่แล้วให้ (ไม่มีจะเป็นตารางว่าง)\n" +
+                    "• กรอกหรือแก้ตัวเลขในไฟล์ แล้วนำเข้ากลับด้วยปุ่ม IMPORT FORECAST / ORDER / DELIVERY\n\n" +
+                    "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
+            btnTemplate.IsEnabled = false;
+            try
+            {
+                string path = ImportTemplateService.NewPath("ForecastOrder_Template_" + month.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+                int count = 0;
+                await Task.Run(() =>
+                {
+                    var rows = _service.GetRows(month, "", 0, 1000000);
+                    count = rows.Count;
+                    System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+                    new ImportTemplateService().CreateForecastTemplate(path, month, rows);
+                });
+                LogService.WriteLog(_session?.UserId, "FORECAST_TEMPLATE", $"Month: {month.ToString("yyyy-MM", CultureInfo.InvariantCulture)} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\n{path}", true);
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+            }
+            catch (Exception ex)
+            {
+                string msg = ex.Message.Contains("being used") ? "กรุณาปิดไฟล์ Excel ก่อน" : ex.Message;
+                DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ\n" + msg);
+            }
+            finally { btnTemplate.IsEnabled = true; }
         }
 
         // 📥 Import (แบบเดียวกับหน้า Max-Min Calculator): เดือน / ลูกค้า / สินค้าเดิมถูกแทนที่ แล้วคำนวณคลังที่เปิด AUTO CALC

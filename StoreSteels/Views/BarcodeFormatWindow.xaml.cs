@@ -102,6 +102,8 @@ namespace CIMS.Views
             txtCodeCut.Text = f.CodeCut?.ToString() ?? "";
             txtMatchStart.Text = f.MatchStart ?? "";
             txtMatchEnd.Text = f.MatchEnd ?? "";
+            cbMatchBy.SelectedIndex = f.MatchByName ? 1 : 0;
+            txtNameFields.Text = f.NameFields ?? "";
             SelectSourceStock(f.SourceStkId);
             btnDelete.IsEnabled = f.FmtId > 0;
             btnDelete.Visibility = _session.CanDeleteStore ? Visibility.Visible : Visibility.Collapsed;
@@ -129,6 +131,8 @@ namespace CIMS.Views
                 CodeCut = ParsePos(txtCodeCut.Text),
                 MatchStart = string.IsNullOrWhiteSpace(txtMatchStart.Text) ? null : txtMatchStart.Text.Trim(),
                 MatchEnd = string.IsNullOrWhiteSpace(txtMatchEnd.Text) ? null : txtMatchEnd.Text.Trim(),
+                MatchBy = cbMatchBy.SelectedIndex == 1 ? "NAME" : "CODE",
+                NameFields = string.IsNullOrWhiteSpace(txtNameFields.Text) ? null : txtNameFields.Text.Trim(),
                 CodePos = codePos,
                 AltCodePos = alt,
                 QtyPos = qty,
@@ -142,15 +146,16 @@ namespace CIMS.Views
 
         private void Filter_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (txtDelimiter == null || txtCodeCut == null) return;
+            if (txtDelimiter == null || txtCodeCut == null || txtNameFields == null || cbMatchBy == null) return;
             txtDelimiter.IsEnabled = cbDelimMode.SelectedIndex != 1;
             txtCodeCut.IsEnabled = cbCodePrefix.SelectedIndex == 2;
+            txtNameFields.IsEnabled = cbMatchBy.SelectedIndex == 1;
             UpdatePreview();
         }
 
         private void UpdatePreview()
         {
-            if (icFields == null || txtParseResult == null) return;
+            if (icFields == null || txtParseResult == null || cbMatchBy == null || txtLookupResult == null) return;
 
             var f = BuildFromInputs();
             string sample = txtSample.Text ?? "";
@@ -164,23 +169,55 @@ namespace CIMS.Views
             var gray = (Brush)new BrushConverter().ConvertFrom("#F1EEF6");
             var dark = (Brush)FindResource("MainPurple");
 
+            var nameFields = f.MatchByName ? f.NamePositions() : new List<int>();
             icFields.ItemsSource = fields.Select((text, i) =>
             {
                 int n = i + 1;
-                Brush bg = n == f.CodePos ? purple : n == f.AltCodePos ? blue : n == f.QtyPos ? green : gray;
+                Brush bg = (f.MatchByName ? nameFields.Contains(n) : n == f.CodePos) ? purple : n == f.AltCodePos ? blue : n == f.QtyPos ? green : gray;
                 return new FieldChip { Number = n, Text = text.Trim(), Background = bg, Foreground = bg == gray ? dark : Brushes.White };
             }).ToList();
 
+            List<string> codes = null;
+            bool ok = false;
             if (string.IsNullOrWhiteSpace(sample))
                 txtParseResult.Text = "Scan a label above to test this format.";
             else if (f.CodePos == 0)
                 txtParseResult.Text = "Set CODE FIELD # to test.";
-            else if (f.TryParse(sample, out List<string> codes, out decimal? q))
-                txtParseResult.Text = $"✓ MATCH   CODE: {string.Join("  /  ", codes)}   QTY: {(q.HasValue ? q.Value.ToString("0.##") : "Pack Size")}";
+            else if (ok = f.TryParse(sample, out codes, out decimal? q))
+                txtParseResult.Text = f.MatchByName
+                    ? $"✓ MATCH   PRODUCT NAME: {codes[0]}{(codes.Count > 1 ? "   ALT CODE: " + string.Join(" / ", codes.Skip(1)) : "")}   QTY: {(q.HasValue ? q.Value.ToString("0.##") : "Pack Size")}"
+                    : $"✓ MATCH   CODE: {string.Join("  /  ", codes)}   QTY: {(q.HasValue ? q.Value.ToString("0.##") : "Pack Size")}";
             else
                 txtParseResult.Text = !f.Matches(sample)
                     ? "✗ NOT MATCH   (label does not start / end with the text set in LABEL FILTERS)"
                     : $"✗ NOT MATCH   ({fields.Length} field(s) found, need at least {f.MinFields})";
+
+            ShowLookup(ok ? f : null, codes);
+        }
+
+        // ผลค้นหาสินค้าจริงในระบบจากป้ายทดสอบ (ไว้เช็กว่าตั้งรูปแบบถูกไหม) - ค้นเบื้องหลัง เอาผลล่าสุดเท่านั้น
+        private int _lookupVersion;
+        private async void ShowLookup(BarcodeFormatModel f, List<string> codes)
+        {
+            int v = ++_lookupVersion;
+            if (f == null || codes == null || codes.Count == 0) { txtLookupResult.Visibility = Visibility.Collapsed; return; }
+            string text; bool found;
+            try
+            {
+                var r = await System.Threading.Tasks.Task.Run(() =>
+                {
+                    var p = new ScanService().FindPart(f, codes, out string note);
+                    return (p, note);
+                });
+                found = r.p != null;
+                text = found ? $"FOUND IN SYSTEM:  {r.p.PartCode}  •  {r.p.PartName}"
+                             : "NOT FOUND IN SYSTEM" + (string.IsNullOrEmpty(r.note) ? "  (no product has this " + (f.MatchByName ? "name" : "code") + ")" : "  -  " + r.note);
+            }
+            catch (Exception ex) { found = false; text = "LOOKUP ERROR: " + ex.Message; }
+            if (v != _lookupVersion) return;
+            txtLookupResult.Text = text;
+            txtLookupResult.Foreground = found ? (Brush)new BrushConverter().ConvertFrom("#2E7D32") : (Brush)new BrushConverter().ConvertFrom("#C62828");
+            txtLookupResult.Visibility = Visibility.Visible;
         }
 
         private void Digits_PreviewTextInput(object sender, TextCompositionEventArgs e) => e.Handled = !DigitsOnly.IsMatch(e.Text);
@@ -207,6 +244,8 @@ namespace CIMS.Views
             if (!f.SplitBySpaces && string.IsNullOrEmpty(f.Delimiter)) { DialogHelper.ShowWarning("กรุณากรอกตัวคั่น (DELIMITER) เช่น ; หรือเลือก SPLIT FIELDS BY = ANY SPACES"); txtDelimiter.Focus(); return; }
             if (f.CodePrefix == "CUT" && !(f.CodeCut > 0)) { DialogHelper.ShowWarning("กรุณากรอกจำนวนตัวอักษรที่ต้องการตัด (N)"); txtCodeCut.Focus(); return; }
             if (f.CodePos <= 0) { DialogHelper.ShowWarning("กรุณากรอกตำแหน่งช่องรหัสสินค้า (CODE FIELD #)"); txtCodePos.Focus(); return; }
+            if (f.MatchByName && !string.IsNullOrWhiteSpace(f.NameFields) && f.NamePositions().Count == 0)
+            { DialogHelper.ShowWarning("กรุณากรอกช่องชื่อสินค้า (NAME FIELDS #) เป็นตัวเลข เช่น 6,7"); txtNameFields.Focus(); return; }
 
             var list = lstFormats.ItemsSource as IEnumerable<BarcodeFormatModel> ?? Enumerable.Empty<BarcodeFormatModel>();
             if (list.Any(x => x.FmtId != f.FmtId && string.Equals(x.Name, f.Name, StringComparison.OrdinalIgnoreCase)))
@@ -224,7 +263,7 @@ namespace CIMS.Views
                 bool isNew = f.FmtId == 0;
                 int id = _stockService.SaveFormat(f, _session.UserId);
                 LogService.WriteLog(_session.UserId, isNew ? "BARCODE_FMT_CREATE" : "BARCODE_FMT_UPDATE",
-                    $"{f.Name} | Delim: {f.Delimiter} | Code#{f.CodePos} Alt#{f.AltCodePos} Qty#{f.QtyPos} Min{f.MinFields} | Active: {f.IsActive} | DeductStk: {f.SourceStkId}", f.Name);
+                    $"{f.Name} | Delim: {f.Delimiter} | Code#{f.CodePos} Alt#{f.AltCodePos} Qty#{f.QtyPos} Min{f.MinFields} | Match: {(f.MatchByName ? "NAME#" + string.Join(",", f.NamePositions()) : "CODE")} | Active: {f.IsActive} | DeductStk: {f.SourceStkId}", f.Name);
                 NotificationManager.Show("Barcode Format", $"บันทึกรูปแบบ {f.Name} สำเร็จ", true);
                 Reload(id);
             }

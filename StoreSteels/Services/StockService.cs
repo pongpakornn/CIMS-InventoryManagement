@@ -282,7 +282,7 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@opl", s.OutPickList);
             cmd.Parameters.AddWithValue("@osup", s.OutSupplier);
             cmd.Parameters.AddWithValue("@osys", s.OutSysQr);
-            cmd.Parameters.AddWithValue("@grp", s.GroupByCustomer ? "CUSTOMER" : "CATEGORY");
+            cmd.Parameters.AddWithValue("@grp", s.GroupCode);
             cmd.Parameters.AddWithValue("@mmb", s.MaxMinInBox ? "BOX" : "UNIT");
             cmd.Parameters.AddWithValue("@ccust", s.ColCustomer);
             cmd.Parameters.AddWithValue("@cparta", s.ColPartA);
@@ -331,7 +331,7 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_connectionString))
             {
                 string sql = @"SELECT FormatID, FormatName, Delimiter, CodePosition, AltCodePosition, QuantityPosition, MinFields, SampleText, IsActive, SourceStockID,
-                                      DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd
+                                      DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd, MatchBy, NameFields
                                FROM CIMS.BarcodeFormats" + (activeOnly ? " WHERE IsActive = 1" : "") + " ORDER BY FormatName";
                 using (var cmd = new SqlCommand(sql, conn))
                 {
@@ -357,7 +357,9 @@ namespace CIMS.Services
                                 CodePrefix = rdr["CodePrefix"].ToString(),
                                 CodeCut = rdr["CodeCut"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["CodeCut"]),
                                 MatchStart = rdr["MatchStart"] == DBNull.Value ? null : rdr["MatchStart"].ToString(),
-                                MatchEnd = rdr["MatchEnd"] == DBNull.Value ? null : rdr["MatchEnd"].ToString()
+                                MatchEnd = rdr["MatchEnd"] == DBNull.Value ? null : rdr["MatchEnd"].ToString(),
+                                MatchBy = rdr["MatchBy"] == DBNull.Value ? "CODE" : rdr["MatchBy"].ToString(),
+                                NameFields = rdr["NameFields"] == DBNull.Value ? null : rdr["NameFields"].ToString()
                             });
                         }
                     }
@@ -378,13 +380,13 @@ namespace CIMS.Services
             {
                 string sql = f.FmtId == 0
                     ? @"INSERT INTO CIMS.BarcodeFormats (FormatName, Delimiter, CodePosition, AltCodePosition, QuantityPosition, MinFields, SampleText, IsActive, SourceStockID, CreatedBy,
-                                                     DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd)
-                        VALUES (@name, @delim, @code, @alt, @qty, @min, @sample, @active, @src, @uid, @dmode, @trim, @cpre, @ccut, @mstart, @mend);
+                                                     DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd, MatchBy, NameFields)
+                        VALUES (@name, @delim, @code, @alt, @qty, @min, @sample, @active, @src, @uid, @dmode, @trim, @cpre, @ccut, @mstart, @mend, @mby, @nfld);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);"
                     : @"UPDATE CIMS.BarcodeFormats SET FormatName = @name, Delimiter = @delim, CodePosition = @code, AltCodePosition = @alt,
                             QuantityPosition = @qty, MinFields = @min, SampleText = @sample, IsActive = @active, SourceStockID = @src,
                             DelimiterMode = @dmode, TrimChars = @trim, CodePrefix = @cpre, CodeCut = @ccut, MatchStart = @mstart, MatchEnd = @mend,
-                            UpdatedBy = @uid, UpdatedDate = GETDATE()
+                            MatchBy = @mby, NameFields = @nfld, UpdatedBy = @uid, UpdatedDate = GETDATE()
                         WHERE FormatID = @id;
                         SELECT @id;";
 
@@ -406,6 +408,8 @@ namespace CIMS.Services
                     cmd.Parameters.AddWithValue("@ccut", (object)f.CodeCut ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@mstart", string.IsNullOrWhiteSpace(f.MatchStart) ? (object)DBNull.Value : f.MatchStart.Trim());
                     cmd.Parameters.AddWithValue("@mend", string.IsNullOrWhiteSpace(f.MatchEnd) ? (object)DBNull.Value : f.MatchEnd.Trim());
+                    cmd.Parameters.AddWithValue("@mby", f.MatchByName ? "NAME" : "CODE");
+                    cmd.Parameters.AddWithValue("@nfld", string.IsNullOrWhiteSpace(f.NameFields) ? (object)DBNull.Value : f.NameFields.Trim());
                     cmd.Parameters.AddWithValue("@uid", userId);
                     conn.Open();
                     f.FmtId = Convert.ToInt32(cmd.ExecuteScalar());

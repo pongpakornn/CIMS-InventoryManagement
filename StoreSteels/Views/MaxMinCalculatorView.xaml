@@ -159,8 +159,8 @@
                 <Button x:Name="btnFormula" Content="⚙ FORMULAS" Style="{StaticResource CalcButton}" Margin="0,0,8,0" Click="Formula_Click"/>
                 <Button x:Name="btnWorkdays" Content="📅 WORKDAYS" Style="{StaticResource CalcButton}" Margin="0,0,8,0" Click="Workdays_Click"/>
                 <Button x:Name="btnImportDays" Content="📥 IMPORT SET MAX MIN" Style="{StaticResource CalcButton}" Margin="0,0,8,0" Click="ImportDays_Click"/>
-                <Button x:Name="btnExport" Content="📤 EXPORT" Style="{StaticResource CalcButton}" Margin="0,0,8,0" Click="Export_Click"
-                        ToolTip="Export PART NO / PRODUCT NAME / MAX (DAYS) / MIN (DAYS) of the table - edit and IMPORT SET MAX MIN back"/>
+                <Button x:Name="btnExport" Content="📄 TEMPLATE EXCEL" Style="{StaticResource CalcButton}" Margin="0,0,8,0" Click="Export_Click"
+                        ToolTip="Files to fill in for IMPORT SET MAX MIN / IMPORT FORECAST &amp; ORDER"/>
                 <Button x:Name="btnImportForecast" Content="📊 IMPORT FORECAST &amp; ORDER" Style="{StaticResource CalcButton}" Margin="0,0,8,0" Click="ImportForecast_Click"/>
                 <Button x:Name="btnCalculate" Content="⚡ CALCULATE NOW" Style="{StaticResource CalcButton}" Background="{StaticResource AccentPurple}" Click="Calculate_Click"/>
             </WrapPanel>

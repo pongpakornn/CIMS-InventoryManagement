@@ -247,6 +247,8 @@
                     <!-- 🏬 กรองตารางตามคลัง -->
                     <ComboBox x:Name="cbStockFilter" Width="190" Height="45" Margin="0,0,10,0" Style="{StaticResource StkCombo}"
                               SelectionChanged="cbStockFilter_SelectionChanged" ToolTip="Show only the products in this stock" Visibility="Collapsed"/>
+                    <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource CyberButton}" Background="#6750A4" Width="140" Height="45" Margin="0,0,10,0" Click="Template_Click" Visibility="{Binding AddVisibility}" FontSize="12" FontWeight="ExtraBold"
+                            ToolTip="Excel file to fill in for IMPORT EXCEL (many products at once)"/>
                     <Button Content="📥 IMPORT EXCEL" Style="{StaticResource CyberButton}" Background="{StaticResource MainPurple}" Width="170" Height="45" Margin="0,0,10,0" Click="Import_Click" Visibility="{Binding AddVisibility}" FontSize="12" FontWeight="ExtraBold" />
                     <Button Content="EXPORT QR SELECT" Style="{StaticResource CyberButton}" Width="200" Height="45" Click="Export_Click" FontSize="12" FontWeight="ExtraBold" />
                     <!-- 🗑 ลบสินค้าแบบ Admin (Level 1): เลือกคลัง -> ลบที่ติ๊ก / ลบทั้งหมดในคลัง -->

@@ -56,10 +56,8 @@ namespace CIMS.Views
             _viewModel.Products.CollectionChanged += Products_CollectionChanged;
 
             this.Loaded += (s, e) => {
-                if (string.IsNullOrEmpty(_filterType) && string.IsNullOrEmpty(_selectedCategory))
-                {
-                    _viewModel.LoadData();
-                }
+                // โหลดครั้งเดียวตอนเปิดหน้า (ใช้กลุ่ม / ตัวกรองที่ส่งมาจาก Dashboard ถ้ามี)
+                _viewModel.LoadData();
                 InitializeAutoScroll();
                 InitializeRealTimeRefresh();
                 _uiReady = true;
@@ -418,6 +416,8 @@ namespace CIMS.Views
         private void cbCategory_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_viewModel == null) return;
+            // เลือกค่าเริ่มต้นตอนเปิดหน้า (ไม่มีค่าเดิม) -> หน้าโหลดข้อมูลเองอยู่แล้ว ไม่ต้องดึงซ้ำ
+            if (e.RemovedItems.Count == 0) return;
             string searchKey = txtSearch != null ? txtSearch.Text : "";
             _viewModel.LoadData(searchKey);
         }

@@ -518,6 +518,8 @@ namespace CIMS.Services
                     IXLCell Cell(string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c) : null;
                     string cust = Cell("CUST")?.GetString().Trim() ?? "";
                     if (cust.Length == 0 && ws.Row(r).IsEmpty()) continue;
+                    // แถวว่างที่มีแค่เลข NO (ไฟล์ Template) -> ข้าม ไม่นับเป็นแถวผิด
+                    if (cust.Length == 0 && new[] { "PART", "FC", "ORD", "DLV" }.All(k => Cell(k) == null || Cell(k).IsEmpty())) continue;
 
                     var item = new CalcImportRow { RowNumber = r, Customer = cust, Part = Cell("PART")?.GetString().Trim() ?? "" };
                     int? year = null;

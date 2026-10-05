@@ -122,6 +122,32 @@
                             </Grid>
                         </Border>
 
+                        <!-- ค้นสินค้าด้วยรหัส หรือ ชื่อสินค้า (PRODUCT NAME) จากช่องที่กำหนด -->
+                        <Border Style="{StaticResource StkSection}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="MATCH PRODUCT BY" Style="{StaticResource StkLabel}"/>
+                                        <ComboBox x:Name="cbMatchBy" Style="{StaticResource StkCombo}" SelectionChanged="Filter_Changed">
+                                            <ComboBoxItem Content="PRODUCT CODE  (CODE FIELD #)"/>
+                                            <ComboBoxItem Content="PRODUCT NAME  (NAME FIELDS #)"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="NAME FIELDS #" Style="{StaticResource StkLabel}"/>
+                                        <TextBox x:Name="txtNameFields" Style="{StaticResource StkInput}" MaxLength="20" Tag="e.g. 6,7  (empty = CODE FIELD #)" TextChanged="Field_TextChanged"/>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="PRODUCT NAME: the fields are joined and compared with PRODUCT NAME in the system, ignoring spaces, commas, upper / lower case, extra zeros and COIL = C  (SGACE 45/45 + 1.000 X 1219.00 X COIL = SGACE,45/45 1.0x1219xC). The name must match one product only. ALT CODE FIELD # is still tried if the name is not found."
+                                           FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" Margin="2,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- ตัวกรองป้าย: แยกช่องด้วยช่องว่าง / ตัดตัวอักษรหัว-ท้าย / ตัดหัวรหัส / ระบุชนิดป้ายด้วยคำขึ้นต้น-ลงท้าย -->
                         <Border Style="{StaticResource StkSection}">
                             <StackPanel>
@@ -196,6 +222,7 @@
                                 <Border Background="White" CornerRadius="10" Padding="12,10" Margin="0,10,0,0">
                                     <StackPanel>
                                         <TextBlock x:Name="txtParseResult" FontSize="14" FontWeight="Black" Foreground="{StaticResource MainPurple}" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="txtLookupResult" FontSize="13" FontWeight="Bold" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
                                         <ItemsControl x:Name="icFields" Margin="0,8,0,0">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>

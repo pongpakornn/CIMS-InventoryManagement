@@ -4,6 +4,7 @@ using CIMS.Models;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 
 namespace CIMS.Services
 {
@@ -46,6 +47,64 @@ namespace CIMS.Services
                     }
                 }
             }
+            return null;
+        }
+
+        // 🔎 ค้นสินค้าจากป้าย Supplier ตามรูปแบบ: ค้นด้วยชื่อ (MATCH BY PRODUCT NAME) หรือรหัสทีละตัว
+        // note = เหตุผลที่ไม่เจอ (เช่น ชื่อนี้ตรงกับสินค้าหลายรายการ) ไว้แจ้งผู้ใช้
+        public ScanItemModel FindPart(BarcodeFormatModel fmt, List<string> codes, out string note)
+        {
+            note = null;
+            if (codes == null || codes.Count == 0) return null;
+            int start = 0;
+            if (fmt != null && fmt.MatchByName)
+            {
+                var byName = GetPartByName(codes[0], out note);
+                if (byName != null) return byName;
+                start = 1;   // ไม่เจอชื่อ -> ลองรหัสสำรอง (ALT CODE) ต่อ
+            }
+            for (int i = start; i < codes.Count; i++)
+            {
+                var part = GetPartByScan(codes[i]);
+                if (part != null) { note = null; return part; }
+            }
+            return null;
+        }
+
+        // ชื่อสินค้าจากป้าย -> สินค้าในระบบ (เทียบแบบ NormalizeName)
+        //   1) ชื่อตรงกันทั้งหมด  2) ไม่มี -> ชื่อในระบบมีชื่อจากป้ายอยู่ข้างใน หรือกลับกัน
+        //   ต้องเจอรายการเดียวเท่านั้น เจอหลายรายการ = ไม่บันทึก (กันลงผิดสินค้า)
+        public ScanItemModel GetPartByName(string labelName, out string note)
+        {
+            note = null;
+            string key = BarcodeFormatModel.NormalizeName(labelName);
+            if (key.Length == 0) return null;
+
+            var rows = new List<(int Id, string Code, string Name, int Pack, string Norm)>();
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("SELECT PartID, PartCode, Description, PackSize FROM CIMS.Parts WITH (NOLOCK) WHERE IsActive = 1 AND ISNULL(Description, '') <> ''", conn))
+            {
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read())
+                    {
+                        string name = r["Description"].ToString();
+                        rows.Add((Convert.ToInt32(r["PartID"]), r["PartCode"].ToString(), name,
+                                  r["PackSize"] == DBNull.Value ? 1 : Convert.ToInt32(r["PackSize"]), BarcodeFormatModel.NormalizeName(name)));
+                    }
+            }
+
+            var hits = rows.Where(x => x.Norm == key).ToList();
+            if (hits.Count == 0 && key.Length >= 4)
+                hits = rows.Where(x => x.Norm.Length >= 4 && (x.Norm.Contains(key) || key.Contains(x.Norm))).ToList();
+
+            if (hits.Count == 1)
+            {
+                var h = hits[0];
+                return new ScanItemModel { PartId = h.Id, PartCode = h.Code, PartName = h.Name, PartNo = string.Empty, PartACode = h.Code, Qty = h.Pack, UpdateTime = DateTime.Now };
+            }
+            if (hits.Count > 1)
+                note = $"ชื่อสินค้าบนป้ายตรงกับสินค้าในระบบ {hits.Count} รายการ ({string.Join(", ", hits.Take(3).Select(x => x.Code))}{(hits.Count > 3 ? " ..." : "")}) กรุณาแก้ชื่อสินค้าให้ไม่ซ้ำ";
             return null;
         }
 

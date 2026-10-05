@@ -171,6 +171,37 @@
                 }
             }
 
+            // 📄 Template สำหรับ IMPORT EXCEL: หัวคอลัมน์ที่ระบบอ่านได้ + ชีทวิธีกรอก + รายชื่อรหัสคลัง
+            private async void Template_Click(object sender, RoutedEventArgs e)
+            {
+                if (_viewModel.CurrentUser?.CanAddProduct != true) { DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ Import สินค้า", "ACCESS DENIED"); return; }
+                if (!DialogHelper.ShowConfirm(
+                        "ต้องการสร้างไฟล์ Template สำหรับลงทะเบียนสินค้าหลายรายการใช่หรือไม่?\n\n" +
+                        "• ไฟล์มีหัวคอลัมน์ที่ระบบอ่านได้ พร้อมชีทวิธีกรอก และรายชื่อรหัสคลัง\n" +
+                        "• กรอกข้อมูลในชีทแรก แล้วนำเข้าด้วยปุ่ม IMPORT EXCEL\n\n" +
+                        "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
+                btnTemplate.IsEnabled = false;
+                try
+                {
+                    string path = ImportTemplateService.NewPath("Inventory_Registration_Template");
+                    var stocks = _stocks;
+                    await Task.Run(() =>
+                    {
+                        System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+                        new ImportTemplateService().CreatePartTemplate(path, stocks);
+                    });
+                    LogService.WriteLog(_viewModel.CurrentUser?.UserId, "PART_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)}", "");
+                    NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
+                    try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+                }
+                catch (Exception ex)
+                {
+                    string msg = ex.Message.Contains("being used") ? "กรุณาปิดไฟล์ Excel ก่อน" : ex.Message;
+                    DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ\n" + msg);
+                }
+                finally { btnTemplate.IsEnabled = true; }
+            }
+
             // 📥 Import Excel ลงทะเบียนสินค้าใหม่หลายรายการ (รหัสที่มีอยู่แล้วจะถูกข้าม)
             private async void Import_Click(object sender, RoutedEventArgs e)
             {
