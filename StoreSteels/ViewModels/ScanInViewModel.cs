@@ -88,7 +88,7 @@ using CIMS.Helpers;
 
 //            string finalSearchCode = inputCode.Trim();
 
-//            // ✅ เก็บบาร์โค้ดดิบ "ทั้งชุด" ไว้ก่อนตัดส่วนหัวออก เพื่อบันทึกลง REF_NO
+//            // ✅ เก็บบาร์โค้ดดิบ "ทั้งชุด" ไว้ก่อนตัดส่วนหัวออก เพื่อบันทึกลง ReferenceNo
 //            string rawBarcodeFull = finalSearchCode;
 
 //            string uid = CurrentUser.UserId;
@@ -122,7 +122,7 @@ using CIMS.Helpers;
 
 //                    int originalQty = (int)part.Qty;
 
-//                    // ✅ ส่ง rawBarcodeFull เข้าไปบันทึกลง REF_NO
+//                    // ✅ ส่ง rawBarcodeFull เข้าไปบันทึกลง ReferenceNo
 //                    bool isSaved = _scanService.UpdateStock(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull);
 //                    if (isSaved)
 //                    {
@@ -391,6 +391,8 @@ namespace CIMS.ViewModels
             CurrentUser?.CanViewScanIn == true || CurrentUser?.CanViewScanOut == true ? Visibility.Visible : Visibility.Collapsed;
         // ✏️ ADJUST SCAN: Level 1 (Admin) เท่านั้น
         public Visibility AdjustButtonVisibility => CurrentUser?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
+        // 🏷️ DISPLAY: เลือกค่าที่แสดงแทนรหัสต่อคลัง (ตั้งค่าคลัง = EDIT ของ Store(Max-Min))
+        public Visibility DisplayButtonVisibility => CurrentUser?.CanEditStore == true ? Visibility.Visible : Visibility.Collapsed;
 
         public ICommand ToggleRemainderModeCommand { get; }
         #endregion
@@ -446,6 +448,7 @@ namespace CIMS.ViewModels
             OnPropertyChanged(nameof(ReturnButtonVisibility));
             OnPropertyChanged(nameof(RemainderButtonVisibility));
             OnPropertyChanged(nameof(AdjustButtonVisibility));
+            OnPropertyChanged(nameof(DisplayButtonVisibility));
             LoadStocks();
         }
         #endregion
@@ -535,11 +538,47 @@ namespace CIMS.ViewModels
 
         private static bool SupportsReturn(StockModel s) => s != null && (s.InSysQr || s.InSupplier);
 
+        // 🏷️ ค่าที่แสดงแทนรหัสต่อคลัง (ปุ่ม DISPLAY) - แสดงผลอย่างเดียว ไม่มีผลกับการบันทึก
+        private Dictionary<int, string> _displayMap = new Dictionary<int, string>();
+        private List<BarcodeFormatModel> _displayFormats = new List<BarcodeFormatModel>();
+
+        private void LoadDisplaySettings()
+        {
+            try
+            {
+                _displayMap = _scanService.GetScanDisplayMap();
+                _displayFormats = _displayMap.Values.Any(v => v.StartsWith("FIELD:")) ? _stockService.GetFormats() : new List<BarcodeFormatModel>();
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"LoadDisplaySettings: {ex.Message}"); }
+        }
+
+        // หลังบันทึกการตั้งค่าในหน้าต่าง DISPLAY -> ใช้ค่าใหม่กับตารางวันนี้ทันที
+        public void ReloadDisplaySettings()
+        {
+            LoadDisplaySettings();
+            _todaySignature = null;
+            LoadTodayData();
+        }
+
+        private void ApplyDisplay(ScanItemModel item, string raw, bool fetchInfo)
+        {
+            if (item == null || !_displayMap.TryGetValue(item.StkId, out string key)) { if (item != null) item.DisplayCode = null; return; }
+            if (!string.IsNullOrEmpty(raw)) item.RefNo = raw;
+            if (fetchInfo && (key == "PartA" || key == "PartNumber" || key == "Model") && item.PartA == null && item.PartId > 0)
+            {
+                try { var info = _scanService.GetPartDisplayInfo(item.PartId); item.PartA = info.PartA; item.PartNumber = info.PartNumber; item.Model = info.Model; }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GetPartDisplayInfo: {ex.Message}"); }
+            }
+            string v = ScanDisplay.Resolve(key, item.PartCode, item.PartA, item.PartNumber, item.Model, item.PartName, item.RefNo, _displayFormats);
+            item.DisplayCode = string.IsNullOrWhiteSpace(v) ? null : v;
+        }
+
         private void LoadStocks()
         {
             try
             {
                 _allFormats = _stockService.GetFormats(activeOnly: true);
+                LoadDisplaySettings();
                 var all = _stockService.GetStocks();
                 bool canIn = CurrentUser?.CanViewScanIn == true;
                 bool canOut = CurrentUser?.CanViewScanOut == true;
@@ -731,16 +770,61 @@ namespace CIMS.ViewModels
         // หลัง ADJUST SCAN แก้ / ลบรายการ -> โหลดตารางวันนี้ใหม่
         public void ReloadToday() => LoadTodayData();
 
-        private async void LoadTodayData()
+        // 🔄 เรียลไทม์: ทุก 5 วินาทีดึงรายการวันนี้ใหม่ (เห็นที่เครื่องอื่นสแกน / ADJUST) - เปลี่ยนตารางเฉพาะเมื่อข้อมูลเปลี่ยน
+        //    ไม่ดึงระหว่าง TEST MODE หรือภายใน 3 วินาทีหลังสแกน (กันตารางกระพริบตอนกำลังยิงต่อเนื่อง)
+        private System.Windows.Threading.DispatcherTimer _liveTimer;
+        private string _todaySignature;
+        private DateTime _lastScanAt;
+        private bool _liveBusy;
+
+        public void StartLive()
+        {
+            if (_liveTimer == null)
+            {
+                _liveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                _liveTimer.Tick += async (s, e) => await LiveRefreshAsync();
+            }
+            _liveTimer.Start();
+        }
+
+        public void StopLive() => _liveTimer?.Stop();
+
+        private async Task LiveRefreshAsync()
+        {
+            if (_liveBusy || IsTestMode || (DateTime.Now - _lastScanAt).TotalSeconds < 3) return;
+            _liveBusy = true;
+            try { await LoadTodayDataAsync(onlyIfChanged: true); }
+            finally { _liveBusy = false; }
+        }
+
+        private async void LoadTodayData() => await LoadTodayDataAsync(onlyIfChanged: false);
+
+        private async Task LoadTodayDataAsync(bool onlyIfChanged)
         {
             var stocksForLoad = ScopeStocks;
             if (stocksForLoad.Count == 0) return;
             try
             {
                 // สแกนร่วมหลายคลัง: รวมรายการวันนี้ของทุกคลังที่เลือก เรียงตามเวลา (แต่ละแถวรู้ว่าเป็นของคลังไหน)
-                var data = await Task.Run(() => stocksForLoad
-                    .SelectMany(st => _scanService.GetTodayTransactions(st).Select(t => { t.StkId = st.StkId; t.StockCode = st.Code; t.ShowStockInCode = stocksForLoad.Count > 1; return t; }))
-                    .OrderBy(t => t.UpdateTime).ToList());
+                // ยอดคงเหลือของแต่ละสินค้าในตารางสรุปดึงเบื้องหลังพร้อมกัน (เดิมดึงทีละแถวบน UI Thread ทำให้หน้าจอค้างเมื่อวันนั้นสแกนเยอะ)
+                var balances = new Dictionary<(int, int), int>();
+                var data = await Task.Run(() =>
+                {
+                    var rows = stocksForLoad
+                        .SelectMany(st => _scanService.GetTodayTransactions(st).Select(t => { t.StkId = st.StkId; t.StockCode = st.Code; t.ShowStockInCode = stocksForLoad.Count > 1; return t; }))
+                        .OrderBy(t => t.UpdateTime).ToList();
+                    foreach (var k in rows.Select(r => (r.StkId, r.PartId)).Distinct())
+                    {
+                        var st = stocksForLoad.FirstOrDefault(s => s.StkId == k.StkId);
+                        balances[k] = _scanService.GetInventoryBalance(k.PartId, st);
+                    }
+                    return rows;
+                });
+
+                string sig = string.Join(",", stocksForLoad.Select(s => s.StkId)) + "|" + data.Count + "|" + data.Sum(d => d.Qty) + "|" +
+                             (data.Count > 0 ? data.Max(d => d.UpdateTime).Ticks : 0);
+                if (onlyIfChanged && sig == _todaySignature) return;
+                _todaySignature = sig;
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -749,11 +833,12 @@ namespace CIMS.ViewModels
                     foreach (var item in data)
                     {
                         // หน้าเดียวรวมทั้งรับเข้า/คืน/สแกนออก จึงแสดงทุกสถานะในตารางวันนี้
+                        ApplyDisplay(item, item.RefNo, fetchInfo: false);
                         if (item.Status == "IN" || item.Status == "RETURN" || item.Status == "OUT")
                         {
                             ScannedItems.Insert(0, item);
                         }
-                        UpdateSummary(item);
+                        UpdateSummary(item, balances.TryGetValue((item.StkId, item.PartId), out int bal) ? bal : (int?)null);
                     }
                 });
             }
@@ -766,6 +851,7 @@ namespace CIMS.ViewModels
         public async Task ProcessScan(string inputCode)
         {
             if (string.IsNullOrWhiteSpace(inputCode) || CurrentUser == null) return;
+            _lastScanAt = DateTime.Now;
 
             // 🔄 โหมดคืนเหล็ก: ตัดออกจาก flow ปกติทั้งหมด ใช้ QR รูปแบบ Export จากหน้า ProductControl
             // (ProductCode|ProductName) แทน แล้วเด้ง Popup ให้กรอกจำนวนรับคืนเอง
@@ -806,7 +892,7 @@ namespace CIMS.ViewModels
             // ให้ค้นหาด้วย MaterialCode และใช้ Qty ตามใบเบิกแทนค่า Pack Size เริ่มต้นของสินค้า
             bool isPackingCardScan = PackingCardBarcodeParser.TryParse(finalSearchCode, out string packingMaterialCode, out decimal packingQty);
 
-            // ✅ ป้าย Supplier (เช่น Panta) ตามรูปแบบที่ตั้งไว้ใน MST_BARCODE_FMT: ค้นหาด้วยช่องรหัสที่กำหนด
+            // ✅ ป้าย Supplier (เช่น Panta) ตามรูปแบบที่ตั้งไว้ใน CIMS.BarcodeFormats: ค้นหาด้วยช่องรหัสที่กำหนด
             // (ตัวที่ผู้ใช้ลงทะเบียนไว้ในช่อง QR Code หน้า Inventory Registration) และใช้จำนวนตามป้าย
             List<string> supplierCodes = null;
             decimal? supplierQty = null;
@@ -874,8 +960,8 @@ namespace CIMS.ViewModels
                     var part = isSupplierScan ? FindPartByCodes(supplierCodes) : _scanService.GetPartByScan(finalSearchCode);
                     if (part == null) return null;
 
-                    // สต็อก/TX_QTY เป็นจำนวนเต็ม ป้าย Supplier ที่มีทศนิยมจึงปัดเป็นจำนวนเต็มที่ใกล้ที่สุด
-                    // (ค่าเต็มยังอยู่ครบในบาร์โค้ดดิบที่บันทึกลง REF_NO) - รูปแบบที่ไม่ได้กำหนดช่องจำนวน ใช้ Pack Size
+                    // สต็อก/Quantity เป็นจำนวนเต็ม ป้าย Supplier ที่มีทศนิยมจึงปัดเป็นจำนวนเต็มที่ใกล้ที่สุด
+                    // (ค่าเต็มยังอยู่ครบในบาร์โค้ดดิบที่บันทึกลง ReferenceNo) - รูปแบบที่ไม่ได้กำหนดช่องจำนวน ใช้ Pack Size
                     int originalQty = isPackingCardScan ? (int)packingQty
                                     : (isSupplierScan && supplierQty.HasValue) ? (int)Math.Round(supplierQty.Value, MidpointRounding.AwayFromZero)
                                     : (int)part.Qty;
@@ -954,6 +1040,8 @@ namespace CIMS.ViewModels
                         UpdateTime = DateTime.Now,
                         ProductImagePath = ShowProductImage
                     };
+                    ApplyDisplay(newItem, rawBarcodeFull, fetchInfo: true);
+                    ShowCode = newItem.CodeText;
 
                     // ⚙️ [สลับตารางแสดงผล]: ถ้าเป็น Test Mode ให้โยนลง TestScannedItems (ตารางที่ 2)
                     if (IsTestMode)
@@ -1005,21 +1093,21 @@ namespace CIMS.ViewModels
         }
 
         // ดึงรูปสินค้าจาก Shared Folder มาแสดงที่ ShowProductImage (ใช้ร่วมกันทั้งสแกนปกติและคืนเหล็ก)
-        // รูปสินค้าที่สแกน: PT_IMG ของสินค้า (1. Image Stock\<คลัง>\<คลัง>-01.png หรือรูปเก่า) -> ถ้าไม่มี ลองชื่อ Product Code แบบเดิม
+        // รูปสินค้าที่สแกน: ImageFileName ของสินค้า (1. Image Stock\<คลัง>\<คลัง>-01.png หรือรูปเก่า) -> ถ้าไม่มี ลองชื่อ Product Code แบบเดิม
         private void LoadProductImage(int ptId, string partACode)
         {
             string imgPath = null;
             try
             {
                 using (var conn = new Microsoft.Data.SqlClient.SqlConnection(GlobalConfig.ConnStr))
-                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT PT_IMG FROM MST_PART WHERE PT_ID = @p", conn))
+                using (var cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT ImageFileName FROM CIMS.Parts WHERE PartID = @p", conn))
                 {
                     cmd.Parameters.AddWithValue("@p", ptId);
                     conn.Open();
                     imgPath = ImagePaths.Resolve(cmd.ExecuteScalar() as string);
                 }
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Load PT_IMG: {ex.Message}"); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Load ImageFileName: {ex.Message}"); }
 
             if (!ImageCacheHelper.Exists(imgPath))
             {
@@ -1079,7 +1167,7 @@ namespace CIMS.ViewModels
         }
 
         // 🔄 [โหมดคืนเหล็ก] สแกน QR Export จากหน้า ProductControl -> ค้นหาสินค้า -> เด้ง Popup กรอกจำนวนรับคืน
-        // -> ยืนยันแล้วอัปเดต QTY_STKB ตามจำนวนที่กรอกเอง (ไม่ใช่ Packsize มาตรฐาน) พร้อม tag สถานะ "RETURN"
+        // -> ยืนยันแล้วอัปเดต StockQuantity ตามจำนวนที่กรอกเอง (ไม่ใช่ Packsize มาตรฐาน) พร้อม tag สถานะ "RETURN"
         private async Task ProcessReturnScan(string inputCode)
         {
             string rawBarcodeFull = inputCode.Trim();
@@ -1169,6 +1257,8 @@ namespace CIMS.ViewModels
                     UpdateTime = DateTime.Now,
                     ProductImagePath = ShowProductImage
                 };
+                ApplyDisplay(newItem, inputCode, fetchInfo: true);
+                ShowCode = newItem.CodeText;
 
                 if (IsTestMode)
                 {
@@ -1198,13 +1288,14 @@ namespace CIMS.ViewModels
             }
         }
 
-        private void UpdateSummary(ScanItemModel item)
+        // knownBalance: ยอดที่ดึงมาแล้วเบื้องหลัง (โหลดตารางวันนี้) / null = ดึงเองตอนนี้ (หลังสแกน 1 รายการ)
+        private void UpdateSummary(ScanItemModel item, int? knownBalance = null)
         {
             if (string.IsNullOrWhiteSpace(item.PartACode)) return;
 
             // ยอดคงเหลือของคลังที่รายการนั้นลงจริง (สแกนร่วมหลายคลังแยกแถวสรุปตามคลัง)
             var itemStock = Stocks.FirstOrDefault(s => s.StkId == item.StkId && item.StkId != 0) ?? SelectedStock;
-            int actualCurrentStock = _scanService.GetInventoryBalance(item.PartId, itemStock);
+            int actualCurrentStock = knownBalance ?? _scanService.GetInventoryBalance(item.PartId, itemStock);
             var existing = HistoryItems.FirstOrDefault(x => x.PartACode == item.PartACode && x.StkId == item.StkId);
 
             if (existing != null)
@@ -1242,6 +1333,7 @@ namespace CIMS.ViewModels
                     PartName = item.PartName,
                     PartACode = item.PartACode,
                     PartNo = item.PartNo,
+                    DisplayCode = item.DisplayCode,
                     InCount = (item.Status == "IN" || item.Status == "RETURN") ? 1 : 0,
                     TotalInQty = (item.Status == "IN" || item.Status == "RETURN") ? item.Qty : 0,
                     OutCount = item.Status == "OUT" ? 1 : 0,

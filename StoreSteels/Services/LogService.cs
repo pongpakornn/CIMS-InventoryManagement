@@ -1,4 +1,4 @@
-﻿// LogService.cs : บันทึกการทำงานของผู้ใช้งานในระบบ เก็บรายละเอียดทุกการเคลื่อนไหว (SYS_LOGS -> หน้า ACTIVITY LOG)
+﻿// LogService.cs : บันทึกการทำงานของผู้ใช้งานในระบบ เก็บรายละเอียดทุกการเคลื่อนไหว (CIMS.SystemLogs -> หน้า ACTIVITY LOG)
 
 using Microsoft.Data.SqlClient;
 using CIMS.Core;
@@ -32,7 +32,7 @@ namespace CIMS.Services
                         {
                             Exec(conn, _hasPcColumn, userId, action, detail, refCode);
                         }
-                        catch (SqlException ex) when (_hasPcColumn && ex.Number == 207)   // ฐานเก่ายังไม่มีคอลัมน์ LOG_PC
+                        catch (SqlException ex) when (_hasPcColumn && ex.Number == 207)   // ฐานเก่ายังไม่มีคอลัมน์ ComputerName
                         {
                             _hasPcColumn = false;
                             Exec(conn, false, userId, action, detail, refCode);
@@ -49,8 +49,8 @@ namespace CIMS.Services
         private static void Exec(SqlConnection conn, bool withPc, string userId, string action, string detail, string refCode)
         {
             string sql = withPc
-                ? "INSERT INTO SYS_LOGS (USR_ID, ACT_TYPE, LOG_DESC, LOG_REF, LOG_DATE, LOG_PC) VALUES (@user, @action, @detail, @ref, GETDATE(), @pc)"
-                : "INSERT INTO SYS_LOGS (USR_ID, ACT_TYPE, LOG_DESC, LOG_REF, LOG_DATE) VALUES (@user, @action, @detail, @ref, GETDATE())";
+                ? "INSERT INTO CIMS.SystemLogs (UserID, ActionType, Description, Reference, LogDate, ComputerName) VALUES (@user, @action, @detail, @ref, GETDATE(), @pc)"
+                : "INSERT INTO CIMS.SystemLogs (UserID, ActionType, Description, Reference, LogDate) VALUES (@user, @action, @detail, @ref, GETDATE())";
             using (SqlCommand cmd = new SqlCommand(sql, conn))
             {
                 cmd.Parameters.AddWithValue("@user", (object)userId ?? DBNull.Value);
@@ -74,7 +74,7 @@ namespace CIMS.Services
                 {
                     using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
                     {
-                        string sql = @"INSERT INTO STK_UPDATE_LOG (USR_ID, LOG_PART, LOG_MAX, LOG_MIN, LOG_REMARK)
+                        string sql = @"INSERT INTO STK_UPDATE_LOG (UserID, LOG_PART, LOG_MAX, LOG_MIN, LOG_REMARK)
                              VALUES (@uid, @part, @max, @min, @remark)";
 
                         using (SqlCommand cmd = new SqlCommand(sql, conn))
@@ -109,7 +109,7 @@ namespace CIMS.Services
             => Insert(userId, "PR_SYSTEM", description, reference);
 
         // ✅ งานแสกน (Scan In / Scan Out)
-        // rawBarcode (ไม่บังคับ): บาร์โค้ดดิบทั้งชุด เช่นป้าย Panta - ต่อท้ายใน LOG_DESC (nvarchar(max)) ให้ย้อนดูได้ครบ
+        // rawBarcode (ไม่บังคับ): บาร์โค้ดดิบทั้งชุด เช่นป้าย Panta - ต่อท้ายใน Description (nvarchar(max)) ให้ย้อนดูได้ครบ
         public static void WriteScanLog(string userId, string actionType, string partCode, string partName, int qty, string rawBarcode = null)
         {
             string description = $"[{actionType}] PD: {partName} | QTY: {qty}"

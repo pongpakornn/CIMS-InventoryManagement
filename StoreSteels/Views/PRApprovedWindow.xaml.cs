@@ -54,9 +54,9 @@ namespace CIMS.Views
             {
                 var list = await Task.Run(() => _service.GetApprovedList(key, from, to));
                 if (ver != _version) return;   // พิมพ์ต่อแล้ว -> ผลนี้เก่า ทิ้งไป
-                var picked = new HashSet<string>(_rows.Where(r => r.IsSelected).Select(r => r.PR_NO));
+                var picked = new HashSet<string>(_rows.Where(r => r.IsSelected).Select(r => r.PRNumber));
                 _rows.Clear();
-                foreach (var r in list) { r.IsSelected = picked.Contains(r.PR_NO); _rows.Add(r); }
+                foreach (var r in list) { r.IsSelected = picked.Contains(r.PRNumber); _rows.Add(r); }
                 UpdateStatus();
             }
             catch (Exception ex)
@@ -111,8 +111,8 @@ namespace CIMS.Views
                 await Task.Run(() =>
                 {
                     foreach (var item in selected)
-                        if (_service.UpdateAfterExport(item.PR_NO, uid))
-                            LogService.WriteLog(uid, "EXPORT_PR", $"Exported PR No: {item.PR_NO}", item.PR_NO);
+                        if (_service.UpdateAfterExport(item.PRNumber, uid))
+                            LogService.WriteLog(uid, "EXPORT_PR", $"Exported PR No: {item.PRNumber}", item.PRNumber);
                 });
                 NotificationManager.Show("Export complete", $"Export PR แล้ว {selected.Count:N0} รายการ", true);
                 foreach (var r in _rows) r.IsSelected = false;
@@ -135,14 +135,14 @@ namespace CIMS.Views
             try
             {
                 int q = w.Qty; string d = w.Dept, t = w.Target, r = w.Remark;
-                await Task.Run(() => _service.UpdatePR(pr.PR_NO, q, d, t, r));
+                await Task.Run(() => _service.UpdatePR(pr.PRNumber, q, d, t, r));
                 var changes = new List<string>();
                 if (q != pr.QTY) changes.Add($"QTY: {pr.QTY}->{q}");
                 if (d != (pr.Department ?? "")) changes.Add($"DEPT: {pr.Department}->{d}");
                 if (t != (pr.TargetDept ?? "")) changes.Add($"TARGET: {pr.TargetDept}->{t}");
-                if (r != (pr.PR_REM ?? "")) changes.Add($"REMARK: {pr.PR_REM}->{r}");
-                LogService.WritePRLog(_session?.UserId, "EDIT_PR", $"Edited PR No: {pr.PR_NO} | {(changes.Count == 0 ? "no change" : string.Join(", ", changes))}", pr.PR_NO);
-                NotificationManager.Show("Saved", $"แก้ไข {pr.PR_NO} แล้ว", true);
+                if (r != (pr.Remark ?? "")) changes.Add($"REMARK: {pr.Remark}->{r}");
+                LogService.WritePRLog(_session?.UserId, "EDIT_PR", $"Edited PR No: {pr.PRNumber} | {(changes.Count == 0 ? "no change" : string.Join(", ", changes))}", pr.PRNumber);
+                NotificationManager.Show("Saved", $"แก้ไข {pr.PRNumber} แล้ว", true);
                 Changed = true;
                 await LoadAsync();
             }
@@ -152,12 +152,12 @@ namespace CIMS.Views
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
             if (!((sender as FrameworkElement)?.DataContext is PRModel pr) || _session?.CanDeletePR != true) return;
-            if (!DialogHelper.ShowConfirm($"ลบ {pr.PR_NO}\n{pr.PartName}  จำนวน {pr.QTY:N0}\n\nลบแล้วกู้คืนไม่ได้ ยืนยันหรือไม่?", "DELETE PR")) return;
+            if (!DialogHelper.ShowConfirm($"ลบ {pr.PRNumber}\n{pr.PartName}  จำนวน {pr.QTY:N0}\n\nลบแล้วกู้คืนไม่ได้ ยืนยันหรือไม่?", "DELETE PR")) return;
             try
             {
-                await Task.Run(() => _service.DeletePR(pr.PR_NO));
-                LogService.WritePRLog(_session?.UserId, "DELETE_PR", $"Deleted approved PR No: {pr.PR_NO} | {pr.PartName} | QTY: {pr.QTY}", pr.PR_NO);
-                NotificationManager.Show("Deleted", $"ลบ {pr.PR_NO} แล้ว", true);
+                await Task.Run(() => _service.DeletePR(pr.PRNumber));
+                LogService.WritePRLog(_session?.UserId, "DELETE_PR", $"Deleted approved PR No: {pr.PRNumber} | {pr.PartName} | QTY: {pr.QTY}", pr.PRNumber);
+                NotificationManager.Show("Deleted", $"ลบ {pr.PRNumber} แล้ว", true);
                 Changed = true;
                 await LoadAsync();
             }

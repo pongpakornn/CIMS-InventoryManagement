@@ -184,7 +184,7 @@ namespace CIMS.Services
             var byKey = new Dictionary<string, int>();
             var byCode = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT PT_ID, LTRIM(RTRIM(PT_CODE)), ISNULL(PT_PARTA, '') FROM MST_PART", conn))
+            using (var cmd = new SqlCommand("SELECT PartID, LTRIM(RTRIM(PartCode)), ISNULL(PartA, '') FROM CIMS.Parts", conn))
             {
                 conn.Open();
                 using (var rd = cmd.ExecuteReader())
@@ -229,8 +229,8 @@ namespace CIMS.Services
                         if (x.IsNew)
                         {
                             using (var cmd = new SqlCommand(@"
-                                INSERT INTO MST_PART (PT_CODE, PT_DESC, PT_PSZ, PT_QR, QTY_MAX, QTY_MIN, PT_CAT, PT_BIN, QTY_STKB, IS_ACTIVE, IS_SHOW_MST,
-                                                      PT_IMG, PT_SUPPLIER, PT_CUST, PT_PARTA, PT_PARTNO, PT_MODEL)
+                                INSERT INTO CIMS.Parts (PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category, Bin, StockQuantity, IsActive, IsShowInMaster,
+                                                      ImageFileName, Supplier, Customer, PartA, PartNumber, Model)
                                 VALUES (@code, @name, ISNULL(@psz, 0), ISNULL(@qr, @code), 0, 0, ISNULL(@cat, 'GENERAL'), ISNULL(@bin, 'N/A'), 0, 1, @show,
                                         NULL, @sup, @cust, @parta, @partno, @model);
                                 SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, tr))
@@ -245,12 +245,12 @@ namespace CIMS.Services
                         else
                         {
                             using (var cmd = new SqlCommand(@"
-                                UPDATE MST_PART SET PT_DESC = ISNULL(@name, PT_DESC), PT_PSZ = ISNULL(@psz, PT_PSZ), PT_QR = ISNULL(@qr, PT_QR),
-                                       PT_CAT = ISNULL(@cat, PT_CAT), PT_BIN = ISNULL(@bin, PT_BIN), PT_SUPPLIER = ISNULL(@sup, PT_SUPPLIER),
-                                       PT_CUST = ISNULL(@cust, PT_CUST), PT_PARTA = ISNULL(@parta, PT_PARTA), PT_PARTNO = ISNULL(@partno, PT_PARTNO),
-                                       PT_MODEL = ISNULL(@model, PT_MODEL), IS_ACTIVE = 1,
-                                       IS_SHOW_MST = CASE WHEN @inMain = 1 THEN ISNULL(@show, 1) ELSE IS_SHOW_MST END
-                                WHERE PT_ID = @id", conn, tr))
+                                UPDATE CIMS.Parts SET Description = ISNULL(@name, Description), PackSize = ISNULL(@psz, PackSize), QRCode = ISNULL(@qr, QRCode),
+                                       Category = ISNULL(@cat, Category), Bin = ISNULL(@bin, Bin), Supplier = ISNULL(@sup, Supplier),
+                                       Customer = ISNULL(@cust, Customer), PartA = ISNULL(@parta, PartA), PartNumber = ISNULL(@partno, PartNumber),
+                                       Model = ISNULL(@model, Model), IsActive = 1,
+                                       IsShowInMaster = CASE WHEN @inMain = 1 THEN ISNULL(@show, 1) ELSE IsShowInMaster END
+                                WHERE PartID = @id", conn, tr))
                             {
                                 AddPart(cmd, x);
                                 cmd.Parameters.AddWithValue("@show", x.ShowInMain.HasValue ? (object)(x.ShowInMain.Value ? 1 : 0) : DBNull.Value);
@@ -265,16 +265,16 @@ namespace CIMS.Services
                         foreach (var s in x.Stocks)
                         {
                             string sql = s.IsMain
-                                ? @"UPDATE MST_PART SET QTY_STKB = ISNULL(@qty, QTY_STKB), QTY_MAX = ISNULL(@max, QTY_MAX), QTY_MIN = ISNULL(@min, QTY_MIN),
-                                           PT_REMARK = ISNULL(@rmk, PT_REMARK) WHERE PT_ID = @p"
-                                : @"IF NOT EXISTS (SELECT 1 FROM MST_PART_STOCK WHERE STK_ID = @s AND PT_ID = @p)
-                                        INSERT INTO MST_PART_STOCK (STK_ID, PT_ID, QTY) VALUES (@s, @p, 0);
-                                    UPDATE MST_PART_STOCK SET QTY_MAX = ISNULL(@max, QTY_MAX), QTY_MIN = ISNULL(@min, QTY_MIN),
-                                           REMARK = ISNULL(@rmk, REMARK), IS_SHOW = ISNULL(@show, IS_SHOW), UPDATED_DATE = GETDATE() WHERE STK_ID = @s AND PT_ID = @p;
+                                ? @"UPDATE CIMS.Parts SET StockQuantity = ISNULL(@qty, StockQuantity), MaxQuantity = ISNULL(@max, MaxQuantity), MinQuantity = ISNULL(@min, MinQuantity),
+                                           Remark = ISNULL(@rmk, Remark) WHERE PartID = @p"
+                                : @"IF NOT EXISTS (SELECT 1 FROM CIMS.PartStocks WHERE StockID = @s AND PartID = @p)
+                                        INSERT INTO CIMS.PartStocks (StockID, PartID, Quantity) VALUES (@s, @p, 0);
+                                    UPDATE CIMS.PartStocks SET MaxQuantity = ISNULL(@max, MaxQuantity), MinQuantity = ISNULL(@min, MinQuantity),
+                                           Remark = ISNULL(@rmk, Remark), IsShow = ISNULL(@show, IsShow), UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p;
                                     -- ยอด: ใส่ QTY อย่างเดียว = กล่องคำนวณตาม Pack Size / ใส่ STOCK (BOX) อย่างเดียว = ชิ้นคำนวณให้ / ใส่ทั้งคู่ = ตามไฟล์
-                                    IF @qty IS NOT NULL AND @box IS NOT NULL UPDATE MST_PART_STOCK SET QTY = @qty, QTY_BOX = @box WHERE STK_ID = @s AND PT_ID = @p;
-                                    ELSE IF @qty IS NOT NULL UPDATE MST_PART_STOCK SET QTY = @qty WHERE STK_ID = @s AND PT_ID = @p;
-                                    ELSE IF @box IS NOT NULL UPDATE MST_PART_STOCK SET QTY_BOX = @box WHERE STK_ID = @s AND PT_ID = @p;";
+                                    IF @qty IS NOT NULL AND @box IS NOT NULL UPDATE CIMS.PartStocks SET Quantity = @qty, BoxQuantity = @box WHERE StockID = @s AND PartID = @p;
+                                    ELSE IF @qty IS NOT NULL UPDATE CIMS.PartStocks SET Quantity = @qty WHERE StockID = @s AND PartID = @p;
+                                    ELSE IF @box IS NOT NULL UPDATE CIMS.PartStocks SET BoxQuantity = @box WHERE StockID = @s AND PartID = @p;";
                             using (var cmd = new SqlCommand(sql, conn, tr))
                             {
                                 cmd.Parameters.AddWithValue("@s", s.StkId);

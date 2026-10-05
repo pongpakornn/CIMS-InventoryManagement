@@ -747,6 +747,11 @@
                                 Background="{StaticResource MainPurple}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
                                 Width="130" Height="38" FontSize="13" Margin="10,0,0,0"/>
+                        <!-- 🏷️ เลือกค่าที่แสดงแทนรหัสต่อคลัง (PART A / PART NO / Barcode #n ...) -->
+                        <Button Content="🏷️ DISPLAY" Click="ScanDisplay_Click"
+                                Background="#49454F" Visibility="{Binding DisplayButtonVisibility}"
+                                Style="{StaticResource AnimatedButton}" Focusable="False" ToolTip="Choose what each stock shows as PRODUCT CODE"
+                                Width="120" Height="38" FontSize="13" Margin="10,0,0,0"/>
                         <!-- ✏️ แก้ไข / ลบรายการสแกน (Admin Level 1 เท่านั้น) -->
                         <Button Content="✏️ ADJUST SCAN" Click="AdjustScan_Click"
                                 Background="#B3261E" Visibility="{Binding AdjustButtonVisibility}"

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CIMS.Services
 {
-    // 🕘 การเคลื่อนไหวของผู้ใช้งานทั้งระบบ (SYS_LOGS) สำหรับหน้า ACTIVITY LOG
+    // 🕘 การเคลื่อนไหวของผู้ใช้งานทั้งระบบ (CIMS.SystemLogs) สำหรับหน้า ACTIVITY LOG
     public class ActivityLogRow
     {
         public DateTime LogDate { get; set; }
@@ -40,26 +40,26 @@ namespace CIMS.Services
         private static bool HasPc(SqlConnection conn)
         {
             if (_hasPc.HasValue) return _hasPc.Value;
-            using (var cmd = new SqlCommand("SELECT COL_LENGTH('dbo.SYS_LOGS', 'LOG_PC')", conn))
+            using (var cmd = new SqlCommand("SELECT COL_LENGTH('CIMS.SystemLogs', 'ComputerName')", conn))
                 _hasPc = cmd.ExecuteScalar() != DBNull.Value;
             return _hasPc.Value;
         }
 
         private static string FromWhere => @"
-            FROM SYS_LOGS l
-            LEFT JOIN MST_USER u ON u.USR_ID = l.USR_ID
-            WHERE l.LOG_DATE >= @from AND l.LOG_DATE < @to
-              AND (@usr IS NULL OR l.USR_ID = @usr)
-              AND (@act IS NULL OR l.ACT_TYPE = @act)
-              AND (@key = '' OR l.ACT_TYPE LIKE '%' + @key + '%' OR l.LOG_DESC LIKE '%' + @key + '%' OR ISNULL(l.LOG_REF, '') LIKE '%' + @key + '%'
-                   OR ISNULL(l.USR_ID, '') LIKE '%' + @key + '%' OR ISNULL(u.USR_NAME, '') LIKE '%' + @key + '%' {PC})";
+            FROM CIMS.SystemLogs l
+            LEFT JOIN CIMS.Users u ON u.UserID = l.UserID
+            WHERE l.LogDate >= @from AND l.LogDate < @to
+              AND (@usr IS NULL OR l.UserID = @usr)
+              AND (@act IS NULL OR l.ActionType = @act)
+              AND (@key = '' OR l.ActionType LIKE '%' + @key + '%' OR l.Description LIKE '%' + @key + '%' OR ISNULL(l.Reference, '') LIKE '%' + @key + '%'
+                   OR ISNULL(l.UserID, '') LIKE '%' + @key + '%' OR ISNULL(u.FullName, '') LIKE '%' + @key + '%' {PC})";
 
         private static string Sql(bool pc, string select, string tail) =>
-            select + FromWhere.Replace("{PC}", pc ? "OR ISNULL(l.LOG_PC, '') LIKE '%' + @key + '%'" : "") + tail;
+            select + FromWhere.Replace("{PC}", pc ? "OR ISNULL(l.ComputerName, '') LIKE '%' + @key + '%'" : "") + tail;
 
         private static string Cols(bool pc) =>
-            "SELECT l.LOG_DATE, l.USR_ID, ISNULL(u.USR_NAME, '') AS USR_NAME, l.ACT_TYPE, ISNULL(l.LOG_DESC, '') AS LOG_DESC, ISNULL(l.LOG_REF, '') AS LOG_REF, "
-            + (pc ? "ISNULL(l.LOG_PC, '') AS LOG_PC " : "'' AS LOG_PC ");
+            "SELECT l.LogDate, l.UserID, ISNULL(u.FullName, '') AS FullName, l.ActionType, ISNULL(l.Description, '') AS Description, ISNULL(l.Reference, '') AS Reference, "
+            + (pc ? "ISNULL(l.ComputerName, '') AS ComputerName " : "'' AS ComputerName ");
 
         private static void AddParams(SqlCommand cmd, ActivityLogFilter f)
         {
@@ -72,13 +72,13 @@ namespace CIMS.Services
 
         private static ActivityLogRow Read(SqlDataReader r) => new ActivityLogRow
         {
-            LogDate = Convert.ToDateTime(r["LOG_DATE"]),
-            UserId = r["USR_ID"] == DBNull.Value ? null : r["USR_ID"].ToString(),
-            UserName = r["USR_NAME"].ToString(),
-            Action = r["ACT_TYPE"].ToString(),
-            Detail = r["LOG_DESC"].ToString(),
-            RefCode = r["LOG_REF"].ToString(),
-            Computer = r["LOG_PC"].ToString()
+            LogDate = Convert.ToDateTime(r["LogDate"]),
+            UserId = r["UserID"] == DBNull.Value ? null : r["UserID"].ToString(),
+            UserName = r["FullName"].ToString(),
+            Action = r["ActionType"].ToString(),
+            Detail = r["Description"].ToString(),
+            RefCode = r["Reference"].ToString(),
+            Computer = r["ComputerName"].ToString()
         };
 
         public async Task<(List<ActivityLogRow> Rows, int Total)> QueryAsync(ActivityLogFilter f, int page, CancellationToken ct)
@@ -94,7 +94,7 @@ namespace CIMS.Services
                     AddParams(cmd, f);
                     total = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false));
                 }
-                using (var cmd = new SqlCommand(Sql(pc, Cols(pc), " ORDER BY l.LOG_DATE DESC, l.LOG_ID DESC OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY"), conn))
+                using (var cmd = new SqlCommand(Sql(pc, Cols(pc), " ORDER BY l.LogDate DESC, l.LogID DESC OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY"), conn))
                 {
                     AddParams(cmd, f);
                     cmd.Parameters.AddWithValue("@skip", Math.Max(0, page) * PageSize);
@@ -114,9 +114,9 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(GlobalConfig.ConnStr))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand("SELECT USR_ID, ISNULL(USR_NAME, '') FROM MST_USER ORDER BY USR_ID", conn))
+                using (var cmd = new SqlCommand("SELECT UserID, ISNULL(FullName, '') FROM CIMS.Users ORDER BY UserID", conn))
                 using (var r = cmd.ExecuteReader()) while (r.Read()) users.Add((r.GetValue(0).ToString(), r.GetValue(1).ToString()));
-                using (var cmd = new SqlCommand("SELECT DISTINCT ACT_TYPE FROM SYS_LOGS WHERE ISNULL(ACT_TYPE, '') <> '' ORDER BY ACT_TYPE", conn))
+                using (var cmd = new SqlCommand("SELECT DISTINCT ActionType FROM CIMS.SystemLogs WHERE ISNULL(ActionType, '') <> '' ORDER BY ActionType", conn))
                 using (var r = cmd.ExecuteReader()) while (r.Read()) acts.Add(r.GetValue(0).ToString());
             }
             return (users, acts);
@@ -130,7 +130,7 @@ namespace CIMS.Services
             {
                 conn.Open();
                 bool pc = HasPc(conn);
-                using (var cmd = new SqlCommand(Sql(pc, Cols(pc), " ORDER BY l.LOG_DATE DESC, l.LOG_ID DESC"), conn) { CommandTimeout = 300 })
+                using (var cmd = new SqlCommand(Sql(pc, Cols(pc), " ORDER BY l.LogDate DESC, l.LogID DESC"), conn) { CommandTimeout = 300 })
                 {
                     AddParams(cmd, f);
                     using (var r = cmd.ExecuteReader()) while (r.Read()) rows.Add(Read(r));

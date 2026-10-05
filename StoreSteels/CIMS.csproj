@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>in-stock.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,6 +32,9 @@
   -->
   <ItemGroup>
     <Resource Include="Assets\**\*.png;Assets\**\*.gif;Assets\**\*.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="in-stock.ico" />
   </ItemGroup>
 
   <!--

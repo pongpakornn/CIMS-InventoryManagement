@@ -69,7 +69,7 @@ namespace CIMS.Views
             return w.ShowDialog() == true ? w.Chosen : null;
         }
 
-        // PR SETTINGS: คืน map STK_ID -> เปิด/ปิด (null = ยกเลิก)
+        // PR SETTINGS: คืน map StockID -> เปิด/ปิด (null = ยกเลิก)
         public static Dictionary<int, bool> ShowPrSettings(IEnumerable<StockModel> stocks, IDictionary<int, bool> current)
         {
             var w = new StockPickerWindow(PickMode.PrSettings, stocks);

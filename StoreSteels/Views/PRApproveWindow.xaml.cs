@@ -22,7 +22,7 @@ namespace CIMS.Views
             var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) { Owner = owner; WindowStartupLocation = WindowStartupLocation.CenterOwner; }
 
-            txtPrNo.Text = pr.PR_NO;
+            txtPrNo.Text = pr.PRNumber;
             txtProduct.Text = pr.PartName;
             txtRequested.Text = $"REQUESTED : {pr.QTY:N0} {pr.Unit}";
             txtAll.Text = $"APPROVE ALL  ({pr.QTY:N0})";
@@ -71,7 +71,7 @@ namespace CIMS.Views
             }
             bool partial = q.Value < _pr.QTY;
             bool keep = partial && rbKeep.IsChecked == true;
-            string msg = $"อนุมัติ {_pr.PR_NO}\n{_pr.PartName}\n\nยอดที่อนุมัติ {q.Value:N0} จาก {_pr.QTY:N0} {_pr.Unit}" +
+            string msg = $"อนุมัติ {_pr.PRNumber}\n{_pr.PartName}\n\nยอดที่อนุมัติ {q.Value:N0} จาก {_pr.QTY:N0} {_pr.Unit}" +
                          (partial ? (keep ? $"\nยอดที่เหลือ {_pr.QTY - q.Value:N0} จะสร้างเป็น PR ใหม่ (Waiting)" : $"\nยอดที่เหลือ {_pr.QTY - q.Value:N0} ไม่เก็บไว้") : "") +
                          "\n\nยืนยันการอนุมัติหรือไม่?";
             if (!DialogHelper.ShowConfirm(msg, "CONFIRM APPROVE")) return;

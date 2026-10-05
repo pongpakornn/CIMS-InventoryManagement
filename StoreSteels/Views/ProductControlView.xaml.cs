@@ -124,7 +124,7 @@
                 _viewModel.LoadData(txtSearch.Text);
             }
 
-            // Stock-CHR ติ๊ก = แสดงในตารางคลังหลัก (IS_SHOW_MST) / คลังอื่นติ๊ก = อยู่ในคลังนั้น
+            // Stock-CHR ติ๊ก = แสดงในตารางคลังหลัก (IsShowInMaster) / คลังอื่นติ๊ก = อยู่ในคลังนั้น
             private void SetStockChips(bool inMain, IEnumerable<int> otherIds)
             {
                 var others = new HashSet<int>(otherIds ?? Enumerable.Empty<int>());
@@ -346,7 +346,7 @@
                         FillInputsFromModel(selected);
                         _currentViewingCode = selected.PartACode;
                         _oldPartACode = selected.PartACode;
-                        _editPtId = selected.PtId;   // PRODUCT CODE ซ้ำได้ -> แก้แถวนี้ด้วย PT_ID
+                        _editPtId = selected.PtId;   // PRODUCT CODE ซ้ำได้ -> แก้แถวนี้ด้วย PartID
                         SetEditMode(true);
                         txtProductName.Focus();
                         GenerateQRPreviewLogic();
@@ -404,7 +404,7 @@
             // --- UI Helpers ---
             private ProductControlModel GetModelFromInputs()
             {
-                // schema ใหม่ตัด PT_ACODE/PT_MODEL/PT_NO ออกจาก MST_PART แล้ว PT_CODE เป็นตัวระบุหลักตัวเดียว
+                // schema ใหม่ตัด PartACode/Model/PT_NO ออกจาก CIMS.Parts แล้ว PartCode เป็นตัวระบุหลักตัวเดียว
                 // PartACode จึงมิเรอร์ค่าจาก PartCode เพื่อให้ logic เดิมที่อ้างอิง PartACode (lookup แถว, edit, delete) ยังทำงานถูกต้อง
                 string code = txtProductCode.Text.Trim();
                 return new ProductControlModel
@@ -556,6 +556,19 @@
             }
 
             // ✅ นำฟังก์ชันกลับเข้ามาอยู่ก่อนปีกกาปิดคลาสอันแรกแล้วครับ
+            // 🗑 ADMIN DELETE (Level 1): เลือกคลังในหน้าต่าง แล้วลบรายการที่ติ๊ก / ลบทั้งหมดในคลัง
+            private void AdminDelete_Click(object sender, RoutedEventArgs e)
+            {
+                if (_viewModel.CurrentUser?.UserLevel != 1)
+                {
+                    DialogHelper.ShowWarning("เฉพาะผู้ดูแลระบบ (Level 1) เท่านั้นที่ใช้ปุ่มนี้ได้", "ACCESS DENIED");
+                    return;
+                }
+                var ticked = _viewModel.Products.Where(x => x.IsSelected && x.PtId > 0).Select(x => x.PtId).Distinct().ToList();
+                var w = new AdminDeleteWindow(_viewModel.CurrentUser, _stocks, ticked);
+                if (w.ShowDialog() == true) _viewModel.LoadData(txtSearch.Text);
+            }
+
             private async void Export_Click(object sender, RoutedEventArgs e)
             {
                 var selectedItems = _viewModel.Products.Where(x => x.IsSelected).ToList();

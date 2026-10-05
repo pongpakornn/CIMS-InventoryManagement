@@ -27,7 +27,18 @@ namespace CIMS.Models
 
         // ข้อความรหัสในตาราง: สแกนร่วมหลายคลังต่อท้ายรหัสคลังบรรทัดล่าง (สินค้าเดียวกันคนละคลังจะได้แยกออก)
         public bool ShowStockInCode { get; set; }
-        public string CodeLabel => ShowStockInCode && !string.IsNullOrEmpty(StockCode) ? $"{PartACode}\n{StockCode}" : PartACode;
+        public string CodeLabel => ShowStockInCode && !string.IsNullOrEmpty(StockCode) ? $"{CodeText}\n{StockCode}" : CodeText;
+
+        // ค่าที่ตั้งให้แสดงแทนรหัส (ตั้งต่อคลังที่ปุ่ม DISPLAY ในหน้า Multi-Scanner) - ไม่ได้ตั้ง = รหัสเดิม
+        private string _displayCode;
+        public string DisplayCode { get => _displayCode; set { _displayCode = value; OnPropertyChanged(); OnPropertyChanged(nameof(CodeLabel)); OnPropertyChanged(nameof(CodeText)); } }
+        public string CodeText => string.IsNullOrWhiteSpace(DisplayCode) ? PartACode : DisplayCode;
+
+        // ข้อมูลเสริมสำหรับเลือกค่าที่แสดง
+        public string PartA { get; set; }
+        public string PartNumber { get; set; }
+        public string Model { get; set; }
+        public string RefNo { get; set; }
 
         // เปลี่ยนมารับเป็น ImageSource เพื่อรองรับภาพจาก UI Thread โดยตรง
         public System.Windows.Media.ImageSource ProductImagePath

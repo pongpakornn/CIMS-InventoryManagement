@@ -15,7 +15,7 @@ namespace CIMS.Models
         private string _id;
         public string ID { get => _id; set { _id = value; OnPropertyChanged(); } }
 
-        // PT_ID (คลังอื่นที่ไม่ใช่คลังหลัก)
+        // PartID (คลังอื่นที่ไม่ใช่คลังหลัก)
         public int PartId { get; set; }
 
         // คอลัมน์เสริมที่คลังเลือกแสดงได้ (CUSTOMER / PART A / PART NO / STOCK (BOX) / STOCK (PCS))
@@ -43,7 +43,7 @@ namespace CIMS.Models
         private LoopGroupKey _loopGroup;
         public LoopGroupKey LoopGroup { get => _loopGroup ??= new LoopGroupKey(GroupKey, 0); set { _loopGroup = value; OnPropertyChanged(); } }
 
-        // ตัวระบุหลักของสินค้า (เดิมคือ PartACode/PT_ACODE - schema ใหม่ตัดออก เหลือ PT_CODE ตัวเดียว)
+        // ตัวระบุหลักของสินค้า (เดิมคือ PartACode/PartACode - schema ใหม่ตัดออก เหลือ PartCode ตัวเดียว)
         private string _partCode;
         public string PartCode { get => _partCode; set { _partCode = value; OnPropertyChanged(); } }
 
@@ -93,7 +93,7 @@ namespace CIMS.Models
 
         #endregion
 
-        // ยอดคงคลัง (QTY_STKB) - schema ใหม่เหลือค่าเดียว ไม่มี QTY_STK/PackSize auto-calc pcs↔box
+        // ยอดคงคลัง (StockQuantity) - schema ใหม่เหลือค่าเดียว ไม่มี QTY_STK/PackSize auto-calc pcs↔box
         // อีกต่อไป เพราะค่านี้แทนน้ำหนัก (กก.) ไม่ใช่จำนวนกล่อง/ชิ้น
         private string _qty;
         public string Qty { get => _qty; set { _qty = value; OnPropertyChanged(); } }

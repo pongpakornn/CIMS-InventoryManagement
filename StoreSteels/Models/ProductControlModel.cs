@@ -41,9 +41,9 @@ namespace CIMS.Models
         public string Location { get => _location; set { _location = value; OnPropertyChanged(); } }
         public bool IsActive { get => _isActive; set { _isActive = value; OnPropertyChanged(); } }
         public bool IsShow { get => _isShow; set { _isShow = value; OnPropertyChanged(); } }
-        // อยู่ในคลังหลักไหม (IS_SHOW_MST) - แยกจาก IsShow ที่เป็น SHOW/HIDE ตามคลังในช่องกรอง
+        // อยู่ในคลังหลักไหม (IsShowInMaster) - แยกจาก IsShow ที่เป็น SHOW/HIDE ตามคลังในช่องกรอง
         public bool IsShowMain { get; set; }
-        // PT_ID ของแถว (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน จึงอ้างอิงแถวด้วย PT_ID)
+        // PartID ของแถว (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน จึงอ้างอิงแถวด้วย PartID)
         public int PtId { get; set; }
         public bool IsSelected { get => _isSelected; set { _isSelected = value; OnPropertyChanged(); } }
 
@@ -53,11 +53,11 @@ namespace CIMS.Models
         public string PartACode { get => _partACode; set { _partACode = value; OnPropertyChanged(); } }
         public string PartNo { get => _partNo; set { _partNo = value; OnPropertyChanged(); } }
 
-        // ลูกค้า / PART A (PT_CUST / PT_PARTA) - แสดงเป็นคอลัมน์และจัดกลุ่มในหน้า Store (Max-Min) ได้ตามการตั้งค่าคลัง
+        // ลูกค้า / PART A (Customer / PartA) - แสดงเป็นคอลัมน์และจัดกลุ่มในหน้า Store (Max-Min) ได้ตามการตั้งค่าคลัง
         private string _customer;
         public string Customer { get => _customer; set { _customer = value; OnPropertyChanged(); } }
         private string _model;
-        public string Model { get => _model; set { _model = value; OnPropertyChanged(); } }   // รหัสโมเดล (PT_MODEL)
+        public string Model { get => _model; set { _model = value; OnPropertyChanged(); } }   // รหัสโมเดล (Model)
         private string _partA;
         public string PartA { get => _partA; set { _partA = value; OnPropertyChanged(); } }
 

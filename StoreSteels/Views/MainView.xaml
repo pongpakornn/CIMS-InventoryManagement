@@ -159,6 +159,19 @@
                     </Button>
                     <!-- End Function -->
 
+                    <!-- Function Button : Forecast / Order / Delivery (กราฟ + TOP 5 + ตาราง / Import / Export) -->
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnForecastOrder_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewForecastOrder, Converter={StaticResource BoolToVis}}">
+                        <Grid HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/ForecastOrder.png" Style="{StaticResource SidebarIconStyle}"/>
+                            <TextBlock Grid.Column="1" Text="Forecast / Order" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                    </Button>
+                    <!-- End Function -->
+
                     <!-- Function Button : PR (เปิดใช้งานแล้ว - เห็นได้กลุ่มเดียวกับเมนู Store) -->
                     <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnPR_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewPR, Converter={StaticResource BoolToVis}}">
                             <Grid HorizontalAlignment="Stretch">

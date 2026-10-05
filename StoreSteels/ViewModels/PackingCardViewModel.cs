@@ -173,7 +173,7 @@ namespace CIMS.ViewModels
             => VisibleItems.Where(x => x.IsSelected).ToList();
 
         // เรียกหลังพิมพ์สำเร็จ: ตัดรายการที่พิมพ์แล้วออกจากลิสต์ทันที (query รอบถัดไปก็จะไม่ดึงมาอยู่แล้ว
-        // เพราะ PackingCardErpService กรองด้วย PackingPrintLog แล้ว แต่ตัดออกจาก UI เลยจะได้ไม่ต้องรอ)
+        // เพราะ PackingCardErpService กรองด้วย CIMS.PickListPrintLogs แล้ว แต่ตัดออกจาก UI เลยจะได้ไม่ต้องรอ)
         public void RemoveItems(IEnumerable<PackingCardModel> items)
         {
             if (items == null) return;

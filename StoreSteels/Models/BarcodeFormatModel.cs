@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace CIMS.Models
 {
-    // รูปแบบป้ายบาร์โค้ดของ Supplier ที่ผู้ใช้ตั้งเอง (MST_BARCODE_FMT) เช่น Panta:
+    // รูปแบบป้ายบาร์โค้ดของ Supplier ที่ผู้ใช้ตั้งเอง (CIMS.BarcodeFormats) เช่น Panta:
     // DCAE9031B-006;CHR; 26071606; -; DCAE9031B-006;SGACE 45/45; 1.000 X 175.00 X COIL; 1; 613.00; 21/08/2026; DCAE9031B;
     //   ตัวคั่น ";"  ช่องรหัสสินค้า 11 (DCAE9031B)  ช่องรหัสสำรอง 1 (DCAE9031B-006)  ช่องจำนวน 9 (613.00)
     // ตำแหน่งช่องนับจาก 1 (ช่องแรก = 1) ให้ตรงกับที่ผู้ใช้เห็นบนหน้าจอตั้งค่า

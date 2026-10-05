@@ -11,7 +11,7 @@ using System.Linq;
 
 namespace CIMS.Services
 {
-    // คลังสินค้า (MST_STOCK), รูปแบบบาร์โค้ด Supplier (MST_BARCODE_FMT), โอนย้าย และ Import Excel
+    // คลังสินค้า (CIMS.Stocks), รูปแบบบาร์โค้ด Supplier (CIMS.BarcodeFormats), โอนย้าย และ Import Excel
     // ตาราง/SP ทั้งหมดอยู่ใน Database/MultiStock.sql
     public class StockService
     {
@@ -20,12 +20,12 @@ namespace CIMS.Services
         #region === [ Stocks ] ===
 
         private const string StockColumns = @"
-            s.STK_ID, s.STK_CODE, s.STK_NAME, s.STK_UNIT, s.IS_MAIN, s.USE_MAXMIN,
-            s.COL_IMAGE, s.COL_CODE, s.COL_NAME, s.COL_QTY, s.COL_REMARK,
-            s.IN_PICKLIST, s.IN_SUPPLIER, s.IN_SYSQR, s.IN_EXCEL,
-            s.OUT_PICKLIST, s.OUT_SUPPLIER, s.OUT_SYSQR, s.SORT_NO,
-            s.GROUP_BY, s.MAXMIN_BASIS, s.COL_CUSTOMER, s.COL_PARTA, s.COL_PARTNO, s.COL_STK_BOX, s.COL_STK_PCS,
-            s.COL_NO, s.COL_MODEL, s.OUT_EXCEL";
+            s.StockID, s.StockCode, s.StockName, s.Unit, s.IsMain, s.UseMaxMin,
+            s.ShowColImage, s.ShowColCode, s.ShowColName, s.ShowColQuantity, s.ShowColRemark,
+            s.InPickList, s.InSupplier, s.InSystemQR, s.InExcel,
+            s.OutPickList, s.OutSupplier, s.OutSystemQR, s.SortNo,
+            s.GroupBy, s.MaxMinBasis, s.ShowColCustomer, s.ShowColPartA, s.ShowColPartNumber, s.ShowColStockBox, s.ShowColStockPcs,
+            s.ShowColNo, s.ShowColModel, s.OutExcel";
 
         // คลังทั้งหมด (คลังหลักอยู่บนสุด) พร้อมจำนวนรายการสินค้าในแต่ละคลัง
         public List<StockModel> GetStocks()
@@ -35,9 +35,9 @@ namespace CIMS.Services
             {
                 conn.Open();
                 string sql = $@"SELECT {StockColumns}, ISNULL(v.ItemCount, 0) AS ItemCount
-                                FROM MST_STOCK s
-                                LEFT JOIN VW_StockSummary v ON v.STK_ID = s.STK_ID
-                                ORDER BY s.IS_MAIN DESC, s.SORT_NO, s.STK_CODE";
+                                FROM CIMS.Stocks s
+                                LEFT JOIN CIMS.vw_StockSummary v ON v.StockID = s.StockID
+                                ORDER BY s.IsMain DESC, s.SortNo, s.StockCode";
                 using (var cmd = new SqlCommand(sql, conn))
                 using (var rdr = cmd.ExecuteReader())
                 {
@@ -55,18 +55,18 @@ namespace CIMS.Services
 
         public StockModel GetStock(int stkId) => GetStocks().FirstOrDefault(s => s.StkId == stkId);
 
-        // 🧾 PR SETTINGS: คลังที่แสกนออกแล้วสร้าง PR อัตโนมัติ (MST_STOCK.PR_AUTO - Database/PRView.sql)
+        // 🧾 PR SETTINGS: คลังที่แสกนออกแล้วสร้าง PR อัตโนมัติ (CIMS.Stocks.AutoPR - Database/PRView.sql)
         public Dictionary<int, bool> GetPrAutoMap()
         {
             var map = new Dictionary<int, bool>();
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                using (var chk = new SqlCommand("SELECT COL_LENGTH('dbo.MST_STOCK', 'PR_AUTO')", conn))
+                using (var chk = new SqlCommand("SELECT COL_LENGTH('CIMS.Stocks', 'AutoPR')", conn))
                     if (chk.ExecuteScalar() == DBNull.Value)
                         throw new InvalidOperationException("ฐานข้อมูลยังไม่รองรับการตั้งค่า PR อัตโนมัติ กรุณารัน Database/PRView.sql");
 
-                using (var cmd = new SqlCommand("SELECT STK_ID, PR_AUTO FROM MST_STOCK", conn))
+                using (var cmd = new SqlCommand("SELECT StockID, AutoPR FROM CIMS.Stocks", conn))
                 using (var rdr = cmd.ExecuteReader())
                     while (rdr.Read()) map[Convert.ToInt32(rdr[0])] = Convert.ToBoolean(rdr[1]);
             }
@@ -82,7 +82,7 @@ namespace CIMS.Services
                 {
                     foreach (var kv in map)
                     {
-                        using (var cmd = new SqlCommand("UPDATE MST_STOCK SET PR_AUTO = @on, UPDATED_BY = @u, UPDATED_DATE = GETDATE() WHERE STK_ID = @id", conn, trans))
+                        using (var cmd = new SqlCommand("UPDATE CIMS.Stocks SET AutoPR = @on, UpdatedBy = @u, UpdatedDate = GETDATE() WHERE StockID = @id", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@on", kv.Value);
                             cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
@@ -101,48 +101,48 @@ namespace CIMS.Services
         {
             return new StockModel
             {
-                StkId = Convert.ToInt32(rdr["STK_ID"]),
-                Code = rdr["STK_CODE"].ToString(),
-                Name = rdr["STK_NAME"].ToString(),
-                Unit = rdr["STK_UNIT"].ToString(),
-                IsMain = Convert.ToBoolean(rdr["IS_MAIN"]),
-                UseMaxMin = Convert.ToBoolean(rdr["USE_MAXMIN"]),
-                ColImage = Convert.ToBoolean(rdr["COL_IMAGE"]),
-                ColCode = Convert.ToBoolean(rdr["COL_CODE"]),
-                ColName = Convert.ToBoolean(rdr["COL_NAME"]),
-                ColQty = Convert.ToBoolean(rdr["COL_QTY"]),
-                ColRemark = Convert.ToBoolean(rdr["COL_REMARK"]),
-                InPickList = Convert.ToBoolean(rdr["IN_PICKLIST"]),
-                InSupplier = Convert.ToBoolean(rdr["IN_SUPPLIER"]),
-                InSysQr = Convert.ToBoolean(rdr["IN_SYSQR"]),
-                InExcel = Convert.ToBoolean(rdr["IN_EXCEL"]),
-                OutPickList = Convert.ToBoolean(rdr["OUT_PICKLIST"]),
-                OutSupplier = Convert.ToBoolean(rdr["OUT_SUPPLIER"]),
-                OutSysQr = Convert.ToBoolean(rdr["OUT_SYSQR"]),
-                SortNo = Convert.ToInt32(rdr["SORT_NO"]),
-                GroupBy = rdr["GROUP_BY"].ToString(),
-                MaxMinBasis = rdr["MAXMIN_BASIS"].ToString(),
-                ColCustomer = Convert.ToBoolean(rdr["COL_CUSTOMER"]),
-                ColPartA = Convert.ToBoolean(rdr["COL_PARTA"]),
-                ColPartNo = Convert.ToBoolean(rdr["COL_PARTNO"]),
-                ColStockBox = Convert.ToBoolean(rdr["COL_STK_BOX"]),
-                ColStockPcs = Convert.ToBoolean(rdr["COL_STK_PCS"]),
-                ColNo = Convert.ToBoolean(rdr["COL_NO"]),
-                ColModel = Convert.ToBoolean(rdr["COL_MODEL"]),
-                OutExcel = Convert.ToBoolean(rdr["OUT_EXCEL"])
+                StkId = Convert.ToInt32(rdr["StockID"]),
+                Code = rdr["StockCode"].ToString(),
+                Name = rdr["StockName"].ToString(),
+                Unit = rdr["Unit"].ToString(),
+                IsMain = Convert.ToBoolean(rdr["IsMain"]),
+                UseMaxMin = Convert.ToBoolean(rdr["UseMaxMin"]),
+                ColImage = Convert.ToBoolean(rdr["ShowColImage"]),
+                ColCode = Convert.ToBoolean(rdr["ShowColCode"]),
+                ColName = Convert.ToBoolean(rdr["ShowColName"]),
+                ColQty = Convert.ToBoolean(rdr["ShowColQuantity"]),
+                ColRemark = Convert.ToBoolean(rdr["ShowColRemark"]),
+                InPickList = Convert.ToBoolean(rdr["InPickList"]),
+                InSupplier = Convert.ToBoolean(rdr["InSupplier"]),
+                InSysQr = Convert.ToBoolean(rdr["InSystemQR"]),
+                InExcel = Convert.ToBoolean(rdr["InExcel"]),
+                OutPickList = Convert.ToBoolean(rdr["OutPickList"]),
+                OutSupplier = Convert.ToBoolean(rdr["OutSupplier"]),
+                OutSysQr = Convert.ToBoolean(rdr["OutSystemQR"]),
+                SortNo = Convert.ToInt32(rdr["SortNo"]),
+                GroupBy = rdr["GroupBy"].ToString(),
+                MaxMinBasis = rdr["MaxMinBasis"].ToString(),
+                ColCustomer = Convert.ToBoolean(rdr["ShowColCustomer"]),
+                ColPartA = Convert.ToBoolean(rdr["ShowColPartA"]),
+                ColPartNo = Convert.ToBoolean(rdr["ShowColPartNumber"]),
+                ColStockBox = Convert.ToBoolean(rdr["ShowColStockBox"]),
+                ColStockPcs = Convert.ToBoolean(rdr["ShowColStockPcs"]),
+                ColNo = Convert.ToBoolean(rdr["ShowColNo"]),
+                ColModel = Convert.ToBoolean(rdr["ShowColModel"]),
+                OutExcel = Convert.ToBoolean(rdr["OutExcel"])
             };
         }
 
         private static void LoadFormatIds(SqlConnection conn, List<StockModel> stocks)
         {
-            using (var cmd = new SqlCommand("SELECT STK_ID, FMT_ID FROM MST_STOCK_FMT", conn))
+            using (var cmd = new SqlCommand("SELECT StockID, FormatID FROM CIMS.StockBarcodeFormats", conn))
             using (var rdr = cmd.ExecuteReader())
             {
                 var byId = stocks.ToDictionary(s => s.StkId);
                 while (rdr.Read())
                 {
-                    if (byId.TryGetValue(Convert.ToInt32(rdr["STK_ID"]), out var s))
-                        s.FormatIds.Add(Convert.ToInt32(rdr["FMT_ID"]));
+                    if (byId.TryGetValue(Convert.ToInt32(rdr["StockID"]), out var s))
+                        s.FormatIds.Add(Convert.ToInt32(rdr["FormatID"]));
                 }
             }
         }
@@ -150,7 +150,7 @@ namespace CIMS.Services
         public bool IsStockCodeTaken(string code, int exceptStkId)
         {
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("SELECT COUNT(1) FROM MST_STOCK WHERE STK_CODE = @code AND STK_ID <> @id", conn))
+            using (var cmd = new SqlCommand("SELECT COUNT(1) FROM CIMS.Stocks WHERE StockCode = @code AND StockID <> @id", conn))
             {
                 cmd.Parameters.AddWithValue("@code", code.Trim());
                 cmd.Parameters.AddWithValue("@id", exceptStkId);
@@ -159,7 +159,7 @@ namespace CIMS.Services
             }
         }
 
-        // สร้างคลังใหม่ + ผูกรูปแบบบาร์โค้ด + ให้สิทธิ์ VIEW ผู้ใช้ทุกคน (sp_Stock_GrantViewAll) ใน Transaction เดียว
+        // สร้างคลังใหม่ + ผูกรูปแบบบาร์โค้ด + ให้สิทธิ์ VIEW ผู้ใช้ทุกคน (CIMS.sp_Stock_GrantViewAll) ใน Transaction เดียว
         public int CreateStock(StockModel s, string userId)
         {
             using (var conn = new SqlConnection(_connectionString))
@@ -168,16 +168,16 @@ namespace CIMS.Services
                 using (var trans = conn.BeginTransaction())
                 {
                     string sql = @"
-                        INSERT INTO MST_STOCK (STK_CODE, STK_NAME, STK_UNIT, IS_MAIN, USE_MAXMIN,
-                            COL_IMAGE, COL_CODE, COL_NAME, COL_QTY, COL_REMARK,
-                            IN_PICKLIST, IN_SUPPLIER, IN_SYSQR, IN_EXCEL, OUT_PICKLIST, OUT_SUPPLIER, OUT_SYSQR,
-                            GROUP_BY, MAXMIN_BASIS, COL_CUSTOMER, COL_PARTA, COL_PARTNO, COL_STK_BOX, COL_STK_PCS, COL_NO, COL_MODEL, OUT_EXCEL,
-                            SORT_NO, CREATED_BY)
+                        INSERT INTO CIMS.Stocks (StockCode, StockName, Unit, IsMain, UseMaxMin,
+                            ShowColImage, ShowColCode, ShowColName, ShowColQuantity, ShowColRemark,
+                            InPickList, InSupplier, InSystemQR, InExcel, OutPickList, OutSupplier, OutSystemQR,
+                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel,
+                            SortNo, CreatedBy)
                         VALUES (@code, @name, @unit, 0, @maxmin,
                             @cimg, @ccode, @cname, @cqty, @crmk,
                             @ipl, @isup, @isys, @ixls, @opl, @osup, @osys,
                             @grp, @mmb, @ccust, @cparta, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls,
-                            (SELECT ISNULL(MAX(SORT_NO), 0) + 1 FROM MST_STOCK), @uid);
+                            (SELECT ISNULL(MAX(SortNo), 0) + 1 FROM CIMS.Stocks), @uid);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
                     int newId;
@@ -190,7 +190,7 @@ namespace CIMS.Services
 
                     SaveFormatLinks(conn, trans, newId, s.FormatIds);
 
-                    using (var cmd = new SqlCommand("sp_Stock_GrantViewAll", conn, trans) { CommandType = CommandType.StoredProcedure })
+                    using (var cmd = new SqlCommand("CIMS.sp_Stock_GrantViewAll", conn, trans) { CommandType = CommandType.StoredProcedure })
                     {
                         cmd.Parameters.AddWithValue("@StkId", newId);
                         cmd.ExecuteNonQuery();
@@ -215,23 +215,23 @@ namespace CIMS.Services
                 {
                     // รหัสคลังเดิม (ก่อนแก้) ใช้เปลี่ยนชื่อสิทธิ์
                     string oldCode;
-                    using (var cmd = new SqlCommand("SELECT STK_CODE FROM MST_STOCK WHERE STK_ID = @id", conn, trans))
+                    using (var cmd = new SqlCommand("SELECT StockCode FROM CIMS.Stocks WHERE StockID = @id", conn, trans))
                     {
                         cmd.Parameters.AddWithValue("@id", s.StkId);
                         oldCode = cmd.ExecuteScalar()?.ToString();
                     }
 
                     string sql = @"
-                        UPDATE MST_STOCK SET
-                            STK_CODE = @code, STK_NAME = @name, STK_UNIT = @unit, USE_MAXMIN = @maxmin,
-                            COL_IMAGE = @cimg, COL_CODE = @ccode, COL_NAME = @cname, COL_QTY = @cqty, COL_REMARK = @crmk,
-                            IN_PICKLIST = @ipl, IN_SUPPLIER = @isup, IN_SYSQR = @isys, IN_EXCEL = @ixls,
-                            OUT_PICKLIST = @opl, OUT_SUPPLIER = @osup, OUT_SYSQR = @osys,
-                            GROUP_BY = @grp, MAXMIN_BASIS = @mmb, COL_CUSTOMER = @ccust, COL_PARTA = @cparta,
-                            COL_PARTNO = @cpartno, COL_STK_BOX = @cbox, COL_STK_PCS = @cpcs,
-                                 COL_NO = @cno, COL_MODEL = @cmodel, OUT_EXCEL = @oxls,
-                            UPDATED_BY = @uid, UPDATED_DATE = GETDATE()
-                        WHERE STK_ID = @id";
+                        UPDATE CIMS.Stocks SET
+                            StockCode = @code, StockName = @name, Unit = @unit, UseMaxMin = @maxmin,
+                            ShowColImage = @cimg, ShowColCode = @ccode, ShowColName = @cname, ShowColQuantity = @cqty, ShowColRemark = @crmk,
+                            InPickList = @ipl, InSupplier = @isup, InSystemQR = @isys, InExcel = @ixls,
+                            OutPickList = @opl, OutSupplier = @osup, OutSystemQR = @osys,
+                            GroupBy = @grp, MaxMinBasis = @mmb, ShowColCustomer = @ccust, ShowColPartA = @cparta,
+                            ShowColPartNumber = @cpartno, ShowColStockBox = @cbox, ShowColStockPcs = @cpcs,
+                                 ShowColNo = @cno, ShowColModel = @cmodel, OutExcel = @oxls,
+                            UpdatedBy = @uid, UpdatedDate = GETDATE()
+                        WHERE StockID = @id";
 
                     using (var cmd = new SqlCommand(sql, conn, trans))
                     {
@@ -241,10 +241,10 @@ namespace CIMS.Services
                         cmd.ExecuteNonQuery();
                     }
 
-                    // สิทธิ์ของคลังใช้รหัสคลังเป็น SYS_ID -> เปลี่ยนรหัสคลังแล้วต้องเปลี่ยนชื่อสิทธิ์ตามใน Transaction เดียวกัน
+                    // สิทธิ์ของคลังใช้รหัสคลังเป็น SystemID -> เปลี่ยนรหัสคลังแล้วต้องเปลี่ยนชื่อสิทธิ์ตามใน Transaction เดียวกัน
                     if (!string.IsNullOrEmpty(oldCode) && !string.Equals(oldCode, s.Code.Trim(), StringComparison.Ordinal))
                     {
-                        using (var cmd = new SqlCommand("UPDATE MST_PERM SET SYS_ID = @new WHERE SYS_ID = @old", conn, trans))
+                        using (var cmd = new SqlCommand("UPDATE CIMS.Permissions SET SystemID = @new WHERE SystemID = @old", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@new", s.Code.Trim());
                             cmd.Parameters.AddWithValue("@old", oldCode);
@@ -252,7 +252,7 @@ namespace CIMS.Services
                         }
                     }
 
-                    using (var cmd = new SqlCommand("DELETE FROM MST_STOCK_FMT WHERE STK_ID = @id", conn, trans))
+                    using (var cmd = new SqlCommand("DELETE FROM CIMS.StockBarcodeFormats WHERE StockID = @id", conn, trans))
                     {
                         cmd.Parameters.AddWithValue("@id", s.StkId);
                         cmd.ExecuteNonQuery();
@@ -298,7 +298,7 @@ namespace CIMS.Services
         {
             foreach (int fmtId in (fmtIds ?? Enumerable.Empty<int>()).Distinct())
             {
-                using (var cmd = new SqlCommand("INSERT INTO MST_STOCK_FMT (STK_ID, FMT_ID) VALUES (@s, @f)", conn, trans))
+                using (var cmd = new SqlCommand("INSERT INTO CIMS.StockBarcodeFormats (StockID, FormatID) VALUES (@s, @f)", conn, trans))
                 {
                     cmd.Parameters.AddWithValue("@s", stkId);
                     cmd.Parameters.AddWithValue("@f", fmtId);
@@ -307,11 +307,11 @@ namespace CIMS.Services
             }
         }
 
-        // ลบคลังและข้อมูลทั้งหมดของคลังนั้น (sp_Stock_Delete บังคับเหตุผล + เก็บหลักฐานใน MST_STOCK_DEL_LOG)
+        // ลบคลังและข้อมูลทั้งหมดของคลังนั้น (CIMS.sp_Stock_Delete บังคับเหตุผล + เก็บหลักฐานใน CIMS.StockDeleteLogs)
         public void DeleteStock(int stkId, string reason, string userId)
         {
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("sp_Stock_Delete", conn) { CommandType = CommandType.StoredProcedure })
+            using (var cmd = new SqlCommand("CIMS.sp_Stock_Delete", conn) { CommandType = CommandType.StoredProcedure })
             {
                 cmd.Parameters.AddWithValue("@StkId", stkId);
                 cmd.Parameters.AddWithValue("@Reason", reason ?? "");
@@ -330,9 +330,9 @@ namespace CIMS.Services
             var list = new List<BarcodeFormatModel>();
             using (var conn = new SqlConnection(_connectionString))
             {
-                string sql = @"SELECT FMT_ID, FMT_NAME, DELIMITER, CODE_POS, ALT_CODE_POS, QTY_POS, MIN_FIELDS, SAMPLE_TEXT, IS_ACTIVE, SOURCE_STK_ID,
-                                      DELIM_MODE, TRIM_CHARS, CODE_PREFIX, CODE_CUT, MATCH_START, MATCH_END
-                               FROM MST_BARCODE_FMT" + (activeOnly ? " WHERE IS_ACTIVE = 1" : "") + " ORDER BY FMT_NAME";
+                string sql = @"SELECT FormatID, FormatName, Delimiter, CodePosition, AltCodePosition, QuantityPosition, MinFields, SampleText, IsActive, SourceStockID,
+                                      DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd
+                               FROM CIMS.BarcodeFormats" + (activeOnly ? " WHERE IsActive = 1" : "") + " ORDER BY FormatName";
                 using (var cmd = new SqlCommand(sql, conn))
                 {
                     conn.Open();
@@ -342,22 +342,22 @@ namespace CIMS.Services
                         {
                             list.Add(new BarcodeFormatModel
                             {
-                                FmtId = Convert.ToInt32(rdr["FMT_ID"]),
-                                Name = rdr["FMT_NAME"].ToString(),
-                                Delimiter = rdr["DELIMITER"].ToString(),
-                                CodePos = Convert.ToInt32(rdr["CODE_POS"]),
-                                AltCodePos = rdr["ALT_CODE_POS"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["ALT_CODE_POS"]),
-                                QtyPos = rdr["QTY_POS"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["QTY_POS"]),
-                                MinFields = Convert.ToInt32(rdr["MIN_FIELDS"]),
-                                SampleText = rdr["SAMPLE_TEXT"] == DBNull.Value ? "" : rdr["SAMPLE_TEXT"].ToString(),
-                                IsActive = Convert.ToBoolean(rdr["IS_ACTIVE"]),
-                                SourceStkId = rdr["SOURCE_STK_ID"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["SOURCE_STK_ID"]),
-                                DelimMode = rdr["DELIM_MODE"].ToString(),
-                                TrimChars = rdr["TRIM_CHARS"] == DBNull.Value ? null : rdr["TRIM_CHARS"].ToString(),
-                                CodePrefix = rdr["CODE_PREFIX"].ToString(),
-                                CodeCut = rdr["CODE_CUT"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["CODE_CUT"]),
-                                MatchStart = rdr["MATCH_START"] == DBNull.Value ? null : rdr["MATCH_START"].ToString(),
-                                MatchEnd = rdr["MATCH_END"] == DBNull.Value ? null : rdr["MATCH_END"].ToString()
+                                FmtId = Convert.ToInt32(rdr["FormatID"]),
+                                Name = rdr["FormatName"].ToString(),
+                                Delimiter = rdr["Delimiter"].ToString(),
+                                CodePos = Convert.ToInt32(rdr["CodePosition"]),
+                                AltCodePos = rdr["AltCodePosition"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["AltCodePosition"]),
+                                QtyPos = rdr["QuantityPosition"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["QuantityPosition"]),
+                                MinFields = Convert.ToInt32(rdr["MinFields"]),
+                                SampleText = rdr["SampleText"] == DBNull.Value ? "" : rdr["SampleText"].ToString(),
+                                IsActive = Convert.ToBoolean(rdr["IsActive"]),
+                                SourceStkId = rdr["SourceStockID"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["SourceStockID"]),
+                                DelimMode = rdr["DelimiterMode"].ToString(),
+                                TrimChars = rdr["TrimChars"] == DBNull.Value ? null : rdr["TrimChars"].ToString(),
+                                CodePrefix = rdr["CodePrefix"].ToString(),
+                                CodeCut = rdr["CodeCut"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["CodeCut"]),
+                                MatchStart = rdr["MatchStart"] == DBNull.Value ? null : rdr["MatchStart"].ToString(),
+                                MatchEnd = rdr["MatchEnd"] == DBNull.Value ? null : rdr["MatchEnd"].ToString()
                             });
                         }
                     }
@@ -377,15 +377,15 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_connectionString))
             {
                 string sql = f.FmtId == 0
-                    ? @"INSERT INTO MST_BARCODE_FMT (FMT_NAME, DELIMITER, CODE_POS, ALT_CODE_POS, QTY_POS, MIN_FIELDS, SAMPLE_TEXT, IS_ACTIVE, SOURCE_STK_ID, CREATED_BY,
-                                                     DELIM_MODE, TRIM_CHARS, CODE_PREFIX, CODE_CUT, MATCH_START, MATCH_END)
+                    ? @"INSERT INTO CIMS.BarcodeFormats (FormatName, Delimiter, CodePosition, AltCodePosition, QuantityPosition, MinFields, SampleText, IsActive, SourceStockID, CreatedBy,
+                                                     DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd)
                         VALUES (@name, @delim, @code, @alt, @qty, @min, @sample, @active, @src, @uid, @dmode, @trim, @cpre, @ccut, @mstart, @mend);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);"
-                    : @"UPDATE MST_BARCODE_FMT SET FMT_NAME = @name, DELIMITER = @delim, CODE_POS = @code, ALT_CODE_POS = @alt,
-                            QTY_POS = @qty, MIN_FIELDS = @min, SAMPLE_TEXT = @sample, IS_ACTIVE = @active, SOURCE_STK_ID = @src,
-                            DELIM_MODE = @dmode, TRIM_CHARS = @trim, CODE_PREFIX = @cpre, CODE_CUT = @ccut, MATCH_START = @mstart, MATCH_END = @mend,
-                            UPDATED_BY = @uid, UPDATED_DATE = GETDATE()
-                        WHERE FMT_ID = @id;
+                    : @"UPDATE CIMS.BarcodeFormats SET FormatName = @name, Delimiter = @delim, CodePosition = @code, AltCodePosition = @alt,
+                            QuantityPosition = @qty, MinFields = @min, SampleText = @sample, IsActive = @active, SourceStockID = @src,
+                            DelimiterMode = @dmode, TrimChars = @trim, CodePrefix = @cpre, CodeCut = @ccut, MatchStart = @mstart, MatchEnd = @mend,
+                            UpdatedBy = @uid, UpdatedDate = GETDATE()
+                        WHERE FormatID = @id;
                         SELECT @id;";
 
                 using (var cmd = new SqlCommand(sql, conn))
@@ -417,7 +417,7 @@ namespace CIMS.Services
         public void DeleteFormat(int fmtId)
         {
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("DELETE FROM MST_BARCODE_FMT WHERE FMT_ID = @id", conn))
+            using (var cmd = new SqlCommand("DELETE FROM CIMS.BarcodeFormats WHERE FormatID = @id", conn))
             {
                 cmd.Parameters.AddWithValue("@id", fmtId);
                 conn.Open();
@@ -490,7 +490,7 @@ namespace CIMS.Services
             return rows;
         }
 
-        // จับคู่รหัสในไฟล์กับ MST_PART (PT_CODE หรือช่อง QR Code ที่ลงทะเบียนไว้)
+        // จับคู่รหัสในไฟล์กับ CIMS.Parts (PartCode หรือช่อง QR Code ที่ลงทะเบียนไว้)
         private void ValidateImportRows(List<StockImportRow> rows)
         {
             var pending = rows.Where(r => string.IsNullOrEmpty(r.Error)).ToList();
@@ -498,16 +498,16 @@ namespace CIMS.Services
 
             var lookup = new Dictionary<string, (int Id, string Code)>(StringComparer.OrdinalIgnoreCase);
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("SELECT PT_ID, LTRIM(RTRIM(PT_CODE)) AS PT_CODE, LTRIM(RTRIM(ISNULL(PT_QR, ''))) AS PT_QR FROM MST_PART WHERE IS_ACTIVE = 1", conn))
+            using (var cmd = new SqlCommand("SELECT PartID, LTRIM(RTRIM(PartCode)) AS PartCode, LTRIM(RTRIM(ISNULL(QRCode, ''))) AS QRCode FROM CIMS.Parts WHERE IsActive = 1", conn))
             {
                 conn.Open();
                 using (var rdr = cmd.ExecuteReader())
                 {
                     while (rdr.Read())
                     {
-                        int id = Convert.ToInt32(rdr["PT_ID"]);
-                        string code = rdr["PT_CODE"].ToString();
-                        string qr = rdr["PT_QR"].ToString();
+                        int id = Convert.ToInt32(rdr["PartID"]);
+                        string code = rdr["PartCode"].ToString();
+                        string qr = rdr["QRCode"].ToString();
                         lookup[code] = (id, code);
                         if (!string.IsNullOrEmpty(qr) && !lookup.ContainsKey(qr)) lookup[qr] = (id, code);
                     }
@@ -541,7 +541,7 @@ namespace CIMS.Services
                     foreach (var v in valid)
                     {
                         int newBal;
-                        using (var cmd = new SqlCommand("sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
+                        using (var cmd = new SqlCommand("CIMS.sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
                         {
                             cmd.Parameters.AddWithValue("@StkId", stkId);
                             cmd.Parameters.AddWithValue("@PtId", v.PartId);
@@ -552,7 +552,7 @@ namespace CIMS.Services
                             newBal = outBal.Value == DBNull.Value ? 0 : Convert.ToInt32(outBal.Value);
                         }
 
-                        using (var cmd = new SqlCommand(@"INSERT INTO TRN_STOCK_IMPORT (BATCH_ID, STK_ID, PT_ID, PT_CODE, QTY, BAL_AFTER, FILE_NAME, USR_ID)
+                        using (var cmd = new SqlCommand(@"INSERT INTO CIMS.StockImports (BatchID, StockID, PartID, PartCode, Quantity, BalanceAfter, FileName, UserID)
                                                           VALUES (@b, @s, @p, @c, @q, @bal, @f, @u)", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@b", batch);

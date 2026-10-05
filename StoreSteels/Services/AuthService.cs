@@ -23,7 +23,7 @@ namespace CIMS.Services
 
         //            // 1. ปรับ SQL แรกให้ดึงค่า Master Admin มาด้วยเพื่อใช้เช็ค
         //            // 1. เช็คสถานะ Online (ห้ามทุกคนเข้าซ้อน)
-        //            string checkSql = "SELECT IS_ONLINE FROM MST_USER WHERE USR_ID = @user";
+        //            string checkSql = "SELECT IsOnline FROM CIMS.Users WHERE UserID = @user";
         //            using (SqlCommand checkCmd = new SqlCommand(checkSql, conn))
         //            {
         //                checkCmd.Parameters.AddWithValue("@user", username);
@@ -32,7 +32,7 @@ namespace CIMS.Services
         //                    if (rdr.Read())
         //                    {
         //                        // ใช้ Convert.ToBoolean จะปลอดภัยกว่า (bool) ตรงๆ เพราะรองรับ NULL และเลข 0,1
-        //                        bool isOnline = rdr["IS_ONLINE"] != DBNull.Value && Convert.ToBoolean(rdr["IS_ONLINE"]);
+        //                        bool isOnline = rdr["IsOnline"] != DBNull.Value && Convert.ToBoolean(rdr["IsOnline"]);
 
         //                        if (isOnline)
         //                        {
@@ -44,9 +44,9 @@ namespace CIMS.Services
         //            }
 
         //            // 2. ถ้าไม่ Online ถึงค่อยเช็ค Password
-        //            string sql = @"SELECT USR_ID, USR_NAME, USR_LVL, IS_MASTER_ADMIN, USR_DEPT 
-        //                   FROM MST_USER 
-        //                   WHERE USR_ID = @user AND USR_PWD = @pass AND IS_LOCKED = 0";
+        //            string sql = @"SELECT UserID, FullName, UserLevel, IsMasterAdmin, Department 
+        //                   FROM CIMS.Users 
+        //                   WHERE UserID = @user AND Password = @pass AND IsLocked = 0";
 
         //            using (SqlCommand cmd = new SqlCommand(sql, conn)) // ใช้ Connection เดิมที่เปิดอยู่ (ไม่ต้อง conn.Open() ซ้ำ)
         //            {
@@ -60,11 +60,11 @@ namespace CIMS.Services
         //                        // สร้าง Object session ขึ้นมาพักไว้ก่อน
         //                        var session = new UserSession
         //                        {
-        //                            UserId = reader["USR_ID"].ToString(),
-        //                            UserName = reader["USR_NAME"].ToString(),
-        //                            UserLevel = Convert.ToInt32(reader["USR_LVL"]),
-        //                            IsMasterAdmin = Convert.ToBoolean(reader["IS_MASTER_ADMIN"]),
-        //                            Department = reader["USR_DEPT"]?.ToString() ?? ""
+        //                            UserId = reader["UserID"].ToString(),
+        //                            UserName = reader["FullName"].ToString(),
+        //                            UserLevel = Convert.ToInt32(reader["UserLevel"]),
+        //                            IsMasterAdmin = Convert.ToBoolean(reader["IsMasterAdmin"]),
+        //                            Department = reader["Department"]?.ToString() ?? ""
         //                        };
 
         //                        // *** สำคัญ: ต้องปิด reader ก่อนจะไป Query Permissions ต่อ ***
@@ -98,8 +98,8 @@ namespace CIMS.Services
                 {
                     conn.Open();
 
-                    // 1. ปรับ SQL ให้ดึง LAST_SESSION (ชื่อเครื่องคอมพิวเตอร์ล่าสุด) มาตรวจสอบด้วย
-                    string checkSql = "SELECT IS_ONLINE, LAST_SESSION FROM MST_USER WHERE USR_ID = @user";
+                    // 1. ปรับ SQL ให้ดึง LastSession (ชื่อเครื่องคอมพิวเตอร์ล่าสุด) มาตรวจสอบด้วย
+                    string checkSql = "SELECT IsOnline, LastSession FROM CIMS.Users WHERE UserID = @user";
                     using (SqlCommand checkCmd = new SqlCommand(checkSql, conn))
                     {
                         checkCmd.Parameters.AddWithValue("@user", username);
@@ -107,8 +107,8 @@ namespace CIMS.Services
                         {
                             if (rdr.Read())
                             {
-                                bool isOnline = rdr["IS_ONLINE"] != DBNull.Value && Convert.ToBoolean(rdr["IS_ONLINE"]);
-                                string lastSession = rdr["LAST_SESSION"]?.ToString() ?? "";
+                                bool isOnline = rdr["IsOnline"] != DBNull.Value && Convert.ToBoolean(rdr["IsOnline"]);
+                                string lastSession = rdr["LastSession"]?.ToString() ?? "";
 
                                 // ดึงชื่อเครื่องคอมพิวเตอร์ปัจจุบันที่กำลังรันโปรแกรมอยู่
                                 string currentMachine = Environment.MachineName;
@@ -123,9 +123,9 @@ namespace CIMS.Services
                     }
 
                     // 2. ตรวจสอบ Password ต่อตามปกติ
-                    string sql = @"SELECT USR_ID, USR_NAME, USR_LVL, IS_MASTER_ADMIN, USR_DEPT 
-                           FROM MST_USER 
-                           WHERE USR_ID = @user AND USR_PWD = @pass AND IS_LOCKED = 0";
+                    string sql = @"SELECT UserID, FullName, UserLevel, IsMasterAdmin, Department 
+                           FROM CIMS.Users 
+                           WHERE UserID = @user AND Password = @pass AND IsLocked = 0";
 
                     using (SqlCommand cmd = new SqlCommand(sql, conn))
                     {
@@ -138,11 +138,11 @@ namespace CIMS.Services
                             {
                                 var session = new UserSession
                                 {
-                                    UserId = reader["USR_ID"].ToString(),
-                                    UserName = reader["USR_NAME"].ToString(),
-                                    UserLevel = Convert.ToInt32(reader["USR_LVL"]),
-                                    IsMasterAdmin = Convert.ToBoolean(reader["IS_MASTER_ADMIN"]),
-                                    Department = reader["USR_DEPT"]?.ToString() ?? ""
+                                    UserId = reader["UserID"].ToString(),
+                                    UserName = reader["FullName"].ToString(),
+                                    UserLevel = Convert.ToInt32(reader["UserLevel"]),
+                                    IsMasterAdmin = Convert.ToBoolean(reader["IsMasterAdmin"]),
+                                    Department = reader["Department"]?.ToString() ?? ""
                                 };
 
                                 reader.Close();
@@ -162,7 +162,7 @@ namespace CIMS.Services
         }
         #endregion
 
-        // ฟังก์ชันนี้จะถูกเรียกจากภายใน Authenticate หลังจากที่ตรวจสอบ User ได้แล้ว เพื่ออัพเดตสถานะของ User ว่าออนไลน์แล้ว (IS_ONLINE = 1) และบันทึกเวลาที่ Login เข้ามา (LAST_LOGIN) รวมถึงชื่อเครื่องคอมพิวเตอร์ล่าสุดที่ใช้งาน (LAST_SESSION) เพื่อใช้ในการเช็คในครั้งถัดไป
+        // ฟังก์ชันนี้จะถูกเรียกจากภายใน Authenticate หลังจากที่ตรวจสอบ User ได้แล้ว เพื่ออัพเดตสถานะของ User ว่าออนไลน์แล้ว (IsOnline = 1) และบันทึกเวลาที่ Login เข้ามา (LastLogin) รวมถึงชื่อเครื่องคอมพิวเตอร์ล่าสุดที่ใช้งาน (LastSession) เพื่อใช้ในการเช็คในครั้งถัดไป
         #region === [ Function Update Login Stats ] ===
         public void UpdateLoginStats(string userId)
         {
@@ -170,11 +170,11 @@ namespace CIMS.Services
             {
                 using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
                 {
-                    string sql = @"UPDATE MST_USER SET 
-                                   IS_ONLINE = 1, 
-                                   LAST_LOGIN = GETDATE(), 
-                                   LAST_SESSION = @pc 
-                                   WHERE USR_ID = @uid";
+                    string sql = @"UPDATE CIMS.Users SET 
+                                   IsOnline = 1, 
+                                   LastLogin = GETDATE(), 
+                                   LastSession = @pc 
+                                   WHERE UserID = @uid";
                     SqlCommand cmd = new SqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@pc", Environment.MachineName);
                     cmd.Parameters.AddWithValue("@uid", userId);
@@ -186,7 +186,7 @@ namespace CIMS.Services
         }
         #endregion
 
-        // ฟังก์ชันนี้จะถูกเรียกจากภายใน Logout เพื่ออัพเดตสถานะของ User ว่าไม่ได้ออนไลน์แล้ว (IS_ONLINE = 0) และล้างชื่อเครื่องคอมพิวเตอร์ล่าสุด (LAST_SESSION = NULL) เพื่อให้พร้อมสำหรับการ Login ครั้งถัดไป
+        // ฟังก์ชันนี้จะถูกเรียกจากภายใน Logout เพื่ออัพเดตสถานะของ User ว่าไม่ได้ออนไลน์แล้ว (IsOnline = 0) และล้างชื่อเครื่องคอมพิวเตอร์ล่าสุด (LastSession = NULL) เพื่อให้พร้อมสำหรับการ Login ครั้งถัดไป
         #region === [ Function Update Logout Status ] ===
         public void UpdateLogoutStatus(string userId)
         {
@@ -194,7 +194,7 @@ namespace CIMS.Services
             {
                 using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
                 {
-                    string sql = "UPDATE MST_USER SET IS_ONLINE = 0 WHERE USR_ID = @uid";
+                    string sql = "UPDATE CIMS.Users SET IsOnline = 0 WHERE UserID = @uid";
                     SqlCommand cmd = new SqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@uid", userId);
                     conn.Open();
@@ -213,7 +213,7 @@ namespace CIMS.Services
         private List<UserPermission> GetUserPermissions(string userId, SqlConnection conn)
         {
             List<UserPermission> perms = new List<UserPermission>();
-            string sql = "SELECT SYS_ID, PERM_VIEW, PERM_ADD, PERM_EDIT, PERM_DEL, PERM_APP FROM MST_PERM WHERE USR_ID = @uid";
+            string sql = "SELECT SystemID, CanView, CanAdd, CanEdit, CanDelete, CanApprove FROM CIMS.Permissions WHERE UserID = @uid";
 
             using (SqlCommand cmd = new SqlCommand(sql, conn))
             {
@@ -224,13 +224,13 @@ namespace CIMS.Services
                     {
                         perms.Add(new UserPermission
                         {
-                            SystemId = rdr["SYS_ID"].ToString(),
+                            SystemId = rdr["SystemID"].ToString(),
                             // เช็คเงื่อนไขถ้าเป็น 'Y' ให้เป็น true
-                            CanView = rdr["PERM_VIEW"].ToString() == "Y",
-                            CanAdd = rdr["PERM_ADD"].ToString() == "Y",
-                            CanEdit = rdr["PERM_EDIT"].ToString() == "Y",
-                            CanDelete = rdr["PERM_DEL"].ToString() == "Y",
-                            CanApprove = rdr["PERM_APP"].ToString() == "Y"
+                            CanView = rdr["CanView"].ToString() == "Y",
+                            CanAdd = rdr["CanAdd"].ToString() == "Y",
+                            CanEdit = rdr["CanEdit"].ToString() == "Y",
+                            CanDelete = rdr["CanDelete"].ToString() == "Y",
+                            CanApprove = rdr["CanApprove"].ToString() == "Y"
                         });
                     }
                 }

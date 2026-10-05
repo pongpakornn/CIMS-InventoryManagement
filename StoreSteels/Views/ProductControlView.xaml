@@ -249,6 +249,9 @@
                               SelectionChanged="cbStockFilter_SelectionChanged" ToolTip="Show only the products in this stock" Visibility="Collapsed"/>
                     <Button Content="📥 IMPORT EXCEL" Style="{StaticResource CyberButton}" Background="{StaticResource MainPurple}" Width="170" Height="45" Margin="0,0,10,0" Click="Import_Click" Visibility="{Binding AddVisibility}" FontSize="12" FontWeight="ExtraBold" />
                     <Button Content="EXPORT QR SELECT" Style="{StaticResource CyberButton}" Width="200" Height="45" Click="Export_Click" FontSize="12" FontWeight="ExtraBold" />
+                    <!-- 🗑 ลบสินค้าแบบ Admin (Level 1): เลือกคลัง -> ลบที่ติ๊ก / ลบทั้งหมดในคลัง -->
+                    <Button Content="🗑 ADMIN DELETE" Style="{StaticResource CyberButton}" Background="#B3261E" Width="170" Height="45" Margin="10,0,0,0"
+                            Click="AdminDelete_Click" Visibility="{Binding AdminVisibility}" FontSize="12" FontWeight="ExtraBold" ToolTip="Admin only: delete the ticked products or every product in a stock"/>
                 </StackPanel>
             </Grid>
 

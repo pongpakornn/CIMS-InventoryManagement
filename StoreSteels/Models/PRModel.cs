@@ -29,9 +29,9 @@ namespace CIMS.Models
         }
 
         public int ID { get; set; } // ID ปกติไม่ค่อยเปลี่ยนตอนโชว์ ไม่ต้องทำ Notify ก็ได้ครับ
-        public string PR_NO { get; set; }
+        public string PRNumber { get; set; }
         public string Requester { get; set; }
-        public string PR_DATE_Display => PR_DATE.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        public string PR_DATE_Display => PRDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
         public string PartCode
         {
@@ -59,7 +59,7 @@ namespace CIMS.Models
             set { _status = value; OnPropertyChanged(); }
         }
 
-        public string PR_REM
+        public string Remark
         {
             get => _prRem;
             set { _prRem = value; OnPropertyChanged(); }
@@ -67,10 +67,10 @@ namespace CIMS.Models
 
         // ตัวพวกนี้ถ้าไม่ได้มีการแก้ระหว่างหน้าจอเปิดอยู่ ใช้ Auto-Property แบบเดิมได้ครับ
         public string Department { get; set; }
-        public string REQ_DEPT { get; set; }
-        public string USR_ID { get; set; }
+        public string RequestDepartment { get; set; }
+        public string UserID { get; set; }
         public DateTime CreatedDate { get; set; } = DateTime.Now;
-        public DateTime PR_DATE { get; set; }
+        public DateTime PRDate { get; set; }
 
         // รายการที่ Approve แล้ว (หน้าต่าง APPROVED LIST)
         public string Unit { get; set; }

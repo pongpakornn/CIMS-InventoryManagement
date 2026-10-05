@@ -41,6 +41,7 @@ namespace CIMS.ViewModels
         public System.Windows.Visibility AddVisibility => Vis(CurrentUser?.CanAddProduct == true);
         public System.Windows.Visibility EditVisibility => Vis(CurrentUser?.CanEditProduct == true);
         public System.Windows.Visibility DeleteVisibility => Vis(CurrentUser?.CanDeleteProduct == true);
+        public System.Windows.Visibility AdminVisibility => Vis(CurrentUser?.UserLevel == 1);
         public System.Windows.Visibility ImageVisibility => Vis(CurrentUser?.CanAddProduct == true || CurrentUser?.CanEditProduct == true);
 
         public event PropertyChangedEventHandler PropertyChanged;

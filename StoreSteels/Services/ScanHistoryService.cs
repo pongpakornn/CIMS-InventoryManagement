@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CIMS.Services
 {
-    // 🕘 ประวัติการสแกน (TRN_SCAN) สำหรับหน้าต่าง HISTORY ในหน้า Multi-Scanner
+    // 🕘 ประวัติการสแกน (CIMS.ScanTransactions) สำหรับหน้าต่าง HISTORY ในหน้า Multi-Scanner
     public class ScanHistoryRow
     {
         public DateTime TxDate { get; set; }
@@ -21,6 +21,13 @@ namespace CIMS.Services
         public string UserId { get; set; }
         public string UserName { get; set; }
         public string RefNo { get; set; }
+        public int StkId { get; set; }
+        public string PartA { get; set; }
+        public string PartNumber { get; set; }
+        public string Model { get; set; }
+        // ค่าที่ตั้งให้แสดงแทนรหัสของคลังนั้น (ปุ่ม DISPLAY ในหน้า Multi-Scanner) - ไม่ได้ตั้ง = PRODUCT CODE
+        public string DisplayCode { get; set; }
+        public string CodeText => string.IsNullOrWhiteSpace(DisplayCode) ? PartCode : DisplayCode;
         public string DateText => TxDate.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
         public string UserText => string.IsNullOrWhiteSpace(UserName) ? UserId : $"{UserId} - {UserName}";
     }
@@ -31,7 +38,7 @@ namespace CIMS.Services
         public DateTime From { get; set; }
         public DateTime To { get; set; }      // รวมทั้งวัน
         public int? StkId { get; set; }       // null = ทุกคลัง
-        public bool StockIsMain { get; set; } // แถวเก่าที่ไม่มี STK_ID นับเป็นของคลังหลัก
+        public bool StockIsMain { get; set; } // แถวเก่าที่ไม่มี StockID นับเป็นของคลังหลัก
         public string TxType { get; set; }    // null = ทุกประเภท
     }
 
@@ -41,23 +48,23 @@ namespace CIMS.Services
 
         // WHERE + ลำดับความใกล้เคียง: ตรงเป๊ะ > รหัสขึ้นต้นด้วยคำค้น > ชื่อขึ้นต้นด้วยคำค้น > มีคำค้นอยู่ข้างใน แล้วค่อยใหม่ -> เก่า
         private const string FromWhere = @"
-            FROM TRN_SCAN t
-            LEFT JOIN MST_PART p  ON p.PT_ID = t.PT_ID
-            LEFT JOIN MST_STOCK s ON s.STK_ID = t.STK_ID
-            LEFT JOIN MST_USER u  ON u.USR_ID = t.USR_ID
-            WHERE t.TX_DATE >= @from AND t.TX_DATE < @to
-              AND (@stk IS NULL OR t.STK_ID = @stk OR (@isMain = 1 AND t.STK_ID IS NULL))
-              AND (@type IS NULL OR t.TX_TYPE = @type)
-              AND (@key = '' OR p.PT_CODE LIKE '%' + @key + '%' OR p.PT_DESC LIKE '%' + @key + '%'
-                   OR ISNULL(p.PT_PARTA, '') LIKE '%' + @key + '%' OR ISNULL(p.PT_PARTNO, '') LIKE '%' + @key + '%'
-                   OR ISNULL(p.PT_QR, '') LIKE '%' + @key + '%' OR ISNULL(t.PT_ACODE, '') LIKE '%' + @key + '%'
-                   OR ISNULL(t.REF_NO, '') LIKE '%' + @key + '%' OR t.USR_ID LIKE '%' + @key + '%' OR ISNULL(u.USR_NAME, '') LIKE '%' + @key + '%')";
+            FROM CIMS.ScanTransactions t
+            LEFT JOIN CIMS.Parts p  ON p.PartID = t.PartID
+            LEFT JOIN CIMS.Stocks s ON s.StockID = t.StockID
+            LEFT JOIN CIMS.Users u  ON u.UserID = t.UserID
+            WHERE t.TransactionDate >= @from AND t.TransactionDate < @to
+              AND (@stk IS NULL OR t.StockID = @stk OR (@isMain = 1 AND t.StockID IS NULL))
+              AND (@type IS NULL OR t.TransactionType = @type)
+              AND (@key = '' OR p.PartCode LIKE '%' + @key + '%' OR p.Description LIKE '%' + @key + '%'
+                   OR ISNULL(p.PartA, '') LIKE '%' + @key + '%' OR ISNULL(p.PartNumber, '') LIKE '%' + @key + '%'
+                   OR ISNULL(p.QRCode, '') LIKE '%' + @key + '%' OR ISNULL(t.PartACode, '') LIKE '%' + @key + '%'
+                   OR ISNULL(t.ReferenceNo, '') LIKE '%' + @key + '%' OR t.UserID LIKE '%' + @key + '%' OR ISNULL(u.FullName, '') LIKE '%' + @key + '%')";
 
         private const string Rank = @"
             CASE WHEN @key = '' THEN 0
-                 WHEN p.PT_CODE = @key OR ISNULL(p.PT_PARTA, '') = @key OR ISNULL(p.PT_PARTNO, '') = @key OR ISNULL(p.PT_QR, '') = @key THEN 0
-                 WHEN p.PT_CODE LIKE @key + '%' OR ISNULL(p.PT_PARTA, '') LIKE @key + '%' OR ISNULL(p.PT_PARTNO, '') LIKE @key + '%' THEN 1
-                 WHEN p.PT_DESC LIKE @key + '%' THEN 2
+                 WHEN p.PartCode = @key OR ISNULL(p.PartA, '') = @key OR ISNULL(p.PartNumber, '') = @key OR ISNULL(p.QRCode, '') = @key THEN 0
+                 WHEN p.PartCode LIKE @key + '%' OR ISNULL(p.PartA, '') LIKE @key + '%' OR ISNULL(p.PartNumber, '') LIKE @key + '%' THEN 1
+                 WHEN p.Description LIKE @key + '%' THEN 2
                  ELSE 3 END";
 
         private static void AddParams(SqlCommand cmd, ScanHistoryFilter f)
@@ -84,11 +91,12 @@ namespace CIMS.Services
                     total = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false));
                 }
                 using (var cmd = new SqlCommand($@"
-                    SELECT t.TX_DATE, ISNULL(s.STK_CODE, CASE WHEN t.STK_ID IS NULL THEN 'MAIN' ELSE CAST(t.STK_ID AS varchar) END) AS STK_CODE,
-                           CASE WHEN ISNULL(t.IS_CANCEL, 0) = 1 THEN t.TX_TYPE + ' (CANCELLED)' ELSE t.TX_TYPE END AS TX_TYPE, ISNULL(p.PT_CODE, ISNULL(t.PT_ACODE, '')) AS PT_CODE, ISNULL(p.PT_DESC, '') AS PT_DESC,
-                           t.TX_QTY, t.USR_ID, ISNULL(u.USR_NAME, '') AS USR_NAME, ISNULL(t.REF_NO, '') AS REF_NO
+                    SELECT t.TransactionDate, ISNULL(s.StockCode, CASE WHEN t.StockID IS NULL THEN 'MAIN' ELSE CAST(t.StockID AS varchar) END) AS StockCode,
+                           CASE WHEN ISNULL(t.IsCancelled, 0) = 1 THEN t.TransactionType + ' (CANCELLED)' ELSE t.TransactionType END AS TransactionType, ISNULL(p.PartCode, ISNULL(t.PartACode, '')) AS PartCode, ISNULL(p.Description, '') AS Description,
+                           t.Quantity, t.UserID, ISNULL(u.FullName, '') AS FullName, ISNULL(t.ReferenceNo, '') AS ReferenceNo,
+                           ISNULL(t.StockID, 0) AS StockID, ISNULL(p.PartA, '') AS PartA, ISNULL(p.PartNumber, '') AS PartNumber, ISNULL(p.Model, '') AS Model
                     {FromWhere}
-                    ORDER BY {Rank}, t.TX_DATE DESC, t.TX_ID DESC
+                    ORDER BY {Rank}, t.TransactionDate DESC, t.TransactionID DESC
                     OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn))
                 {
                     AddParams(cmd, f);
@@ -98,20 +106,40 @@ namespace CIMS.Services
                         while (await r.ReadAsync(ct).ConfigureAwait(false)) rows.Add(Read(r));
                 }
             }
+            ApplyDisplay(rows);
             return (rows, total);
+        }
+
+        // ค่าที่แสดงแทนรหัสตามการตั้งค่าของแต่ละคลัง
+        private static void ApplyDisplay(List<ScanHistoryRow> rows)
+        {
+            try
+            {
+                var map = new ScanService().GetScanDisplayMap();
+                if (map.Count == 0) return;
+                var formats = map.Values.Any(v => v.StartsWith("FIELD:")) ? new StockService().GetFormats() : new List<CIMS.Models.BarcodeFormatModel>();
+                foreach (var x in rows)
+                    if (map.TryGetValue(x.StkId, out string key))
+                        x.DisplayCode = CIMS.Helpers.ScanDisplay.Resolve(key, x.PartCode, x.PartA, x.PartNumber, x.Model, x.PartName, x.RefNo, formats);
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"History display: {ex.Message}"); }
         }
 
         private static ScanHistoryRow Read(SqlDataReader r) => new ScanHistoryRow
         {
-            TxDate = Convert.ToDateTime(r["TX_DATE"]),
-            StockCode = r["STK_CODE"].ToString(),
-            TxType = r["TX_TYPE"].ToString(),
-            PartCode = r["PT_CODE"].ToString(),
-            PartName = r["PT_DESC"].ToString(),
-            Qty = r["TX_QTY"] == DBNull.Value ? 0 : Convert.ToInt32(r["TX_QTY"]),
-            UserId = r["USR_ID"].ToString(),
-            UserName = r["USR_NAME"].ToString(),
-            RefNo = r["REF_NO"].ToString()
+            TxDate = Convert.ToDateTime(r["TransactionDate"]),
+            StockCode = r["StockCode"].ToString(),
+            TxType = r["TransactionType"].ToString(),
+            PartCode = r["PartCode"].ToString(),
+            PartName = r["Description"].ToString(),
+            Qty = r["Quantity"] == DBNull.Value ? 0 : Convert.ToInt32(r["Quantity"]),
+            UserId = r["UserID"].ToString(),
+            UserName = r["FullName"].ToString(),
+            RefNo = r["ReferenceNo"].ToString(),
+            StkId = Convert.ToInt32(r["StockID"]),
+            PartA = r["PartA"].ToString(),
+            PartNumber = r["PartNumber"].ToString(),
+            Model = r["Model"].ToString()
         };
 
         // 📤 Export ทุกรายการตามตัวกรอง (ไม่จำกัดแค่หน้าที่แสดง)
@@ -120,16 +148,18 @@ namespace CIMS.Services
             var rows = new List<ScanHistoryRow>();
             using (var conn = new SqlConnection(GlobalConfig.ConnStr))
             using (var cmd = new SqlCommand($@"
-                SELECT t.TX_DATE, ISNULL(s.STK_CODE, CASE WHEN t.STK_ID IS NULL THEN 'MAIN' ELSE CAST(t.STK_ID AS varchar) END) AS STK_CODE,
-                       CASE WHEN ISNULL(t.IS_CANCEL, 0) = 1 THEN t.TX_TYPE + ' (CANCELLED)' ELSE t.TX_TYPE END AS TX_TYPE, ISNULL(p.PT_CODE, ISNULL(t.PT_ACODE, '')) AS PT_CODE, ISNULL(p.PT_DESC, '') AS PT_DESC,
-                       t.TX_QTY, t.USR_ID, ISNULL(u.USR_NAME, '') AS USR_NAME, ISNULL(t.REF_NO, '') AS REF_NO
+                SELECT t.TransactionDate, ISNULL(s.StockCode, CASE WHEN t.StockID IS NULL THEN 'MAIN' ELSE CAST(t.StockID AS varchar) END) AS StockCode,
+                       CASE WHEN ISNULL(t.IsCancelled, 0) = 1 THEN t.TransactionType + ' (CANCELLED)' ELSE t.TransactionType END AS TransactionType, ISNULL(p.PartCode, ISNULL(t.PartACode, '')) AS PartCode, ISNULL(p.Description, '') AS Description,
+                       t.Quantity, t.UserID, ISNULL(u.FullName, '') AS FullName, ISNULL(t.ReferenceNo, '') AS ReferenceNo,
+                           ISNULL(t.StockID, 0) AS StockID, ISNULL(p.PartA, '') AS PartA, ISNULL(p.PartNumber, '') AS PartNumber, ISNULL(p.Model, '') AS Model
                 {FromWhere}
-                ORDER BY {Rank}, t.TX_DATE DESC, t.TX_ID DESC", conn) { CommandTimeout = 300 })
+                ORDER BY {Rank}, t.TransactionDate DESC, t.TransactionID DESC", conn) { CommandTimeout = 300 })
             {
                 AddParams(cmd, f);
                 conn.Open();
                 using (var r = cmd.ExecuteReader()) while (r.Read()) rows.Add(Read(r));
             }
+            ApplyDisplay(rows);
 
             using (var wb = new XLWorkbook())
             {
@@ -143,7 +173,7 @@ namespace CIMS.Services
                     ws.Cell(i, 1).Value = x.TxDate; ws.Cell(i, 1).Style.DateFormat.Format = "yyyy-mm-dd hh:mm:ss";
                     ws.Cell(i, 2).Value = x.StockCode;
                     ws.Cell(i, 3).Value = x.TxType;
-                    ws.Cell(i, 4).Value = x.PartCode;
+                    ws.Cell(i, 4).Value = x.CodeText;
                     ws.Cell(i, 5).Value = x.PartName;
                     ws.Cell(i, 6).Value = x.Qty;
                     ws.Cell(i, 7).Value = x.UserText;

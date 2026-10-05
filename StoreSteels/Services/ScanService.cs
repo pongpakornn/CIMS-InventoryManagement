@@ -11,14 +11,14 @@ namespace CIMS.Services
     {
         private readonly string _connectionString = GlobalConfig.ConnStr;
 
-        // ขนาดคอลัมน์ TRN_SCAN.REF_NO (varchar 200) - บาร์โค้ด Panta ยาว ~115 ตัวอักษร ต้องเก็บได้ครบ
+        // ขนาดคอลัมน์ CIMS.ScanTransactions.ReferenceNo (varchar 200) - บาร์โค้ด Panta ยาว ~115 ตัวอักษร ต้องเก็บได้ครบ
         private const int RefNoMaxLength = 200;
 
         public ScanItemModel GetPartByScan(string barcode)
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                using (SqlCommand cmd = new SqlCommand("sp_GetPartByScan", conn))
+                using (SqlCommand cmd = new SqlCommand("CIMS.sp_GetPartByScan", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BarcodeInput", barcode.Trim());
@@ -28,18 +28,18 @@ namespace CIMS.Services
                     {
                         if (rdr.Read())
                         {
-                            // schema ใหม่ตัด PT_ACODE/PT_NO ออกจาก MST_PART แล้ว - PT_CODE เป็นตัวระบุหลัก
+                            // schema ใหม่ตัด PartACode/PT_NO ออกจาก CIMS.Parts แล้ว - PartCode เป็นตัวระบุหลัก
                             // ตัวเดียว ใส่ PartACode = PartCode ไว้เพื่อความเข้ากันได้กับหน้าจอเดิมที่ยัง
                             // ผูก binding กับ PartACode อยู่
-                            string code = rdr["PT_CODE"].ToString();
+                            string code = rdr["PartCode"].ToString();
                             return new ScanItemModel
                             {
-                                PartId = rdr["PT_ID"] != DBNull.Value ? Convert.ToInt32(rdr["PT_ID"]) : 0,
+                                PartId = rdr["PartID"] != DBNull.Value ? Convert.ToInt32(rdr["PartID"]) : 0,
                                 PartCode = code,
-                                PartName = rdr["PT_DESC"].ToString(),
+                                PartName = rdr["Description"].ToString(),
                                 PartNo = string.Empty,
                                 PartACode = code,
-                                Qty = rdr["PT_PSZ"] != DBNull.Value ? Convert.ToInt32(rdr["PT_PSZ"]) : 1,
+                                Qty = rdr["PackSize"] != DBNull.Value ? Convert.ToInt32(rdr["PackSize"]) : 1,
                                 UpdateTime = DateTime.Now
                             };
                         }
@@ -50,28 +50,79 @@ namespace CIMS.Services
         }
 
         // stock = null -> ทุกคลัง (พฤติกรรมเดิม), ระบุคลัง -> เฉพาะรายการของคลังนั้น
-        // (แถวเก่าก่อนมีระบบหลายคลังมี STK_ID = NULL นับเป็นของ Stock-CHR)
+        // (แถวเก่าก่อนมีระบบหลายคลังมี StockID = NULL นับเป็นของ Stock-CHR)
+        // 🏷️ ค่าที่แสดงแทนรหัสของแต่ละคลัง (CIMS.Stocks.ScanDisplayField) - ยังไม่ตั้ง = ไม่มีในรายการ
+        public Dictionary<int, string> GetScanDisplayMap()
+        {
+            var map = new Dictionary<int, string>();
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("SELECT StockID, ScanDisplayField FROM CIMS.Stocks WHERE ISNULL(ScanDisplayField, '') <> ''", conn))
+            {
+                conn.Open();
+                using (var r = cmd.ExecuteReader()) while (r.Read()) map[r.GetInt32(0)] = r.GetString(1);
+            }
+            return map;
+        }
+
+        public void SaveScanDisplayMap(Dictionary<int, string> map, string userId)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var tr = conn.BeginTransaction())
+                {
+                    foreach (var kv in map)
+                        using (var cmd = new SqlCommand("UPDATE CIMS.Stocks SET ScanDisplayField = @v, UpdatedBy = @u, UpdatedDate = GETDATE() WHERE StockID = @s", conn, tr))
+                        {
+                            cmd.Parameters.AddWithValue("@v", string.IsNullOrWhiteSpace(kv.Value) || kv.Value == Helpers.ScanDisplay.Default ? (object)DBNull.Value : kv.Value);
+                            cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@s", kv.Key);
+                            cmd.ExecuteNonQuery();
+                        }
+                    tr.Commit();
+                }
+            }
+        }
+
+        // ข้อมูลสินค้าสำหรับเลือกค่าที่แสดง (หลังสแกน 1 รายการ)
+        public (string PartA, string PartNumber, string Model) GetPartDisplayInfo(int ptId)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("SELECT ISNULL(PartA, ''), ISNULL(PartNumber, ''), ISNULL(Model, '') FROM CIMS.Parts WHERE PartID = @p", conn))
+            {
+                cmd.Parameters.AddWithValue("@p", ptId);
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    return r.Read() ? (r.GetString(0), r.GetString(1), r.GetString(2)) : ("", "", "");
+            }
+        }
+
         public List<ScanItemModel> GetTodayTransactions(StockModel stock = null)
         {
             var list = new List<ScanItemModel>();
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                // schema ใหม่: MST_PART ไม่มี PT_NO แล้ว - ตัดออกจาก SELECT (TRN_SCAN.PT_ACODE เป็นคอลัมน์
-                // ของตัวเองในตาราง log ไม่เกี่ยวกับ MST_PART.PT_ACODE ที่ถูกลบ เลยยังอ่านได้ตามเดิม)
+                // schema ใหม่: CIMS.Parts ไม่มี PT_NO แล้ว - ตัดออกจาก SELECT (CIMS.ScanTransactions.PartACode เป็นคอลัมน์
+                // ของตัวเองในตาราง log ไม่เกี่ยวกับ CIMS.Parts.PartACode ที่ถูกลบ เลยยังอ่านได้ตามเดิม)
                 string sql = @"SELECT
-                                    ISNULL(m.PT_CODE, '') AS PT_CODE,
-                                    ISNULL(m.PT_DESC, 'Unknown Part') AS PT_DESC,
-                                    ISNULL(t.PT_ACODE, '') AS PT_ACODE,
-                                    t.PT_ID,
-                                    t.TX_QTY,
-                                    t.TX_DATE,
-                                    t.TX_TYPE
-                               FROM TRN_SCAN t
-                               LEFT JOIN MST_PART m ON t.PT_ID = m.PT_ID
-                               WHERE CAST(t.TX_DATE AS DATE) = CAST(GETDATE() AS DATE)
-                                 AND ISNULL(t.IS_CANCEL, 0) = 0
-                                 AND (@stk IS NULL OR t.STK_ID = @stk OR (@isMain = 1 AND t.STK_ID IS NULL))
-                               ORDER BY t.TX_DATE ASC";
+                                    ISNULL(m.PartCode, '') AS PartCode,
+                                    ISNULL(m.Description, 'Unknown Part') AS Description,
+                                    ISNULL(t.PartACode, '') AS PartACode,
+                                    t.PartID,
+                                    t.Quantity,
+                                    t.TransactionDate,
+                                    t.TransactionType,
+                                    ISNULL(m.PartA, '') AS PartA,
+                                    ISNULL(m.PartNumber, '') AS PartNumber,
+                                    ISNULL(m.Model, '') AS Model,
+                                    ISNULL(t.ReferenceNo, '') AS ReferenceNo
+                               FROM CIMS.ScanTransactions t
+                               LEFT JOIN CIMS.Parts m ON t.PartID = m.PartID
+                               WHERE t.TransactionDate >= CAST(CAST(GETDATE() AS DATE) AS DATETIME)
+                                 AND t.TransactionDate < DATEADD(DAY, 1, CAST(CAST(GETDATE() AS DATE) AS DATETIME))
+                                 AND ISNULL(t.IsCancelled, 0) = 0
+                                 AND (@stk IS NULL OR t.StockID = @stk OR (@isMain = 1 AND t.StockID IS NULL))
+                               ORDER BY t.TransactionDate ASC";
 
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
@@ -84,14 +135,18 @@ namespace CIMS.Services
                         {
                             list.Add(new ScanItemModel
                             {
-                                PartId = rdr["PT_ID"] != DBNull.Value ? Convert.ToInt32(rdr["PT_ID"]) : 0,
-                                PartCode = rdr["PT_CODE"].ToString(),
-                                PartName = rdr["PT_DESC"].ToString(),
-                                PartACode = rdr["PT_ACODE"].ToString(),
+                                PartId = rdr["PartID"] != DBNull.Value ? Convert.ToInt32(rdr["PartID"]) : 0,
+                                PartCode = rdr["PartCode"].ToString(),
+                                PartName = rdr["Description"].ToString(),
+                                PartACode = rdr["PartACode"].ToString(),
                                 PartNo = string.Empty,
-                                Qty = Convert.ToInt32(rdr["TX_QTY"]),
-                                UpdateTime = Convert.ToDateTime(rdr["TX_DATE"]),
-                                Status = rdr["TX_TYPE"].ToString()
+                                Qty = Convert.ToInt32(rdr["Quantity"]),
+                                UpdateTime = Convert.ToDateTime(rdr["TransactionDate"]),
+                                Status = rdr["TransactionType"].ToString(),
+                                PartA = rdr["PartA"].ToString(),
+                                PartNumber = rdr["PartNumber"].ToString(),
+                                Model = rdr["Model"].ToString(),
+                                RefNo = rdr["ReferenceNo"].ToString()
                             });
                         }
                     }
@@ -103,12 +158,12 @@ namespace CIMS.Services
         // ==========================================
         // 📥 ขาเข้า: UpdateStock
         // ==========================================
-        // ✅ เพิ่มพารามิเตอร์ refNo = บาร์โค้ดดิบ "ทั้งชุด" ที่แสกนเนอร์ยิงเข้ามา เก็บลง REF_NO
-        // schema ใหม่: MST_PART เหลือ QTY_STKB ตัวเดียว (ไม่มี QTY_STK แยกกล่อง/ชิ้นอีกต่อไป) - บวก/ลบ
+        // ✅ เพิ่มพารามิเตอร์ refNo = บาร์โค้ดดิบ "ทั้งชุด" ที่แสกนเนอร์ยิงเข้ามา เก็บลง ReferenceNo
+        // schema ใหม่: CIMS.Parts เหลือ StockQuantity ตัวเดียว (ไม่มี QTY_STK แยกกล่อง/ชิ้นอีกต่อไป) - บวก/ลบ
         // ตรงๆ ด้วยจำนวนที่สแกนเข้ามาจริง (qty) แทนการ +1 กล่องแบบเดิม
         // txType: ปกติ "IN" (ค่า default คงพฤติกรรมเดิม) ใช้ "RETURN" สำหรับกรณีรับคืนเหล็กเหลือจากการผลิต
-        // เพื่อแยกสถานะออกจากการรับเข้าปกติใน TRN_SCAN (คอลัมน์ TX_TYPE เป็น varchar(20) รองรับได้สบาย)
-        // stock: คลังที่รับเข้า (null / Stock-CHR = MST_PART.QTY_STKB เหมือนเดิม, คลังอื่น = MST_PART_STOCK ผ่าน sp_Stock_AddQty)
+        // เพื่อแยกสถานะออกจากการรับเข้าปกติใน CIMS.ScanTransactions (คอลัมน์ TransactionType เป็น varchar(20) รองรับได้สบาย)
+        // stock: คลังที่รับเข้า (null / Stock-CHR = CIMS.Parts.StockQuantity เหมือนเดิม, คลังอื่น = CIMS.PartStocks ผ่าน CIMS.sp_Stock_AddQty)
         public bool UpdateStock(int ptId, string partCode, string partACode, int qty, string userId, string refNo, string txType = "IN", StockModel stock = null, bool remainder = false)
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -118,12 +173,12 @@ namespace CIMS.Services
 
                 try
                 {
-                    string updateSql = @"UPDATE MST_PART
-                                 SET QTY_STKB = ISNULL(QTY_STKB, 0) + @Qty
-                                 WHERE PT_ID = @PtId";
+                    string updateSql = @"UPDATE CIMS.Parts
+                                 SET StockQuantity = ISNULL(StockQuantity, 0) + @Qty
+                                 WHERE PartID = @PtId";
 
-                    // ✅ เพิ่มคอลัมน์ REF_NO + STK_ID (คลังที่แสกน)
-                    string insertLogSql = @"INSERT INTO TRN_SCAN (USR_ID, TX_QTY, TX_TYPE, TX_DATE, PT_ID, PT_ACODE, REF_NO, STK_ID, TX_BOX)
+                    // ✅ เพิ่มคอลัมน์ ReferenceNo + StockID (คลังที่แสกน)
+                    string insertLogSql = @"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
                                     VALUES (@UserId, @Qty, @TxType, GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box)";
 
                     // กล่องที่รายการนี้ขยับ (คลังที่ไม่ใช่คลังหลัก): สแกนป้าย = +1 / สแกนเศษ = 0 / คืนเหล็ก = คิดจากชิ้น (NULL)
@@ -132,7 +187,7 @@ namespace CIMS.Services
 
                     if (stock != null && !stock.IsMain)
                     {
-                        using (SqlCommand cmdAdd = new SqlCommand("sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
+                        using (SqlCommand cmdAdd = new SqlCommand("CIMS.sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
                         {
                             cmdAdd.Parameters.AddWithValue("@StkId", stock.StkId);
                             cmdAdd.Parameters.AddWithValue("@PtId", ptId);
@@ -163,7 +218,7 @@ namespace CIMS.Services
                         cmdLog.Parameters.AddWithValue("@PtId", ptId);
                         cmdLog.Parameters.AddWithValue("@PtACode", string.IsNullOrWhiteSpace(partACode) ? DBNull.Value : (object)partACode.Trim());
 
-                        // 🛡️ กัน Truncate Error เผื่อบาร์โค้ดยาวเกินขนาดคอลัมน์ REF_NO (varchar 200)
+                        // 🛡️ กัน Truncate Error เผื่อบาร์โค้ดยาวเกินขนาดคอลัมน์ ReferenceNo (varchar 200)
                         string safeRefNo = string.IsNullOrWhiteSpace(refNo)
                             ? null
                             : (refNo.Length > RefNoMaxLength ? refNo.Substring(0, RefNoMaxLength) : refNo);
@@ -187,8 +242,8 @@ namespace CIMS.Services
         // ==========================================
         // 📥🔁 รับเข้าคลังหลัก + ตัดยอดคลังต้นทางอัตโนมัติ (เช่น แสกนป้าย Panta -> ตัด STOCK-PANTA)
         // ==========================================
-        // Transaction เดียว: MST_PART.QTY_STKB + qty (รับเข้าเต็มจำนวนตามป้ายเสมอ เพราะของอยู่หน้างานแล้ว),
-        // ตัด MST_PART_STOCK ของคลังต้นทาง "เท่าที่มี" (ไม่ติดลบ), บันทึก TRN_SCAN (IN) + TRN_TRANSFER (TRF_MODE = SCAN)
+        // Transaction เดียว: CIMS.Parts.StockQuantity + qty (รับเข้าเต็มจำนวนตามป้ายเสมอ เพราะของอยู่หน้างานแล้ว),
+        // ตัด CIMS.PartStocks ของคลังต้นทาง "เท่าที่มี" (ไม่ติดลบ), บันทึก CIMS.ScanTransactions (IN) + CIMS.StockTransfers (TransferMode = SCAN)
         public class DeductResult
         {
             public bool Saved { get; set; }
@@ -212,14 +267,14 @@ namespace CIMS.Services
                     try
                     {
                         // 1) รับเข้าคลังหลัก
-                        using (var cmd = new SqlCommand("UPDATE MST_PART SET QTY_STKB = ISNULL(QTY_STKB, 0) + @Qty WHERE PT_ID = @PtId", conn, trans))
+                        using (var cmd = new SqlCommand("UPDATE CIMS.Parts SET StockQuantity = ISNULL(StockQuantity, 0) + @Qty WHERE PartID = @PtId", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@Qty", qty);
                             cmd.Parameters.AddWithValue("@PtId", ptId);
                             cmd.ExecuteNonQuery();
                         }
 
-                        using (var cmd = new SqlCommand(@"INSERT INTO TRN_SCAN (USR_ID, TX_QTY, TX_TYPE, TX_DATE, PT_ID, PT_ACODE, REF_NO, STK_ID)
+                        using (var cmd = new SqlCommand(@"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID)
                                                           VALUES (@UserId, @Qty, 'IN', GETDATE(), @PtId, @PtACode, @RefNo, @StkId)", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@UserId", userId);
@@ -233,13 +288,13 @@ namespace CIMS.Services
                         }
 
                         // 2) ตัดคลังต้นทางเท่าที่มี
-                        using (var cmd = new SqlCommand("SELECT STK_CODE FROM MST_STOCK WHERE STK_ID = @s", conn, trans))
+                        using (var cmd = new SqlCommand("SELECT StockCode FROM CIMS.Stocks WHERE StockID = @s", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@s", sourceStkId);
                             result.SourceCode = cmd.ExecuteScalar()?.ToString() ?? $"STK_{sourceStkId}";
                         }
 
-                        using (var cmd = new SqlCommand("SELECT QTY FROM MST_PART_STOCK WITH (UPDLOCK, HOLDLOCK) WHERE STK_ID = @s AND PT_ID = @p", conn, trans))
+                        using (var cmd = new SqlCommand("SELECT Quantity FROM CIMS.PartStocks WITH (UPDLOCK, HOLDLOCK) WHERE StockID = @s AND PartID = @p", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@s", sourceStkId);
                             cmd.Parameters.AddWithValue("@p", ptId);
@@ -252,7 +307,7 @@ namespace CIMS.Services
 
                         if (result.Deducted > 0)
                         {
-                            using (var cmd = new SqlCommand("UPDATE MST_PART_STOCK SET QTY = QTY - @q, UPDATED_DATE = GETDATE() WHERE STK_ID = @s AND PT_ID = @p", conn, trans))
+                            using (var cmd = new SqlCommand("UPDATE CIMS.PartStocks SET Quantity = Quantity - @q, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@q", result.Deducted);
                                 cmd.Parameters.AddWithValue("@s", sourceStkId);
@@ -260,10 +315,10 @@ namespace CIMS.Services
                                 cmd.ExecuteNonQuery();
                             }
 
-                            using (var cmd = new SqlCommand(@"INSERT INTO TRN_TRANSFER (FROM_STK_ID, FROM_STK_CODE, TO_STK_ID, TO_STK_CODE, PT_ID, PT_CODE,
-                                                                  QTY, TRF_MODE, FROM_BAL_AFTER, TO_BAL_AFTER, USR_ID)
-                                                              SELECT @s, @sc, @m, @mc, @p, @pc, @q, 'SCAN', @fa, ISNULL(QTY_STKB, 0), @u
-                                                              FROM MST_PART WHERE PT_ID = @p", conn, trans))
+                            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.StockTransfers (FromStockID, FromStockCode, ToStockID, ToStockCode, PartID, PartCode,
+                                                                  Quantity, TransferMode, FromBalanceAfter, ToBalanceAfter, UserID)
+                                                              SELECT @s, @sc, @m, @mc, @p, @pc, @q, 'SCAN', @fa, ISNULL(StockQuantity, 0), @u
+                                                              FROM CIMS.Parts WHERE PartID = @p", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@s", sourceStkId);
                                 cmd.Parameters.AddWithValue("@sc", result.SourceCode);
@@ -307,8 +362,8 @@ namespace CIMS.Services
                     try
                     {
                         string checkSql = isOther
-                            ? @"SELECT ISNULL(QTY, 0), ISNULL(QTY_BOX, 0) FROM MST_PART_STOCK WITH (UPDLOCK, HOLDLOCK) WHERE STK_ID = @StkId AND PT_ID = @PtId"
-                            : @"SELECT ISNULL(QTY_STKB, 0), 0 FROM MST_PART WHERE PT_ID = @PtId";
+                            ? @"SELECT ISNULL(Quantity, 0), ISNULL(BoxQuantity, 0) FROM CIMS.PartStocks WITH (UPDLOCK, HOLDLOCK) WHERE StockID = @StkId AND PartID = @PtId"
+                            : @"SELECT ISNULL(StockQuantity, 0), 0 FROM CIMS.Parts WHERE PartID = @PtId";
                         int currentStock = 0, currentBox = 0;
                         using (SqlCommand cmdCheck = new SqlCommand(checkSql, conn, trans))
                         {
@@ -331,10 +386,10 @@ namespace CIMS.Services
                         }
 
                         string updateSql = isOther
-                            ? @"UPDATE MST_PART_STOCK SET QTY = QTY - @Qty, QTY_BOX = QTY_BOX + @BoxOut, UPDATED_DATE = GETDATE() WHERE STK_ID = @StkId AND PT_ID = @PtId"
-                            : @"UPDATE MST_PART
-                                     SET QTY_STKB = ISNULL(QTY_STKB, 0) - @Qty
-                                     WHERE PT_ID = @PtId";
+                            ? @"UPDATE CIMS.PartStocks SET Quantity = Quantity - @Qty, BoxQuantity = BoxQuantity + @BoxOut, UpdatedDate = GETDATE() WHERE StockID = @StkId AND PartID = @PtId"
+                            : @"UPDATE CIMS.Parts
+                                     SET StockQuantity = ISNULL(StockQuantity, 0) - @Qty
+                                     WHERE PartID = @PtId";
 
                         using (SqlCommand cmdUpdate = new SqlCommand(updateSql, conn, trans))
                         {
@@ -348,8 +403,8 @@ namespace CIMS.Services
                             cmdUpdate.ExecuteNonQuery();
                         }
 
-                        // ✅ เพิ่มคอลัมน์ REF_NO
-                        string insertLogSql = @"INSERT INTO TRN_SCAN (USR_ID, TX_QTY, TX_TYPE, TX_DATE, PT_ID, PT_ACODE, REF_NO, STK_ID, TX_BOX)
+                        // ✅ เพิ่มคอลัมน์ ReferenceNo
+                        string insertLogSql = @"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
                                         VALUES (@UserId, @Qty, 'OUT', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box)";
                         using (SqlCommand cmdLog = new SqlCommand(insertLogSql, conn, trans))
                         {
@@ -383,17 +438,17 @@ namespace CIMS.Services
         }
 
         // คลังที่สินค้านี้อยู่ (ใช้ตอนสแกนร่วมหลายคลัง / AUTO ให้ระบบเลือกคลังเอง)
-        // คลังหลัก = แสดงในตารางคลังหลัก (IS_SHOW_MST) / คลังอื่น = มีแถวใน MST_PART_STOCK
+        // คลังหลัก = แสดงในตารางคลังหลัก (IsShowInMaster) / คลังอื่น = มีแถวใน CIMS.PartStocks
         // (ตรงกับชิป STOCK ในหน้า Inventory Registration)
         public HashSet<int> GetPartStockIds(int ptId)
         {
             var ids = new HashSet<int>();
             using (SqlConnection conn = new SqlConnection(_connectionString))
             using (SqlCommand cmd = new SqlCommand(@"
-                SELECT ps.STK_ID FROM MST_PART_STOCK ps WHERE ps.PT_ID = @PtId
+                SELECT ps.StockID FROM CIMS.PartStocks ps WHERE ps.PartID = @PtId
                 UNION
-                SELECT s.STK_ID FROM MST_STOCK s
-                WHERE s.IS_MAIN = 1 AND EXISTS (SELECT 1 FROM MST_PART p WHERE p.PT_ID = @PtId AND p.IS_SHOW_MST = 1)", conn))
+                SELECT s.StockID FROM CIMS.Stocks s
+                WHERE s.IsMain = 1 AND EXISTS (SELECT 1 FROM CIMS.Parts p WHERE p.PartID = @PtId AND p.IsShowInMaster = 1)", conn))
             {
                 cmd.Parameters.AddWithValue("@PtId", ptId);
                 conn.Open();
@@ -408,10 +463,10 @@ namespace CIMS.Services
             bool isOther = stock != null && !stock.IsMain;
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                // คิวรีดึงยอดคงเหลือปัจจุบันจาก Master Table ตรงๆ (คลังอื่นดึงจาก MST_PART_STOCK)
+                // คิวรีดึงยอดคงเหลือปัจจุบันจาก Master Table ตรงๆ (คลังอื่นดึงจาก CIMS.PartStocks)
                 string sql = isOther
-                    ? "SELECT ISNULL(QTY, 0) FROM MST_PART_STOCK WHERE STK_ID = @StkId AND PT_ID = @PtId"
-                    : "SELECT ISNULL(QTY_STKB, 0) FROM MST_PART WHERE PT_ID = @PtId";
+                    ? "SELECT ISNULL(Quantity, 0) FROM CIMS.PartStocks WHERE StockID = @StkId AND PartID = @PtId"
+                    : "SELECT ISNULL(StockQuantity, 0) FROM CIMS.Parts WHERE PartID = @PtId";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@PtId", ptId);

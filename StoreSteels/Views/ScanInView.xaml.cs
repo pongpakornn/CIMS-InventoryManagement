@@ -68,6 +68,7 @@ namespace CIMS.Views
             // สลับกลับมาที่หน้าต่างโปรแกรม (Alt+Tab / คลิกหน้าต่าง) ก็ให้โฟกัสช่องสแกนให้เอง
             _hostWindow = Window.GetWindow(this);
             if (_hostWindow != null) _hostWindow.Activated += HostWindow_Activated;
+            _viewModel.StartLive();
             FocusScanBox();
         }
 
@@ -75,6 +76,7 @@ namespace CIMS.Views
         {
             if (_hostWindow != null) _hostWindow.Activated -= HostWindow_Activated;
             _hostWindow = null;
+            _viewModel.StopLive();
         }
 
         private void HostWindow_Activated(object sender, EventArgs e) => FocusScanBox();
@@ -86,6 +88,19 @@ namespace CIMS.Views
             try { stocks = new CIMS.Services.StockService().GetStocks().Where(s => _viewModel.CurrentUser == null || _viewModel.CurrentUser.CanViewStock(s)).ToList(); }
             catch { stocks = _viewModel.Stocks.ToList(); }
             new ScanHistoryWindow(_viewModel.CurrentUser, stocks).ShowDialog();
+            FocusScanBox();
+        }
+
+        // 🏷️ DISPLAY: ค่าที่แสดงในช่อง PRODUCT CODE ต่อคลัง -> บันทึกแล้วใช้กับตารางวันนี้ทันที
+        private void ScanDisplay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.CurrentUser?.CanEditStore != true) return;
+            List<StockModel> stocks;
+            try { stocks = new CIMS.Services.StockService().GetStocks().Where(s => _viewModel.CurrentUser.CanViewStock(s)).ToList(); }
+            catch { stocks = _viewModel.Stocks.ToList(); }
+            var w = new ScanDisplayWindow(_viewModel.CurrentUser, stocks);
+            w.ShowDialog();
+            if (w.Saved) _viewModel.ReloadDisplaySettings();
             FocusScanBox();
         }
 

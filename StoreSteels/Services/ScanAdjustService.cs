@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using CIMS.Core;
 using System;
 using System.Collections.Generic;
@@ -49,8 +49,8 @@ namespace CIMS.Services
 
     // ✏️ ADJUST SCAN (Level 1): แก้จำนวน / ยกเลิกรายการสแกน แล้วปรับยอดคลังย้อนให้ใน Transaction เดียว
     //   IN / RETURN = เคยบวกยอด -> ยกเลิกแล้วหักออก / OUT = เคยลดยอด -> ยกเลิกแล้วคืนยอด
-    //   กล่อง (คลังที่ไม่ใช่คลังหลัก) ย้อนตาม TX_BOX ที่บันทึกไว้ / รายการเก่าที่ไม่มี TX_BOX: IN +1, OUT -1, RETURN คิดจากชิ้น
-    //   แก้จำนวน = ปรับเฉพาะชิ้นตามส่วนต่าง (จำนวนกล่องไม่เปลี่ยน) / ยอดติดลบไม่ได้ / ทุกครั้งเก็บลง TRN_SCAN_ADJ พร้อมเหตุผล
+    //   กล่อง (คลังที่ไม่ใช่คลังหลัก) ย้อนตาม BoxChange ที่บันทึกไว้ / รายการเก่าที่ไม่มี BoxChange: IN +1, OUT -1, RETURN คิดจากชิ้น
+    //   แก้จำนวน = ปรับเฉพาะชิ้นตามส่วนต่าง (จำนวนกล่องไม่เปลี่ยน) / ยอดติดลบไม่ได้ / ทุกครั้งเก็บลง CIMS.ScanAdjustments พร้อมเหตุผล
     public class ScanAdjustService
     {
         private readonly string _cs = GlobalConfig.ConnStr;
@@ -60,23 +60,23 @@ namespace CIMS.Services
             var list = new List<ScanAdjustRow>();
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(@"
-                SELECT TOP 500 t.TX_ID, t.TX_DATE, ISNULL(s.STK_CODE, 'MAIN') AS STK_CODE, t.TX_TYPE,
-                       ISNULL(p.PT_CODE, ISNULL(t.PT_ACODE, '')) AS PT_CODE, ISNULL(p.PT_DESC, '') AS PT_DESC, t.TX_QTY,
-                       t.USR_ID, ISNULL(u.USR_NAME, '') AS USR_NAME, ISNULL(t.IS_CANCEL, 0) AS IS_CANCEL, t.ADJ_NOTE,
-                       pr.PR_NO, pr.PR_STAT
-                FROM TRN_SCAN t
-                LEFT JOIN MST_PART p  ON p.PT_ID = t.PT_ID
-                LEFT JOIN MST_STOCK s ON s.STK_ID = t.STK_ID
-                LEFT JOIN MST_USER u  ON u.USR_ID = t.USR_ID
-                OUTER APPLY (SELECT TOP 1 h.PR_NO, h.PR_STAT FROM TRN_PR_H h WHERE h.SCAN_TX_ID = t.TX_ID ORDER BY h.PR_NO DESC) pr
-                WHERE t.TX_DATE >= @from AND t.TX_DATE < @to
-                  AND (@stk IS NULL OR t.STK_ID = @stk OR (@isMain = 1 AND t.STK_ID IS NULL))
-                  AND (@type IS NULL OR t.TX_TYPE = @type)
-                  AND (@key = '' OR p.PT_CODE LIKE '%' + @key + '%' OR p.PT_DESC LIKE '%' + @key + '%'
-                       OR ISNULL(p.PT_PARTA, '') LIKE '%' + @key + '%' OR ISNULL(p.PT_PARTNO, '') LIKE '%' + @key + '%'
-                       OR ISNULL(t.PT_ACODE, '') LIKE '%' + @key + '%' OR ISNULL(t.REF_NO, '') LIKE '%' + @key + '%'
-                       OR t.USR_ID LIKE '%' + @key + '%' OR ISNULL(u.USR_NAME, '') LIKE '%' + @key + '%')
-                ORDER BY t.TX_DATE DESC, t.TX_ID DESC", conn))
+                SELECT TOP 500 t.TransactionID, t.TransactionDate, ISNULL(s.StockCode, 'MAIN') AS StockCode, t.TransactionType,
+                       ISNULL(p.PartCode, ISNULL(t.PartACode, '')) AS PartCode, ISNULL(p.Description, '') AS Description, t.Quantity,
+                       t.UserID, ISNULL(u.FullName, '') AS FullName, ISNULL(t.IsCancelled, 0) AS IsCancelled, t.AdjustNote,
+                       pr.PRNumber, pr.Status
+                FROM CIMS.ScanTransactions t
+                LEFT JOIN CIMS.Parts p  ON p.PartID = t.PartID
+                LEFT JOIN CIMS.Stocks s ON s.StockID = t.StockID
+                LEFT JOIN CIMS.Users u  ON u.UserID = t.UserID
+                OUTER APPLY (SELECT TOP 1 h.PRNumber, h.Status FROM CIMS.PRHeaders h WHERE h.ScanTransactionID = t.TransactionID ORDER BY h.PRNumber DESC) pr
+                WHERE t.TransactionDate >= @from AND t.TransactionDate < @to
+                  AND (@stk IS NULL OR t.StockID = @stk OR (@isMain = 1 AND t.StockID IS NULL))
+                  AND (@type IS NULL OR t.TransactionType = @type)
+                  AND (@key = '' OR p.PartCode LIKE '%' + @key + '%' OR p.Description LIKE '%' + @key + '%'
+                       OR ISNULL(p.PartA, '') LIKE '%' + @key + '%' OR ISNULL(p.PartNumber, '') LIKE '%' + @key + '%'
+                       OR ISNULL(t.PartACode, '') LIKE '%' + @key + '%' OR ISNULL(t.ReferenceNo, '') LIKE '%' + @key + '%'
+                       OR t.UserID LIKE '%' + @key + '%' OR ISNULL(u.FullName, '') LIKE '%' + @key + '%')
+                ORDER BY t.TransactionDate DESC, t.TransactionID DESC", conn))
             {
                 cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = from.Date;
                 cmd.Parameters.Add("@to", SqlDbType.DateTime).Value = to.Date.AddDays(1);
@@ -89,18 +89,18 @@ namespace CIMS.Services
                     while (r.Read())
                         list.Add(new ScanAdjustRow
                         {
-                            TxId = Convert.ToInt32(r["TX_ID"]),
-                            TxDate = Convert.ToDateTime(r["TX_DATE"]),
-                            StockCode = r["STK_CODE"].ToString(),
-                            TxType = r["TX_TYPE"].ToString(),
-                            PartCode = r["PT_CODE"].ToString(),
-                            PartName = r["PT_DESC"].ToString(),
-                            Qty = r["TX_QTY"] == DBNull.Value ? 0 : Convert.ToInt32(r["TX_QTY"]),
-                            UserText = string.IsNullOrWhiteSpace(r["USR_NAME"].ToString()) ? r["USR_ID"].ToString() : $"{r["USR_ID"]} - {r["USR_NAME"]}",
-                            IsCancel = Convert.ToBoolean(r["IS_CANCEL"]),
-                            AdjNote = r["ADJ_NOTE"] == DBNull.Value ? null : r["ADJ_NOTE"].ToString(),
-                            PrNo = r["PR_NO"] == DBNull.Value ? null : r["PR_NO"].ToString(),
-                            PrStatus = r["PR_STAT"] == DBNull.Value ? null : r["PR_STAT"].ToString()
+                            TxId = Convert.ToInt32(r["TransactionID"]),
+                            TxDate = Convert.ToDateTime(r["TransactionDate"]),
+                            StockCode = r["StockCode"].ToString(),
+                            TxType = r["TransactionType"].ToString(),
+                            PartCode = r["PartCode"].ToString(),
+                            PartName = r["Description"].ToString(),
+                            Qty = r["Quantity"] == DBNull.Value ? 0 : Convert.ToInt32(r["Quantity"]),
+                            UserText = string.IsNullOrWhiteSpace(r["FullName"].ToString()) ? r["UserID"].ToString() : $"{r["UserID"]} - {r["FullName"]}",
+                            IsCancel = Convert.ToBoolean(r["IsCancelled"]),
+                            AdjNote = r["AdjustNote"] == DBNull.Value ? null : r["AdjustNote"].ToString(),
+                            PrNo = r["PRNumber"] == DBNull.Value ? null : r["PRNumber"].ToString(),
+                            PrStatus = r["Status"] == DBNull.Value ? null : r["Status"].ToString()
                         });
             }
             return list;
@@ -125,25 +125,25 @@ namespace CIMS.Services
                         // 1) รายการเดิม (ล็อกไว้กันคนอื่นแก้พร้อมกัน)
                         int ptId, oldQty; string type; int? stkId, txBox; bool cancelled, isMain; string stkCode; DateTime txDate;
                         using (var cmd = new SqlCommand(@"
-                            SELECT t.PT_ID, t.TX_QTY, t.TX_TYPE, t.STK_ID, t.TX_BOX, ISNULL(t.IS_CANCEL, 0) AS IS_CANCEL, t.TX_DATE,
-                                   ISNULL(s.IS_MAIN, 1) AS IS_MAIN, ISNULL(s.STK_CODE, 'MAIN') AS STK_CODE
-                            FROM TRN_SCAN t WITH (UPDLOCK, HOLDLOCK)
-                            LEFT JOIN MST_STOCK s ON s.STK_ID = t.STK_ID
-                            WHERE t.TX_ID = @id", conn, trans))
+                            SELECT t.PartID, t.Quantity, t.TransactionType, t.StockID, t.BoxChange, ISNULL(t.IsCancelled, 0) AS IsCancelled, t.TransactionDate,
+                                   ISNULL(s.IsMain, 1) AS IsMain, ISNULL(s.StockCode, 'MAIN') AS StockCode
+                            FROM CIMS.ScanTransactions t WITH (UPDLOCK, HOLDLOCK)
+                            LEFT JOIN CIMS.Stocks s ON s.StockID = t.StockID
+                            WHERE t.TransactionID = @id", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@id", txId);
                             using (var r = cmd.ExecuteReader())
                             {
                                 if (!r.Read()) throw new InvalidOperationException($"ไม่พบรายการสแกน #{txId} (อาจถูกลบไปแล้ว)");
-                                ptId = Convert.ToInt32(r["PT_ID"]);
-                                oldQty = r["TX_QTY"] == DBNull.Value ? 0 : Convert.ToInt32(r["TX_QTY"]);
-                                type = r["TX_TYPE"].ToString().Trim().ToUpperInvariant();
-                                stkId = r["STK_ID"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["STK_ID"]);
-                                txBox = r["TX_BOX"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["TX_BOX"]);
-                                cancelled = Convert.ToBoolean(r["IS_CANCEL"]);
-                                isMain = Convert.ToBoolean(r["IS_MAIN"]);
-                                stkCode = r["STK_CODE"].ToString();
-                                txDate = Convert.ToDateTime(r["TX_DATE"]);
+                                ptId = Convert.ToInt32(r["PartID"]);
+                                oldQty = r["Quantity"] == DBNull.Value ? 0 : Convert.ToInt32(r["Quantity"]);
+                                type = r["TransactionType"].ToString().Trim().ToUpperInvariant();
+                                stkId = r["StockID"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["StockID"]);
+                                txBox = r["BoxChange"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["BoxChange"]);
+                                cancelled = Convert.ToBoolean(r["IsCancelled"]);
+                                isMain = Convert.ToBoolean(r["IsMain"]);
+                                stkCode = r["StockCode"].ToString();
+                                txDate = Convert.ToDateTime(r["TransactionDate"]);
                             }
                         }
                         if (cancelled) throw new InvalidOperationException($"รายการ #{txId} ถูกยกเลิกไปแล้ว");
@@ -170,7 +170,7 @@ namespace CIMS.Services
                         int balance;
                         if (isMain)
                         {
-                            using (var cmd = new SqlCommand("SELECT ISNULL(QTY_STKB, 0) FROM MST_PART WITH (UPDLOCK, HOLDLOCK) WHERE PT_ID = @p", conn, trans))
+                            using (var cmd = new SqlCommand("SELECT ISNULL(StockQuantity, 0) FROM CIMS.Parts WITH (UPDLOCK, HOLDLOCK) WHERE PartID = @p", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@p", ptId);
                                 object v = cmd.ExecuteScalar();
@@ -179,7 +179,7 @@ namespace CIMS.Services
                             }
                             if (balance + delta < 0)
                                 throw new InvalidOperationException($"ยอดคงเหลือในคลัง {stkCode} ไม่พอ (คงเหลือ {balance:N0} ต้องปรับ {delta:N0})");
-                            using (var cmd = new SqlCommand("UPDATE MST_PART SET QTY_STKB = ISNULL(QTY_STKB, 0) + @d WHERE PT_ID = @p", conn, trans))
+                            using (var cmd = new SqlCommand("UPDATE CIMS.Parts SET StockQuantity = ISNULL(StockQuantity, 0) + @d WHERE PartID = @p", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@d", delta);
                                 cmd.Parameters.AddWithValue("@p", ptId);
@@ -189,22 +189,22 @@ namespace CIMS.Services
                         else
                         {
                             int box;
-                            using (var cmd = new SqlCommand("SELECT QTY, QTY_BOX FROM MST_PART_STOCK WITH (UPDLOCK, HOLDLOCK) WHERE STK_ID = @s AND PT_ID = @p", conn, trans))
+                            using (var cmd = new SqlCommand("SELECT Quantity, BoxQuantity FROM CIMS.PartStocks WITH (UPDLOCK, HOLDLOCK) WHERE StockID = @s AND PartID = @p", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@s", stkId.Value);
                                 cmd.Parameters.AddWithValue("@p", ptId);
                                 using (var r = cmd.ExecuteReader())
                                 {
                                     if (!r.Read()) throw new InvalidOperationException($"สินค้านี้ไม่อยู่ในคลัง {stkCode} แล้ว ปรับยอดไม่ได้");
-                                    balance = Convert.ToInt32(r["QTY"]);
-                                    box = Convert.ToInt32(r["QTY_BOX"]);
+                                    balance = Convert.ToInt32(r["Quantity"]);
+                                    box = Convert.ToInt32(r["BoxQuantity"]);
                                 }
                             }
                             if (balance + delta < 0)
                                 throw new InvalidOperationException($"ยอดคงเหลือในคลัง {stkCode} ไม่พอ (คงเหลือ {balance:N0} ต้องปรับ {delta:N0})");
                             string sql = recalcBox
-                                ? "UPDATE MST_PART_STOCK SET QTY = QTY + @d, UPDATED_DATE = GETDATE() WHERE STK_ID = @s AND PT_ID = @p"
-                                : "UPDATE MST_PART_STOCK SET QTY = QTY + @d, QTY_BOX = @box, UPDATED_DATE = GETDATE() WHERE STK_ID = @s AND PT_ID = @p";
+                                ? "UPDATE CIMS.PartStocks SET Quantity = Quantity + @d, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p"
+                                : "UPDATE CIMS.PartStocks SET Quantity = Quantity + @d, BoxQuantity = @box, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p";
                             using (var cmd = new SqlCommand(sql, conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@d", delta);
@@ -222,10 +222,10 @@ namespace CIMS.Services
                         {
                             int trfId = 0, trfQty = 0, fromStk = 0; string fromCode = null;
                             using (var cmd = new SqlCommand(@"
-                                SELECT TOP 1 TRF_ID, QTY, FROM_STK_ID, FROM_STK_CODE FROM TRN_TRANSFER
-                                WHERE TRF_MODE = 'SCAN' AND PT_ID = @p AND (TO_STK_ID = @to OR @to IS NULL)
-                                  AND TRF_DATE BETWEEN DATEADD(SECOND, -5, @d) AND DATEADD(SECOND, 5, @d)
-                                ORDER BY ABS(DATEDIFF(MILLISECOND, TRF_DATE, @d))", conn, trans))
+                                SELECT TOP 1 TransferID, Quantity, FromStockID, FromStockCode FROM CIMS.StockTransfers
+                                WHERE TransferMode = 'SCAN' AND PartID = @p AND (ToStockID = @to OR @to IS NULL)
+                                  AND TransferDate BETWEEN DATEADD(SECOND, -5, @d) AND DATEADD(SECOND, 5, @d)
+                                ORDER BY ABS(DATEDIFF(MILLISECOND, TransferDate, @d))", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@p", ptId);
                                 cmd.Parameters.Add("@to", SqlDbType.Int).Value = (object)stkId ?? DBNull.Value;
@@ -235,7 +235,7 @@ namespace CIMS.Services
                             }
                             if (trfId > 0 && trfQty > 0)
                             {
-                                using (var cmd = new SqlCommand("UPDATE MST_PART_STOCK SET QTY = QTY + @q, UPDATED_DATE = GETDATE() WHERE STK_ID = @s AND PT_ID = @p", conn, trans))
+                                using (var cmd = new SqlCommand("UPDATE CIMS.PartStocks SET Quantity = Quantity + @q, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p", conn, trans))
                                 {
                                     cmd.Parameters.AddWithValue("@q", trfQty);
                                     cmd.Parameters.AddWithValue("@s", fromStk);
@@ -250,8 +250,8 @@ namespace CIMS.Services
                                       + $" by {userId} {DateTime.Now:dd/MM/yyyy HH:mm} : {reason.Trim()}";
                         if (note.Length > 300) note = note.Substring(0, 300);
                         using (var cmd = new SqlCommand(newQty.HasValue
-                            ? "UPDATE TRN_SCAN SET TX_QTY = @q, ADJ_NOTE = @n WHERE TX_ID = @id"
-                            : "UPDATE TRN_SCAN SET IS_CANCEL = 1, ADJ_NOTE = @n WHERE TX_ID = @id", conn, trans))
+                            ? "UPDATE CIMS.ScanTransactions SET Quantity = @q, AdjustNote = @n WHERE TransactionID = @id"
+                            : "UPDATE CIMS.ScanTransactions SET IsCancelled = 1, AdjustNote = @n WHERE TransactionID = @id", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@id", txId);
                             cmd.Parameters.AddWithValue("@n", note);
@@ -259,7 +259,7 @@ namespace CIMS.Services
                             cmd.ExecuteNonQuery();
                         }
                         using (var cmd = new SqlCommand(@"
-                            INSERT INTO TRN_SCAN_ADJ (TX_ID, ADJ_ACTION, TX_TYPE, STK_ID, PT_ID, OLD_QTY, NEW_QTY, STOCK_DELTA, BAL_AFTER, REASON, USR_ID)
+                            INSERT INTO CIMS.ScanAdjustments (TransactionID, Action, TransactionType, StockID, PartID, OldQuantity, NewQuantity, StockChange, BalanceAfter, Reason, UserID)
                             VALUES (@id, @a, @t, @s, @p, @o, @n, @d, @b, @r, @u)", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@id", txId);
@@ -278,7 +278,7 @@ namespace CIMS.Services
 
                         // 6) PR อัตโนมัติจากการสแกนออก - ไม่แตะ ให้ผู้มีสิทธิ์ PR จัดการเอง (แจ้งเลข PR กลับไป)
                         var result = new ScanAdjustResult { TxId = txId, BalanceAfter = balAfter, StockCode = stkCode, SourceNote = sourceNote };
-                        using (var cmd = new SqlCommand("SELECT TOP 1 PR_NO, PR_STAT FROM TRN_PR_H WHERE SCAN_TX_ID = @id ORDER BY PR_NO DESC", conn, trans))
+                        using (var cmd = new SqlCommand("SELECT TOP 1 PRNumber, Status FROM CIMS.PRHeaders WHERE ScanTransactionID = @id ORDER BY PRNumber DESC", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@id", txId);
                             using (var r = cmd.ExecuteReader())

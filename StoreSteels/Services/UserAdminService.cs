@@ -6,15 +6,15 @@ using System.Linq;
 
 namespace CIMS.Services
 {
-    // 👥 ผู้ใช้งาน 1 คน (MST_USER) สำหรับหน้า USER MANAGEMENT
+    // 👥 ผู้ใช้งาน 1 คน (CIMS.Users) สำหรับหน้า USER MANAGEMENT
     public class UserAccount
     {
         public string UserId { get; set; }
         public string Name { get; set; }
-        public string Position { get; set; }       // ตำแหน่ง (USR_POS)
-        public string Department { get; set; }     // หน่วยงาน (USR_DEPT)
-        public string Section { get; set; }        // แผนก (USR_SECTION)
-        public string Division { get; set; }       // ฝ่าย (USR_DIVISION)
+        public string Position { get; set; }       // ตำแหน่ง (Position)
+        public string Department { get; set; }     // หน่วยงาน (Department)
+        public string Section { get; set; }        // แผนก (Section)
+        public string Division { get; set; }       // ฝ่าย (Division)
         public int Level { get; set; } = 2;   // UserID ใหม่ = Level 2
         public bool IsOnline { get; set; }
         public bool IsLocked { get; set; }
@@ -43,10 +43,10 @@ namespace CIMS.Services
         public string SubText2 => string.Join("  •  ", new[] { Section, Division }.Where(x => !string.IsNullOrWhiteSpace(x)));
     }
 
-    // สิทธิ์ 1 ระบบของผู้ใช้ (MST_PERM 1 แถว)
+    // สิทธิ์ 1 ระบบของผู้ใช้ (CIMS.Permissions 1 แถว)
     public class UserPermRow
     {
-        public string SysId { get; set; }          // ค่าที่โปรแกรมตรวจสิทธิ์ (เขียนลง MST_PERM.SYS_ID)
+        public string SysId { get; set; }          // ค่าที่โปรแกรมตรวจสิทธิ์ (เขียนลง CIMS.Permissions.SystemID)
         public string Title { get; set; }
         public string Group { get; set; }          // SYSTEM / STOCK
         public string Hint { get; set; }           // ADD/EDIT/DEL ใช้ทำอะไรในระบบนี้
@@ -62,18 +62,19 @@ namespace CIMS.Services
     {
         private readonly string _cs = GlobalConfig.ConnStr;
 
-        // ทุกระบบที่โปรแกรมตรวจสิทธิ์ (SYS_ID ต้องตรงกับที่ UserSession ใช้) - คลังอื่นเพิ่มให้อัตโนมัติจาก MST_STOCK
+        // ทุกระบบที่โปรแกรมตรวจสิทธิ์ (SystemID ต้องตรงกับที่ UserSession ใช้) - คลังอื่นเพิ่มให้อัตโนมัติจาก CIMS.Stocks
         public static readonly (string SysId, string Title, string Hint)[] Systems =
         {
             ("DASHBOARD",   "Dashboard",                  "VIEW = open the page"),
-            ("STORE",       "Store (Max-Min)",            "VIEW = open + stocks (read only)  •  ADD = add stock / barcode format  •  EDIT = stock settings / barcode formats  •  DEL = delete stock"),
-            ("SCANNER",     "Multi-Scanner",              "VIEW = open / history / test mode  •  ADD = scan in + return  •  EDIT = scan out"),
-            ("PDControl",   "Inventory Registration",     "VIEW = open + export QR  •  ADD = register / import  •  EDIT = edit / show-hide / image  •  DEL = delete"),
+            ("StoreMaxMin", "Store(Max-Min)",            "VIEW = open + stocks (read only)  •  ADD = add stock / barcode format  •  EDIT = stock settings / barcode formats  •  DEL = delete stock"),
+            ("MultiScanner", "Multi-Scanner",              "VIEW = open / history / test mode  •  ADD = scan in + return  •  EDIT = scan out"),
+            ("ProductControl", "ProductControl",     "VIEW = open + export QR  •  ADD = register / import  •  EDIT = edit / show-hide / image  •  DEL = delete"),
             ("PackingCard", "Pick List",                  "VIEW = open the page"),
             ("MAXMINCALC",  "Max-Min Calculator",         "VIEW = open  •  EDIT = edit / import / calculate"),
+            ("ForecastOrder", "Forecast / Order / Delivery", "VIEW = open + export  •  ADD = import forecast / order / delivery"),
             ("PR",          "PR Management",              "VIEW = open + approved list  •  ADD = submit  •  EDIT = edit / PR settings  •  DEL = delete  •  APPROVE = approve / reject / export"),
             ("ActivityLog", "Activity Log",               "VIEW = open the page"),
-            ("USERMGMT",    "User Management",            "VIEW = open  •  ADD / EDIT / DEL users  •  APPROVE = set permissions")
+            ("UserManagement", "UserManagement",            "VIEW = open  •  ADD / EDIT / DEL users  •  APPROVE = set permissions")
         };
 
         public List<UserAccount> GetUsers()
@@ -81,27 +82,27 @@ namespace CIMS.Services
             var list = new List<UserAccount>();
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(@"
-                SELECT u.USR_ID, u.USR_NAME, u.USR_POS, u.USR_DEPT, u.USR_SECTION, u.USR_DIVISION, ISNULL(u.USR_LVL, 3) AS LVL, ISNULL(u.IS_ONLINE, 0) AS ONL,
-                       ISNULL(u.IS_LOCKED, 0) AS LCK, ISNULL(u.IS_MASTER_ADMIN, 0) AS MA, u.LAST_LOGIN,
-                       (SELECT COUNT(*) FROM MST_PERM p WHERE p.USR_ID = u.USR_ID AND p.PERM_VIEW = 'Y') AS PERMS
-                FROM MST_USER u ORDER BY ISNULL(u.USR_LVL, 3), u.USR_ID", conn))
+                SELECT u.UserID, u.FullName, u.Position, u.Department, u.Section, u.Division, ISNULL(u.UserLevel, 3) AS LVL, ISNULL(u.IsOnline, 0) AS ONL,
+                       ISNULL(u.IsLocked, 0) AS LCK, ISNULL(u.IsMasterAdmin, 0) AS MA, u.LastLogin,
+                       (SELECT COUNT(*) FROM CIMS.Permissions p WHERE p.UserID = u.UserID AND p.CanView = 'Y') AS PERMS
+                FROM CIMS.Users u ORDER BY ISNULL(u.UserLevel, 3), u.UserID", conn))
             {
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
                     while (r.Read())
                         list.Add(new UserAccount
                         {
-                            UserId = r["USR_ID"].ToString(),
-                            Name = r["USR_NAME"]?.ToString(),
-                            Position = r["USR_POS"]?.ToString(),
-                            Department = r["USR_DEPT"]?.ToString(),
-                            Section = r["USR_SECTION"]?.ToString(),
-                            Division = r["USR_DIVISION"]?.ToString(),
+                            UserId = r["UserID"].ToString(),
+                            Name = r["FullName"]?.ToString(),
+                            Position = r["Position"]?.ToString(),
+                            Department = r["Department"]?.ToString(),
+                            Section = r["Section"]?.ToString(),
+                            Division = r["Division"]?.ToString(),
                             Level = Convert.ToInt32(r["LVL"]),
                             IsOnline = Convert.ToBoolean(r["ONL"]),
                             IsLocked = Convert.ToBoolean(r["LCK"]),
                             IsMasterAdmin = Convert.ToBoolean(r["MA"]),
-                            LastLogin = r["LAST_LOGIN"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["LAST_LOGIN"]),
+                            LastLogin = r["LastLogin"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["LastLogin"]),
                             PermCount = Convert.ToInt32(r["PERMS"])
                         });
             }
@@ -111,7 +112,7 @@ namespace CIMS.Services
         public bool Exists(string userId)
         {
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT COUNT(*) FROM MST_USER WHERE USR_ID = @u", conn))
+            using (var cmd = new SqlCommand("SELECT COUNT(*) FROM CIMS.Users WHERE UserID = @u", conn))
             {
                 cmd.Parameters.AddWithValue("@u", userId);
                 conn.Open();
@@ -123,7 +124,7 @@ namespace CIMS.Services
         public void AddUser(UserAccount u, string password)
         {
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(@"INSERT INTO MST_USER (USR_ID, USR_PWD, USR_NAME, USR_POS, USR_DEPT, USR_SECTION, USR_DIVISION, USR_LVL, IS_ONLINE, IS_LOCKED, IS_MASTER_ADMIN)
+            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.Users (UserID, Password, FullName, Position, Department, Section, Division, UserLevel, IsOnline, IsLocked, IsMasterAdmin)
                                               VALUES (@u, @p, @n, @pos, @d, @sec, @div, @l, 0, @lock, 0)", conn))
             {
                 Fill(cmd, u);
@@ -137,9 +138,9 @@ namespace CIMS.Services
         public void UpdateUser(UserAccount u, string newPassword)
         {
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(@"UPDATE MST_USER SET USR_NAME = @n, USR_POS = @pos, USR_DEPT = @d, USR_SECTION = @sec, USR_DIVISION = @div, USR_LVL = @l, IS_LOCKED = @lock,
-                                                     USR_PWD = CASE WHEN @p IS NULL THEN USR_PWD ELSE @p END
-                                              WHERE USR_ID = @u", conn))
+            using (var cmd = new SqlCommand(@"UPDATE CIMS.Users SET FullName = @n, Position = @pos, Department = @d, Section = @sec, Division = @div, UserLevel = @l, IsLocked = @lock,
+                                                     Password = CASE WHEN @p IS NULL THEN Password ELSE @p END
+                                              WHERE UserID = @u", conn))
             {
                 Fill(cmd, u);
                 cmd.Parameters.AddWithValue("@p", string.IsNullOrEmpty(newPassword) ? (object)DBNull.Value : newPassword);
@@ -161,136 +162,313 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@lock", u.IsLocked);
         }
 
-        // 📥 Import ผู้ใช้จาก Excel (แบบฟอร์มจริงรอผู้ใช้ส่งมา -> หาหัวคอลัมน์เองจาก 10 แถวแรก ไม่สนตัวพิมพ์/ช่องว่าง)
-        //    USER ID + NAME บังคับ / PASSWORD (ผู้ใช้ใหม่บังคับ) / POSITION / หน่วยงาน / แผนก / ฝ่าย / LEVEL / LOCKED
-        //    มี USER ID นี้แล้ว = อัพเดทข้อมูล (ช่องว่างไม่เปลี่ยน, PASSWORD ว่าง = ไม่เปลี่ยน) / ยังไม่มี = เพิ่มใหม่
+        // 📥 Import ผู้ใช้ + สิทธิ์จาก Excel (อ่านทุกชีทในไฟล์ แยกชนิดจากหัวคอลัมน์)
+        //   ชีทผู้ใช้  : NO / USERID / PASSWORD / FULLNAME / DIVISION / DEPARTMENT / SECTION / POSITION / USERLEVEL / ISONLINE / ISLOCKED / ISMASTERADMIN
+        //               มี USERID แล้ว = อัพเดท (ช่องว่างไม่เปลี่ยน, PASSWORD ว่าง = ไม่เปลี่ยน) / ยังไม่มี = เพิ่มใหม่ (ต้องมี PASSWORD)
+        //               ISONLINE ระบบจัดการเอง (ไม่นำเข้า) / ISMASTERADMIN = 1 นำเข้าได้เฉพาะผู้ Import ที่เป็น Level 1 หรือ Master Admin
+        //   ชีทสิทธิ์  : NO / USERID / SYSTEMID / CANVIEW / CANADD / CANEDIT / CANDELETE / CANAPPROVE
+        //               SYSTEMID = รหัสระบบ (Dashboard, StoreMaxMin, MultiScanner ...) หรือรหัสคลัง / ค่า Y N, 1 0, TRUE FALSE (ว่าง = N)
+        //               แถวที่มีในไฟล์ = ตั้งสิทธิ์ตามไฟล์ / ระบบที่ไม่มีในไฟล์ คงสิทธิ์เดิม
         public class ImportRow
         {
             public int RowNumber { get; set; }
+            public string Sheet { get; set; }
             public UserAccount User { get; set; } = new UserAccount();
             public string Password { get; set; }
             public bool IsNew { get; set; }
             public bool LevelGiven { get; set; }
             public bool LockGiven { get; set; }
+            public bool MasterGiven { get; set; }
             public string Error { get; set; }
             public bool IsValid => string.IsNullOrEmpty(Error);
+        }
+
+        public class PermImportRow
+        {
+            public int RowNumber { get; set; }
+            public string Sheet { get; set; }
+            public string UserId { get; set; }
+            public string SysId { get; set; }
+            public bool View { get; set; }
+            public bool Add { get; set; }
+            public bool Edit { get; set; }
+            public bool Delete { get; set; }
+            public bool Approve { get; set; }
+            public string Error { get; set; }
+            public bool IsValid => string.IsNullOrEmpty(Error);
+        }
+
+        public class ImportFile
+        {
+            public List<ImportRow> Users { get; } = new List<ImportRow>();
+            public List<PermImportRow> Perms { get; } = new List<PermImportRow>();
         }
 
         private static readonly Dictionary<string, string[]> ImportHeads = new Dictionary<string, string[]>
         {
             ["ID"] = new[] { "USERID", "USRID", "USER", "EMPID", "EMPLOYEEID", "ID", "รหัสพนักงาน", "รหัสผู้ใช้" },
-            ["NAME"] = new[] { "NAME", "FULLNAME", "USERNAME", "EMPLOYEENAME", "ชื่อ", "ชื่อสกุล", "ชื่อนามสกุล" },
+            ["NAME"] = new[] { "FULLNAME", "NAME", "USERNAME", "EMPLOYEENAME", "ชื่อ", "ชื่อสกุล", "ชื่อนามสกุล" },
             ["PWD"] = new[] { "PASSWORD", "PWD", "PASS", "รหัสผ่าน" },
             ["POS"] = new[] { "POSITION", "POS", "ตำแหน่ง" },
             ["DEPT"] = new[] { "DEPARTMENT", "DEPT", "UNIT", "หน่วยงาน" },
             ["SEC"] = new[] { "SECTION", "SEC", "แผนก" },
             ["DIV"] = new[] { "DIVISION", "DIV", "ฝ่าย" },
-            ["LVL"] = new[] { "LEVEL", "LVL", "USERLEVEL", "ระดับ" },
-            ["LOCK"] = new[] { "LOCKED", "LOCK", "STATUS", "สถานะ" }
+            ["LVL"] = new[] { "USERLEVEL", "LEVEL", "LVL", "ระดับ" },
+            ["LOCK"] = new[] { "ISLOCKED", "LOCKED", "LOCK", "STATUS", "สถานะ" },
+            ["MASTER"] = new[] { "ISMASTERADMIN", "MASTERADMIN", "MASTER" }
+        };
+
+        private static readonly Dictionary<string, string[]> PermHeads = new Dictionary<string, string[]>
+        {
+            ["ID"] = new[] { "USERID", "USRID", "USER", "EMPID", "ID" },
+            ["SYS"] = new[] { "SYSTEMID", "SYSID", "SYSTEM", "ระบบ" },
+            ["V"] = new[] { "CANVIEW", "VIEW" },
+            ["A"] = new[] { "CANADD", "ADD" },
+            ["E"] = new[] { "CANEDIT", "EDIT" },
+            ["D"] = new[] { "CANDELETE", "DELETE", "DEL" },
+            ["P"] = new[] { "CANAPPROVE", "APPROVE", "APP" }
         };
 
         private static string Norm(string h) =>
             new string((h ?? "").Where(c => !char.IsWhiteSpace(c) && c != '.' && c != '(' && c != ')' && c != '_' && c != '-' && c != '/').ToArray()).ToUpperInvariant();
 
-        public List<ImportRow> ReadImport(string path)
+        // แถวหัวตาราง (10 แถวแรก) ที่มีคอลัมน์บังคับครบ -> (แถว, คอลัมน์)
+        private static (int Row, Dictionary<string, int> Cols) FindHeader(ClosedXML.Excel.IXLWorksheet ws, Dictionary<string, string[]> heads, params string[] required)
         {
-            var rows = new List<ImportRow>();
+            foreach (var row in ws.RowsUsed().Take(10))
+            {
+                var cols = new Dictionary<string, int>();
+                foreach (var cell in row.CellsUsed())
+                {
+                    string h = Norm(cell.GetString());
+                    foreach (var kv in heads)
+                        if (!cols.ContainsKey(kv.Key) && kv.Value.Contains(h)) { cols[kv.Key] = cell.Address.ColumnNumber; break; }
+                }
+                if (required.All(cols.ContainsKey)) return (row.RowNumber(), cols);
+            }
+            return (0, null);
+        }
+
+        // Y / N, 1 / 0, TRUE / FALSE, ✓ (ว่าง = false) - ค่าอื่น = null (ผิดรูปแบบ)
+        private static bool? Flag(string v)
+        {
+            v = (v ?? "").Trim().ToUpperInvariant();
+            if (v.Length == 0 || v == "N" || v == "NO" || v == "0" || v == "FALSE" || v == "-" || v == "✗") return false;
+            if (v == "Y" || v == "YES" || v == "1" || v == "TRUE" || v == "✓" || v == "/" || v == "X") return true;
+            return null;
+        }
+
+        // รหัสระบบที่ใช้ได้ + รหัสคลังทั้งหมด (ตัวพิมพ์ตามที่โปรแกรมใช้)
+        private List<string> ValidSystemIds()
+        {
+            var ids = Systems.Select(s => s.SysId).ToList();
+            using (var conn = new SqlConnection(_cs))
+            using (var cmd = new SqlCommand("SELECT StockCode FROM CIMS.Stocks", conn))
+            {
+                conn.Open();
+                using (var r = cmd.ExecuteReader()) while (r.Read()) ids.Add(r.GetString(0));
+            }
+            return ids;
+        }
+
+        public ImportFile ReadImport(string path, bool allowMasterAdmin)
+        {
+            var result = new ImportFile();
             var ms = new System.IO.MemoryStream();
             using (var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite)) fs.CopyTo(ms);
             ms.Position = 0;
+            var existing = new HashSet<string>(GetUsers().Select(u => u.UserId), StringComparer.OrdinalIgnoreCase);
+            var seenUser = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenPerm = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var systemIds = ValidSystemIds();
+
             using (var wb = new ClosedXML.Excel.XLWorkbook(ms))
             {
-                var ws = wb.Worksheet(1);
-                var cols = new Dictionary<string, int>(); int header = 0;
-                foreach (var row in ws.RowsUsed().Take(10))
+                foreach (var ws in wb.Worksheets)
                 {
-                    cols.Clear();
-                    foreach (var cell in row.CellsUsed())
-                    {
-                        string h = Norm(cell.GetString());
-                        foreach (var kv in ImportHeads)
-                            if (!cols.ContainsKey(kv.Key) && kv.Value.Contains(h)) { cols[kv.Key] = cell.Address.ColumnNumber; break; }
-                    }
-                    if (cols.ContainsKey("ID") && cols.ContainsKey("NAME")) { header = row.RowNumber(); break; }
-                }
-                if (header == 0) throw new System.IO.InvalidDataException("ไม่พบหัวคอลัมน์ USER ID และ NAME ในไฟล์ Excel (อยู่ใน 10 แถวแรกของชีทแรก)");
-
-                string Get(int r, string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c).GetString().Trim() : "";
-                int last = ws.LastRowUsed()?.RowNumber() ?? header;
-                var existing = new HashSet<string>(GetUsers().Select(u => u.UserId), StringComparer.OrdinalIgnoreCase);
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int r = header + 1; r <= last; r++)
-                {
-                    string id = Get(r, "ID"), name = Get(r, "NAME");
-                    if (id.Length == 0 && name.Length == 0) continue;
-                    var x = new ImportRow { RowNumber = r, Password = Get(r, "PWD") };
-                    string Opt(string k) { string v = Get(r, k); return v.Length == 0 ? null : v; }
-                    x.User = new UserAccount { UserId = id, Name = name, Position = Opt("POS"), Department = Opt("DEPT"), Section = Opt("SEC"), Division = Opt("DIV") };
-
-                    string lv = Get(r, "LVL");
-                    if (lv.Length > 0)
-                    {
-                        x.LevelGiven = true;
-                        if (int.TryParse(lv.Split(' ')[0], out int l) && l >= 1 && l <= 3) x.User.Level = l;
-                        else x.Error = $"LEVEL ต้องเป็น 1 / 2 / 3 ({lv})";
-                    }
-                    string lk = Get(r, "LOCK").ToUpperInvariant();
-                    if (lk.Length > 0)
-                    {
-                        x.LockGiven = true;
-                        if (lk == "1" || lk == "Y" || lk == "YES" || lk == "LOCK" || lk == "LOCKED" || lk == "TRUE") x.User.IsLocked = true;
-                        else if (lk == "0" || lk == "N" || lk == "NO" || lk == "UNLOCK" || lk == "ACTIVE" || lk == "FALSE") x.User.IsLocked = false;
-                        else x.Error ??= $"LOCKED ไม่ถูกต้อง ({lk}) - ใส่ 1 / 0";
-                    }
-
-                    if (x.Error != null) { }
-                    else if (id.Length == 0) x.Error = "ไม่มี USER ID";
-                    else if (id.Length > 20) x.Error = "USER ID ยาวเกิน 20 ตัวอักษร";
-                    else if (name.Length == 0) x.Error = "ไม่มี NAME";
-                    else if (!seen.Add(id)) x.Error = "USER ID ซ้ำกับแถวก่อนหน้าในไฟล์";
-                    else
-                    {
-                        x.IsNew = !existing.Contains(id);
-                        if (x.IsNew && string.IsNullOrEmpty(x.Password)) x.Error = "ผู้ใช้ใหม่ต้องมี PASSWORD";
-                    }
-                    rows.Add(x);
+                    var perm = FindHeader(ws, PermHeads, "ID", "SYS");
+                    if (perm.Row > 0) { ReadPermSheet(ws, perm.Row, perm.Cols, result, systemIds, seenPerm); continue; }
+                    var user = FindHeader(ws, ImportHeads, "ID", "NAME");
+                    if (user.Row > 0) ReadUserSheet(ws, user.Row, user.Cols, result, existing, seenUser, allowMasterAdmin);
                 }
             }
-            return rows;
+            if (result.Users.Count == 0 && result.Perms.Count == 0)
+                throw new System.IO.InvalidDataException("ไม่พบหัวคอลัมน์ในไฟล์ Excel\n\nชีทผู้ใช้: USERID + FULLNAME\nชีทสิทธิ์: USERID + SYSTEMID\n(หัวคอลัมน์อยู่ใน 10 แถวแรกของชีท)");
+
+            // ผู้ใช้ในชีทสิทธิ์ต้องมีอยู่แล้ว หรือเพิ่มใหม่จากชีทผู้ใช้ในไฟล์เดียวกัน
+            var newIds = new HashSet<string>(result.Users.Where(u => u.IsValid && u.IsNew).Select(u => u.User.UserId), StringComparer.OrdinalIgnoreCase);
+            foreach (var p in result.Perms.Where(p => p.IsValid))
+                if (!existing.Contains(p.UserId) && !newIds.Contains(p.UserId)) p.Error = $"ไม่พบ USERID {p.UserId} ในระบบ (และไม่ได้เพิ่มในชีทผู้ใช้)";
+            return result;
         }
 
-        public (int Added, int Updated) ApplyImport(List<ImportRow> rows)
+        private void ReadUserSheet(ClosedXML.Excel.IXLWorksheet ws, int header, Dictionary<string, int> cols, ImportFile result,
+                                   HashSet<string> existing, HashSet<string> seen, bool allowMasterAdmin)
         {
-            int add = 0, upd = 0;
+            string Get(int r, string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c).GetString().Trim() : "";
+            int last = ws.LastRowUsed()?.RowNumber() ?? header;
+            for (int r = header + 1; r <= last; r++)
+            {
+                string id = Get(r, "ID"), name = Get(r, "NAME");
+                if (id.Length == 0 && name.Length == 0) continue;
+                var x = new ImportRow { RowNumber = r, Sheet = ws.Name, Password = Get(r, "PWD") };
+                string Opt(string k) { string v = Get(r, k); return v.Length == 0 ? null : v; }
+                x.User = new UserAccount { UserId = id, Name = name, Position = Opt("POS"), Department = Opt("DEPT"), Section = Opt("SEC"), Division = Opt("DIV") };
+
+                string lv = Get(r, "LVL");
+                if (lv.Length > 0)
+                {
+                    x.LevelGiven = true;
+                    if (int.TryParse(lv.Split(' ')[0], out int l) && l >= 1 && l <= 3) x.User.Level = l;
+                    else x.Error = $"USERLEVEL ต้องเป็น 1 / 2 / 3 ({lv})";
+                }
+                string lk = Get(r, "LOCK");
+                if (lk.Length > 0)
+                {
+                    x.LockGiven = true;
+                    string u = lk.ToUpperInvariant();
+                    bool? f = u == "LOCK" || u == "LOCKED" ? true : u == "UNLOCK" || u == "ACTIVE" ? false : Flag(lk);
+                    if (f.HasValue) x.User.IsLocked = f.Value; else x.Error ??= $"ISLOCKED ไม่ถูกต้อง ({lk}) - ใส่ 1 / 0";
+                }
+                string ma = Get(r, "MASTER");
+                if (ma.Length > 0)
+                {
+                    bool? f = Flag(ma);
+                    if (!f.HasValue) x.Error ??= $"ISMASTERADMIN ไม่ถูกต้อง ({ma}) - ใส่ 1 / 0";
+                    else if (f.Value && !allowMasterAdmin) x.Error ??= "ISMASTERADMIN = 1 นำเข้าได้เฉพาะผู้ดูแลระบบ Level 1";
+                    else { x.MasterGiven = allowMasterAdmin; x.User.IsMasterAdmin = f.Value; }
+                }
+
+                if (x.Error != null) { }
+                else if (id.Length == 0) x.Error = "ไม่มี USERID";
+                else if (id.Length > 20) x.Error = "USERID ยาวเกิน 20 ตัวอักษร";
+                else if (name.Length == 0) x.Error = "ไม่มี FULLNAME";
+                else if (!seen.Add(id)) x.Error = "USERID ซ้ำกับแถวก่อนหน้าในไฟล์";
+                else
+                {
+                    x.IsNew = !existing.Contains(id);
+                    if (x.IsNew && string.IsNullOrEmpty(x.Password)) x.Error = "ผู้ใช้ใหม่ต้องมี PASSWORD";
+                }
+                result.Users.Add(x);
+            }
+        }
+
+        private static void ReadPermSheet(ClosedXML.Excel.IXLWorksheet ws, int header, Dictionary<string, int> cols, ImportFile result,
+                                          List<string> systemIds, HashSet<string> seen)
+        {
+            string Get(int r, string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c).GetString().Trim() : "";
+            int last = ws.LastRowUsed()?.RowNumber() ?? header;
+            for (int r = header + 1; r <= last; r++)
+            {
+                string id = Get(r, "ID"), sys = Get(r, "SYS");
+                if (id.Length == 0 && sys.Length == 0) continue;
+                var p = new PermImportRow { RowNumber = r, Sheet = ws.Name, UserId = id };
+                bool? v = Flag(Get(r, "V")), a = Flag(Get(r, "A")), e = Flag(Get(r, "E")), d = Flag(Get(r, "D")), ap = Flag(Get(r, "P"));
+                string canon = systemIds.FirstOrDefault(s => string.Equals(s, sys, StringComparison.OrdinalIgnoreCase));
+
+                if (id.Length == 0) p.Error = "ไม่มี USERID";
+                else if (sys.Length == 0) p.Error = "ไม่มี SYSTEMID";
+                else if (canon == null) p.Error = $"ไม่รู้จัก SYSTEMID \"{sys}\"";
+                else if (v == null || a == null || e == null || d == null || ap == null) p.Error = "ค่าสิทธิ์ต้องเป็น Y / N หรือ 1 / 0";
+                else if (!seen.Add(id + "|" + canon)) p.Error = "USERID + SYSTEMID ซ้ำกับแถวก่อนหน้าในไฟล์";
+                p.SysId = canon ?? sys;
+                p.View = v == true; p.Add = a == true; p.Edit = e == true; p.Delete = d == true; p.Approve = ap == true;
+                result.Perms.Add(p);
+            }
+        }
+
+        // นำเข้าทั้งไฟล์ใน Transaction เดียว: ผู้ใช้ก่อน (Trigger ให้สิทธิ์เริ่มต้นกับผู้ใช้ใหม่) แล้วค่อยตั้งสิทธิ์ตามชีทสิทธิ์
+        public (int Added, int Updated, int Perms) ApplyImport(ImportFile file)
+        {
+            int add = 0, upd = 0, perms = 0;
             using (var conn = new SqlConnection(_cs))
             {
                 conn.Open();
                 using (var tr = conn.BeginTransaction())
                 {
-                    foreach (var x in rows.Where(r => r.IsValid))
+                    foreach (var x in file.Users.Where(r => r.IsValid))
                     {
                         string sql = x.IsNew
-                            ? @"INSERT INTO MST_USER (USR_ID, USR_PWD, USR_NAME, USR_POS, USR_DEPT, USR_SECTION, USR_DIVISION, USR_LVL, IS_ONLINE, IS_LOCKED, IS_MASTER_ADMIN)
-                                VALUES (@u, @p, @n, @pos, @d, @sec, @div, @l, 0, @lock, 0)"
-                            : @"UPDATE MST_USER SET USR_NAME = @n, USR_POS = ISNULL(@pos, USR_POS), USR_DEPT = ISNULL(@d, USR_DEPT),
-                                       USR_SECTION = ISNULL(@sec, USR_SECTION), USR_DIVISION = ISNULL(@div, USR_DIVISION),
-                                       USR_LVL = CASE WHEN @lg = 1 THEN @l ELSE USR_LVL END, IS_LOCKED = CASE WHEN @kg = 1 THEN @lock ELSE IS_LOCKED END,
-                                       USR_PWD = CASE WHEN @p IS NULL THEN USR_PWD ELSE @p END
-                                WHERE USR_ID = @u";
+                            ? @"INSERT INTO CIMS.Users (UserID, Password, FullName, Position, Department, Section, Division, UserLevel, IsOnline, IsLocked, IsMasterAdmin)
+                                VALUES (@u, @p, @n, @pos, @d, @sec, @div, @l, 0, @lock, @ma)"
+                            : @"UPDATE CIMS.Users SET FullName = @n, Position = ISNULL(@pos, Position), Department = ISNULL(@d, Department),
+                                       Section = ISNULL(@sec, Section), Division = ISNULL(@div, Division),
+                                       UserLevel = CASE WHEN @lg = 1 THEN @l ELSE UserLevel END, IsLocked = CASE WHEN @kg = 1 THEN @lock ELSE IsLocked END,
+                                       IsMasterAdmin = CASE WHEN @mg = 1 THEN @ma ELSE IsMasterAdmin END,
+                                       Password = CASE WHEN @p IS NULL THEN Password ELSE @p END
+                                WHERE UserID = @u";
                         using (var cmd = new SqlCommand(sql, conn, tr))
                         {
                             Fill(cmd, x.User);
                             cmd.Parameters.AddWithValue("@p", string.IsNullOrEmpty(x.Password) ? (object)DBNull.Value : x.Password);
                             cmd.Parameters.AddWithValue("@lg", x.LevelGiven ? 1 : 0);
                             cmd.Parameters.AddWithValue("@kg", x.LockGiven ? 1 : 0);
+                            cmd.Parameters.AddWithValue("@mg", x.MasterGiven ? 1 : 0);
+                            cmd.Parameters.AddWithValue("@ma", x.MasterGiven && x.User.IsMasterAdmin ? 1 : 0);
                             cmd.ExecuteNonQuery();
                         }
                         if (x.IsNew) add++; else upd++;
                     }
+
+                    foreach (var p in file.Perms.Where(r => r.IsValid))
+                    {
+                        using (var cmd = new SqlCommand(@"
+                            DELETE FROM CIMS.Permissions WHERE UserID = @u AND SystemID = @s COLLATE Latin1_General_CI_AS AND SystemID <> @s COLLATE Latin1_General_CS_AS;
+                            IF EXISTS (SELECT 1 FROM CIMS.Permissions WHERE UserID = @u AND SystemID = @s)
+                                UPDATE CIMS.Permissions SET CanView = @v, CanAdd = @a, CanEdit = @e, CanDelete = @d, CanApprove = @ap WHERE UserID = @u AND SystemID = @s;
+                            ELSE
+                                INSERT INTO CIMS.Permissions (UserID, SystemID, CanView, CanAdd, CanEdit, CanDelete, CanApprove) VALUES (@u, @s, @v, @a, @e, @d, @ap);", conn, tr))
+                        {
+                            string YN(bool b) => b ? "Y" : "N";
+                            cmd.Parameters.AddWithValue("@u", p.UserId);
+                            cmd.Parameters.AddWithValue("@s", p.SysId);
+                            cmd.Parameters.AddWithValue("@v", YN(p.View));
+                            cmd.Parameters.AddWithValue("@a", YN(p.Add));
+                            cmd.Parameters.AddWithValue("@e", YN(p.Edit));
+                            cmd.Parameters.AddWithValue("@d", YN(p.Delete));
+                            cmd.Parameters.AddWithValue("@ap", YN(p.Approve));
+                            cmd.ExecuteNonQuery();
+                        }
+                        perms++;
+                    }
                     tr.Commit();
                 }
             }
-            return (add, upd);
+            return (add, upd, perms);
+        }
+
+        // 📄 แบบฟอร์ม Import: ชีท USERS + ชีท PERMISSIONS (ตัวอย่าง 1 แถว) + ชีท SYSTEM IDS (รหัสที่ใช้ได้)
+        public void CreateImportTemplate(string path)
+        {
+            using (var wb = new ClosedXML.Excel.XLWorkbook())
+            {
+                void Head(ClosedXML.Excel.IXLWorksheet ws, string[] heads)
+                {
+                    for (int i = 0; i < heads.Length; i++) ws.Cell(1, i + 1).Value = heads[i];
+                    var rng = ws.Range(1, 1, 1, heads.Length);
+                    rng.Style.Font.Bold = true; rng.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                    rng.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#6750A4");
+                }
+                var u = wb.AddWorksheet("USERS");
+                Head(u, new[] { "NO", "USERID", "PASSWORD", "FULLNAME", "DIVISION", "DEPARTMENT", "SECTION", "POSITION", "USERLEVEL", "ISONLINE", "ISLOCKED", "ISMASTERADMIN" });
+                object[] ex = { 1, "EMP001", "1234", "Example Name", "Production", "Store", "Store PC", "Staff", 2, 0, 0, 0 };
+                for (int i = 0; i < ex.Length; i++) u.Cell(2, i + 1).Value = ClosedXML.Excel.XLCellValue.FromObject(ex[i]);
+                u.Columns().AdjustToContents();
+
+                var p = wb.AddWorksheet("PERMISSIONS");
+                Head(p, new[] { "NO", "USERID", "SYSTEMID", "CANVIEW", "CANADD", "CANEDIT", "CANDELETE", "CANAPPROVE" });
+                object[] pe = { 1, "EMP001", "MultiScanner", "Y", "Y", "N", "N", "N" };
+                for (int i = 0; i < pe.Length; i++) p.Cell(2, i + 1).Value = ClosedXML.Excel.XLCellValue.FromObject(pe[i]);
+                p.Columns().AdjustToContents();
+
+                var s = wb.AddWorksheet("SYSTEM IDS");
+                Head(s, new[] { "SYSTEMID", "SYSTEM", "VIEW / ADD / EDIT / DEL / APPROVE" });
+                int row = 2;
+                foreach (var sys in Systems) { s.Cell(row, 1).Value = sys.SysId; s.Cell(row, 2).Value = sys.Title; s.Cell(row, 3).Value = sys.Hint; row++; }
+                foreach (var code in ValidSystemIds().Skip(Systems.Length)) { s.Cell(row, 1).Value = code; s.Cell(row, 2).Value = "Stock"; s.Cell(row, 3).Value = "VIEW = see the stock  •  ADD = import excel  •  EDIT = edit Max / Min / Qty"; row++; }
+                s.Columns().AdjustToContents();
+                wb.SaveAs(path);
+            }
         }
 
         // ลบผู้ใช้: มีประวัติในระบบ (สแกน / PR / Log) -> ลบไม่ได้ คืนข้อความบอกเหตุผล (แนะนำให้ LOCK แทน)
@@ -299,9 +477,9 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_cs))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand(@"SELECT (SELECT COUNT(*) FROM TRN_SCAN WHERE USR_ID = @u),
-                                                         (SELECT COUNT(*) FROM TRN_PR_H WHERE USR_ID = @u),
-                                                         (SELECT COUNT(*) FROM SYS_LOGS WHERE USR_ID = @u)", conn))
+                using (var cmd = new SqlCommand(@"SELECT (SELECT COUNT(*) FROM CIMS.ScanTransactions WHERE UserID = @u),
+                                                         (SELECT COUNT(*) FROM CIMS.PRHeaders WHERE UserID = @u),
+                                                         (SELECT COUNT(*) FROM CIMS.SystemLogs WHERE UserID = @u)", conn))
                 {
                     cmd.Parameters.AddWithValue("@u", userId);
                     using (var r = cmd.ExecuteReader())
@@ -315,9 +493,9 @@ namespace CIMS.Services
                 }
                 using (var tr = conn.BeginTransaction())
                 {
-                    using (var cmd = new SqlCommand(@"UPDATE SYS_LOGS SET USR_ID = NULL WHERE USR_ID = @u;
-                                                      DELETE FROM MST_PERM WHERE USR_ID = @u;
-                                                      DELETE FROM MST_USER WHERE USR_ID = @u;", conn, tr))
+                    using (var cmd = new SqlCommand(@"UPDATE CIMS.SystemLogs SET UserID = NULL WHERE UserID = @u;
+                                                      DELETE FROM CIMS.Permissions WHERE UserID = @u;
+                                                      DELETE FROM CIMS.Users WHERE UserID = @u;", conn, tr))
                     {
                         cmd.Parameters.AddWithValue("@u", userId);
                         cmd.ExecuteNonQuery();
@@ -328,7 +506,7 @@ namespace CIMS.Services
             }
         }
 
-        // สิทธิ์ของผู้ใช้ทุกระบบ + ทุกคลัง (ไม่มีแถว = ไม่มีสิทธิ์) - เทียบ SYS_ID แบบไม่สนตัวพิมพ์ (ข้อมูลเก่าเช่น Dashboard / MaxMinCalc)
+        // สิทธิ์ของผู้ใช้ทุกระบบ + ทุกคลัง (ไม่มีแถว = ไม่มีสิทธิ์) - เทียบ SystemID แบบไม่สนตัวพิมพ์ (ข้อมูลเก่าเช่น Dashboard / MaxMinCalc)
         public List<UserPermRow> GetPermissions(string userId)
         {
             var have = new Dictionary<string, (bool v, bool a, bool e, bool d, bool ap)>(StringComparer.OrdinalIgnoreCase);
@@ -336,7 +514,7 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_cs))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand("SELECT SYS_ID, PERM_VIEW, PERM_ADD, PERM_EDIT, PERM_DEL, PERM_APP FROM MST_PERM WHERE USR_ID = @u", conn))
+                using (var cmd = new SqlCommand("SELECT SystemID, CanView, CanAdd, CanEdit, CanDelete, CanApprove FROM CIMS.Permissions WHERE UserID = @u", conn))
                 {
                     cmd.Parameters.AddWithValue("@u", userId);
                     using (var r = cmd.ExecuteReader())
@@ -346,9 +524,9 @@ namespace CIMS.Services
                             have[r.GetString(0)] = (Y(1), Y(2), Y(3), Y(4), Y(5));
                         }
                 }
-                using (var cmd = new SqlCommand("SELECT STK_CODE, STK_NAME FROM MST_STOCK ORDER BY IS_MAIN DESC, SORT_NO, STK_CODE", conn))
+                using (var cmd = new SqlCommand("SELECT StockCode, StockName FROM CIMS.Stocks ORDER BY IsMain DESC, SortNo, StockCode", conn))
                 using (var r = cmd.ExecuteReader())
-                    while (r.Read()) stocks.Add((r.GetString(0), r["STK_NAME"]?.ToString()));
+                    while (r.Read()) stocks.Add((r.GetString(0), r["StockName"]?.ToString()));
             }
 
             UserPermRow Row(string id, string title, string group, string hint)
@@ -364,7 +542,7 @@ namespace CIMS.Services
             return list;
         }
 
-        // บันทึกสิทธิ์ทั้งหมดของผู้ใช้ (แถวเดิมที่ SYS_ID ต่างกันแค่ตัวพิมพ์ ถูกแทนด้วยค่าที่โปรแกรมใช้)
+        // บันทึกสิทธิ์ทั้งหมดของผู้ใช้ (แถวเดิมที่ SystemID ต่างกันแค่ตัวพิมพ์ ถูกแทนด้วยค่าที่โปรแกรมใช้)
         public void SavePermissions(string userId, IEnumerable<UserPermRow> rows)
         {
             using (var conn = new SqlConnection(_cs))
@@ -375,11 +553,11 @@ namespace CIMS.Services
                     foreach (var p in rows)
                     {
                         using (var cmd = new SqlCommand(@"
-                            DELETE FROM MST_PERM WHERE USR_ID = @u AND SYS_ID = @s COLLATE Latin1_General_CI_AS AND SYS_ID <> @s COLLATE Latin1_General_CS_AS;
-                            IF EXISTS (SELECT 1 FROM MST_PERM WHERE USR_ID = @u AND SYS_ID = @s)
-                                UPDATE MST_PERM SET PERM_VIEW = @v, PERM_ADD = @a, PERM_EDIT = @e, PERM_DEL = @d, PERM_APP = @ap WHERE USR_ID = @u AND SYS_ID = @s;
+                            DELETE FROM CIMS.Permissions WHERE UserID = @u AND SystemID = @s COLLATE Latin1_General_CI_AS AND SystemID <> @s COLLATE Latin1_General_CS_AS;
+                            IF EXISTS (SELECT 1 FROM CIMS.Permissions WHERE UserID = @u AND SystemID = @s)
+                                UPDATE CIMS.Permissions SET CanView = @v, CanAdd = @a, CanEdit = @e, CanDelete = @d, CanApprove = @ap WHERE UserID = @u AND SystemID = @s;
                             ELSE
-                                INSERT INTO MST_PERM (USR_ID, SYS_ID, PERM_VIEW, PERM_ADD, PERM_EDIT, PERM_DEL, PERM_APP) VALUES (@u, @s, @v, @a, @e, @d, @ap);", conn, tr))
+                                INSERT INTO CIMS.Permissions (UserID, SystemID, CanView, CanAdd, CanEdit, CanDelete, CanApprove) VALUES (@u, @s, @v, @a, @e, @d, @ap);", conn, tr))
                         {
                             string YN(bool b) => b ? "Y" : "N";
                             cmd.Parameters.AddWithValue("@u", userId);

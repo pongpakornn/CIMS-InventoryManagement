@@ -333,8 +333,8 @@ namespace CIMS.ViewModels
         {
             _refreshTimer = new DispatcherTimer();
             // 🕒 เดิมตั้ง 0 วินาที = ยิง Query วนไม่หยุดบน UI Thread (แม้ออกจากหน้า Dashboard แล้ว) ทำให้ระบบค้าง
-            // ~30 วินาทีเวลามีการบันทึกข้อมูล MST_PART พร้อมกัน -> ตั้ง 10 วินาทีตามที่คอมเมนต์เดิมตั้งใจไว้
-            _refreshTimer.Interval = TimeSpan.FromSeconds(10);
+            // ~30 วินาทีเวลามีการบันทึกข้อมูล CIMS.Parts พร้อมกัน -> รีเฟรชทุก 5 วินาที (Query เบื้องหลัง ไม่ขวางหน้าจอ)
+            _refreshTimer.Interval = TimeSpan.FromSeconds(5);
             _refreshTimer.Tick += RefreshTimer_Tick;
             _refreshTimer.Start();
         }

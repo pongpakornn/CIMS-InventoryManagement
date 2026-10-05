@@ -89,7 +89,7 @@
 
 //            string finalSearchCode = inputCode.Trim();
 
-//            // ✅ เก็บบาร์โค้ดดิบ "ทั้งชุด" ไว้ก่อนตัดส่วนหัวออก เพื่อบันทึกลง REF_NO
+//            // ✅ เก็บบาร์โค้ดดิบ "ทั้งชุด" ไว้ก่อนตัดส่วนหัวออก เพื่อบันทึกลง ReferenceNo
 //            string rawBarcodeFull = finalSearchCode;
 
 //            string uid = CurrentUser.UserId;
@@ -127,7 +127,7 @@
 //                    // ใช้ค่า part.Qty จากฐานข้อมูลตรงๆ โดยแปลง Type เป็น int เพื่อส่งเข้าฟังก์ชันจ่ายออก
 //                    int originalQty = (int)part.Qty;
 
-//                    // ✅ ยิงอัปเดตสต็อกออกคลังสินค้า พร้อมส่ง rawBarcodeFull เข้าไปบันทึกลง REF_NO
+//                    // ✅ ยิงอัปเดตสต็อกออกคลังสินค้า พร้อมส่ง rawBarcodeFull เข้าไปบันทึกลง ReferenceNo
 //                    bool isSaved = _scanService.UpdateStockOut(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull);
 
 //                    if (isSaved)

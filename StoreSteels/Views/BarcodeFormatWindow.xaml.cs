@@ -12,7 +12,7 @@ using System.Windows.Media;
 
 namespace CIMS.Views
 {
-    // จัดการรูปแบบป้ายบาร์โค้ด Supplier (MST_BARCODE_FMT) - ใช้ร่วมกันได้หลายคลัง
+    // จัดการรูปแบบป้ายบาร์โค้ด Supplier (CIMS.BarcodeFormats) - ใช้ร่วมกันได้หลายคลัง
     public partial class BarcodeFormatWindow : Window
     {
         private static readonly Regex DigitsOnly = new Regex("^[0-9]+$");

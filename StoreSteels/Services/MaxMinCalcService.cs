@@ -24,16 +24,16 @@ namespace CIMS.Services
             var list = new List<MaxMinCalcRow>();
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(@"
-                SELECT v.PT_ID, ISNULL(p.PT_CUST, '') AS CUST, p.PT_CODE, ISNULL(p.PT_PARTA, '') AS PARTA, ISNULL(p.PT_PARTNO, '') AS PARTNO,
-                       p.PT_DESC, ISNULL(p.PT_PSZ, 0) AS PSZ, c.DAY_MAX, c.DAY_MIN, ISNULL(v.[Max], 0) AS QMAX, ISNULL(v.[Min], 0) AS QMIN
-                FROM VW_StockMonitoring v
-                JOIN MST_PART p ON p.PT_ID = v.PT_ID
-                LEFT JOIN MST_CALC_CONFIG c ON c.STK_ID = v.StkId AND c.PT_ID = v.PT_ID
+                SELECT v.PartID, ISNULL(p.Customer, '') AS CUST, p.PartCode, ISNULL(p.PartA, '') AS PARTA, ISNULL(p.PartNumber, '') AS PARTNO,
+                       p.Description, ISNULL(p.PackSize, 0) AS PSZ, c.MaxDays, c.MinDays, ISNULL(v.[Max], 0) AS QMAX, ISNULL(v.[Min], 0) AS QMIN
+                FROM CIMS.vw_StockMonitoring v
+                JOIN CIMS.Parts p ON p.PartID = v.PartID
+                LEFT JOIN CIMS.MaxMinPartConfigs c ON c.StockID = v.StkId AND c.PartID = v.PartID
                 WHERE v.StkId = @stk
-                  AND (@key = '' OR p.PT_CODE LIKE '%' + @key + '%' OR p.PT_DESC LIKE '%' + @key + '%'
-                       OR ISNULL(p.PT_PARTNO, '') LIKE '%' + @key + '%' OR ISNULL(p.PT_PARTA, '') LIKE '%' + @key + '%'
-                       OR ISNULL(p.PT_CUST, '') LIKE '%' + @key + '%')
-                ORDER BY ISNULL(NULLIF(p.PT_CUST, ''), '-'), ISNULL(NULLIF(p.PT_PARTNO, ''), p.PT_CODE)", conn))
+                  AND (@key = '' OR p.PartCode LIKE '%' + @key + '%' OR p.Description LIKE '%' + @key + '%'
+                       OR ISNULL(p.PartNumber, '') LIKE '%' + @key + '%' OR ISNULL(p.PartA, '') LIKE '%' + @key + '%'
+                       OR ISNULL(p.Customer, '') LIKE '%' + @key + '%')
+                ORDER BY ISNULL(NULLIF(p.Customer, ''), '-'), ISNULL(NULLIF(p.PartNumber, ''), p.PartCode)", conn))
             {
                 cmd.Parameters.AddWithValue("@stk", stock.StkId);
                 cmd.Parameters.AddWithValue("@key", (keyword ?? "").Trim());
@@ -42,19 +42,19 @@ namespace CIMS.Services
                 {
                     while (r.Read())
                     {
-                        bool own = r["DAY_MAX"] != DBNull.Value || r["DAY_MIN"] != DBNull.Value;
+                        bool own = r["MaxDays"] != DBNull.Value || r["MinDays"] != DBNull.Value;
                         list.Add(new MaxMinCalcRow
                         {
-                            PtId = Convert.ToInt32(r["PT_ID"]),
+                            PtId = Convert.ToInt32(r["PartID"]),
                             Customer = r["CUST"].ToString().Trim(),
-                            PartCode = r["PT_CODE"].ToString(),
+                            PartCode = r["PartCode"].ToString(),
                             PartA = r["PARTA"].ToString(),
                             PartNoRaw = r["PARTNO"].ToString(),
-                            PartName = r["PT_DESC"].ToString(),
+                            PartName = r["Description"].ToString(),
                             PackSize = Convert.ToInt32(r["PSZ"]),
                             HasOwnDays = own,
-                            DayMax = r["DAY_MAX"] != DBNull.Value ? Convert.ToInt32(r["DAY_MAX"]) : formula.DefDayMax,
-                            DayMin = r["DAY_MIN"] != DBNull.Value ? Convert.ToInt32(r["DAY_MIN"]) : formula.DefDayMin,
+                            DayMax = r["MaxDays"] != DBNull.Value ? Convert.ToInt32(r["MaxDays"]) : formula.DefDayMax,
+                            DayMin = r["MinDays"] != DBNull.Value ? Convert.ToInt32(r["MinDays"]) : formula.DefDayMin,
                             QtyMax = Convert.ToInt32(r["QMAX"]),
                             QtyMin = Convert.ToInt32(r["QMIN"])
                         });
@@ -77,10 +77,10 @@ namespace CIMS.Services
         private static void UpsertDays(SqlConnection conn, SqlTransaction tr, int stkId, int ptId, string cust, string partCode, int dayMax, int dayMin, string userId)
         {
             using (var cmd = new SqlCommand(@"
-                MERGE MST_CALC_CONFIG AS t
-                USING (SELECT @s AS STK_ID, @p AS PT_ID) AS s ON t.STK_ID = s.STK_ID AND t.PT_ID = s.PT_ID
-                WHEN MATCHED THEN UPDATE SET DAY_MAX = @dmax, DAY_MIN = @dmin, CUST_CODE = @c, UPDATE_BY = @u, UPDATE_DATE = GETDATE()
-                WHEN NOT MATCHED THEN INSERT (STK_ID, PT_ID, CUST_CODE, PT_ACODE, DAY_MAX, DAY_MIN, UPDATE_BY, UPDATE_DATE)
+                MERGE CIMS.MaxMinPartConfigs AS t
+                USING (SELECT @s AS StockID, @p AS PartID) AS s ON t.StockID = s.StockID AND t.PartID = s.PartID
+                WHEN MATCHED THEN UPDATE SET MaxDays = @dmax, MinDays = @dmin, CustomerCode = @c, UpdatedBy = @u, UpdatedDate = GETDATE()
+                WHEN NOT MATCHED THEN INSERT (StockID, PartID, CustomerCode, PartACode, MaxDays, MinDays, UpdatedBy, UpdatedDate)
                                       VALUES (@s, @p, @c, @a, @dmax, @dmin, @u, GETDATE());", conn, tr))
             {
                 cmd.Parameters.AddWithValue("@s", stkId);
@@ -98,8 +98,8 @@ namespace CIMS.Services
         public void ResetMaxMin(StockModel stock, int ptId)
         {
             string sql = stock.IsMain
-                ? "UPDATE MST_PART SET QTY_MAX = 0, QTY_MIN = 0 WHERE PT_ID = @p"
-                : "UPDATE MST_PART_STOCK SET QTY_MAX = 0, QTY_MIN = 0, UPDATED_DATE = GETDATE() WHERE STK_ID = @s AND PT_ID = @p";
+                ? "UPDATE CIMS.Parts SET MaxQuantity = 0, MinQuantity = 0 WHERE PartID = @p"
+                : "UPDATE CIMS.PartStocks SET MaxQuantity = 0, MinQuantity = 0, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p";
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(sql, conn))
             {
@@ -118,21 +118,21 @@ namespace CIMS.Services
         {
             var list = new List<MaxMinFormula>();
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT * FROM MST_CALC_FORMULA ORDER BY IS_DEFAULT DESC, FORMULA_NAME", conn))
+            using (var cmd = new SqlCommand("SELECT * FROM CIMS.MaxMinFormulas ORDER BY IsDefault DESC, FormulaName", conn))
             {
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
                     while (r.Read())
                         list.Add(new MaxMinFormula
                         {
-                            FormulaId = Convert.ToInt32(r["FORMULA_ID"]),
-                            Name = r["FORMULA_NAME"].ToString(),
-                            IsDefault = Convert.ToBoolean(r["IS_DEFAULT"]),
-                            QtySource = r["QTY_SOURCE"].ToString(),
-                            RoundMode = r["ROUND_MODE"].ToString(),
-                            DefDayMax = Convert.ToInt32(r["DEF_DAY_MAX"]),
-                            DefDayMin = Convert.ToInt32(r["DEF_DAY_MIN"]),
-                            DefWorkdays = Convert.ToInt32(r["DEF_WORKDAYS"])
+                            FormulaId = Convert.ToInt32(r["FormulaID"]),
+                            Name = r["FormulaName"].ToString(),
+                            IsDefault = Convert.ToBoolean(r["IsDefault"]),
+                            QtySource = r["QuantitySource"].ToString(),
+                            RoundMode = r["RoundMode"].ToString(),
+                            DefDayMax = Convert.ToInt32(r["DefaultMaxDays"]),
+                            DefDayMin = Convert.ToInt32(r["DefaultMinDays"]),
+                            DefWorkdays = Convert.ToInt32(r["DefaultWorkdays"])
                         });
             }
             return list;
@@ -141,7 +141,7 @@ namespace CIMS.Services
         public bool IsFormulaNameTaken(string name, int exceptId)
         {
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT COUNT(*) FROM MST_CALC_FORMULA WHERE FORMULA_NAME = @n AND FORMULA_ID <> @id", conn))
+            using (var cmd = new SqlCommand("SELECT COUNT(*) FROM CIMS.MaxMinFormulas WHERE FormulaName = @n AND FormulaID <> @id", conn))
             {
                 cmd.Parameters.AddWithValue("@n", name);
                 cmd.Parameters.AddWithValue("@id", exceptId);
@@ -150,14 +150,14 @@ namespace CIMS.Services
             }
         }
 
-        // เพิ่ม (FormulaId = 0) / แก้ไขสูตร -> คืน FORMULA_ID
+        // เพิ่ม (FormulaId = 0) / แก้ไขสูตร -> คืน FormulaID
         public int SaveFormula(MaxMinFormula f, string userId)
         {
             string sql = f.FormulaId == 0
-                ? @"INSERT INTO MST_CALC_FORMULA (FORMULA_NAME, QTY_SOURCE, ROUND_MODE, DEF_DAY_MAX, DEF_DAY_MIN, DEF_WORKDAYS, IS_DEFAULT, UPDATED_BY, UPDATED_DATE)
+                ? @"INSERT INTO CIMS.MaxMinFormulas (FormulaName, QuantitySource, RoundMode, DefaultMaxDays, DefaultMinDays, DefaultWorkdays, IsDefault, UpdatedBy, UpdatedDate)
                     VALUES (@n, @q, @rm, @dmax, @dmin, @wd, 0, @u, GETDATE()); SELECT CAST(SCOPE_IDENTITY() AS INT);"
-                : @"UPDATE MST_CALC_FORMULA SET FORMULA_NAME = @n, QTY_SOURCE = @q, ROUND_MODE = @rm, DEF_DAY_MAX = @dmax, DEF_DAY_MIN = @dmin,
-                           DEF_WORKDAYS = @wd, UPDATED_BY = @u, UPDATED_DATE = GETDATE() WHERE FORMULA_ID = @id; SELECT @id;";
+                : @"UPDATE CIMS.MaxMinFormulas SET FormulaName = @n, QuantitySource = @q, RoundMode = @rm, DefaultMaxDays = @dmax, DefaultMinDays = @dmin,
+                           DefaultWorkdays = @wd, UpdatedBy = @u, UpdatedDate = GETDATE() WHERE FormulaID = @id; SELECT @id;";
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(sql, conn))
             {
@@ -181,13 +181,13 @@ namespace CIMS.Services
             {
                 conn.Open();
                 var used = new List<string>();
-                using (var cmd = new SqlCommand("SELECT s.STK_CODE FROM MST_CALC_STOCK c JOIN MST_STOCK s ON s.STK_ID = c.STK_ID WHERE c.FORMULA_ID = @id", conn))
+                using (var cmd = new SqlCommand("SELECT s.StockCode FROM CIMS.MaxMinStockSettings c JOIN CIMS.Stocks s ON s.StockID = c.StockID WHERE c.FormulaID = @id", conn))
                 {
                     cmd.Parameters.AddWithValue("@id", formulaId);
                     using (var r = cmd.ExecuteReader()) while (r.Read()) used.Add(r[0].ToString());
                 }
                 if (used.Count > 0) return used;
-                using (var cmd = new SqlCommand("DELETE FROM MST_CALC_FORMULA WHERE FORMULA_ID = @id AND IS_DEFAULT = 0", conn))
+                using (var cmd = new SqlCommand("DELETE FROM CIMS.MaxMinFormulas WHERE FormulaID = @id AND IsDefault = 0", conn))
                 {
                     cmd.Parameters.AddWithValue("@id", formulaId);
                     cmd.ExecuteNonQuery();
@@ -200,7 +200,7 @@ namespace CIMS.Services
         {
             var s = new StockCalcSetting { StkId = stkId };
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT FORMULA_ID, AUTO_CALC, LAST_CALC FROM MST_CALC_STOCK WHERE STK_ID = @s", conn))
+            using (var cmd = new SqlCommand("SELECT FormulaID, AutoCalc, LastCalc FROM CIMS.MaxMinStockSettings WHERE StockID = @s", conn))
             {
                 cmd.Parameters.AddWithValue("@s", stkId);
                 conn.Open();
@@ -208,9 +208,9 @@ namespace CIMS.Services
                 {
                     if (r.Read())
                     {
-                        s.FormulaId = r["FORMULA_ID"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["FORMULA_ID"]);
-                        s.AutoCalc = Convert.ToBoolean(r["AUTO_CALC"]);
-                        s.LastCalc = r["LAST_CALC"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["LAST_CALC"]);
+                        s.FormulaId = r["FormulaID"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["FormulaID"]);
+                        s.AutoCalc = Convert.ToBoolean(r["AutoCalc"]);
+                        s.LastCalc = r["LastCalc"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["LastCalc"]);
                     }
                 }
             }
@@ -222,9 +222,9 @@ namespace CIMS.Services
         {
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(@"
-                MERGE MST_CALC_STOCK AS t USING (SELECT @s AS STK_ID) AS s ON t.STK_ID = s.STK_ID
-                WHEN MATCHED THEN UPDATE SET FORMULA_ID = @f, AUTO_CALC = @a, UPDATED_BY = @u, UPDATED_DATE = GETDATE()
-                WHEN NOT MATCHED THEN INSERT (STK_ID, FORMULA_ID, AUTO_CALC, UPDATED_BY, UPDATED_DATE) VALUES (@s, @f, @a, @u, GETDATE());", conn))
+                MERGE CIMS.MaxMinStockSettings AS t USING (SELECT @s AS StockID) AS s ON t.StockID = s.StockID
+                WHEN MATCHED THEN UPDATE SET FormulaID = @f, AutoCalc = @a, UpdatedBy = @u, UpdatedDate = GETDATE()
+                WHEN NOT MATCHED THEN INSERT (StockID, FormulaID, AutoCalc, UpdatedBy, UpdatedDate) VALUES (@s, @f, @a, @u, GETDATE());", conn))
             {
                 cmd.Parameters.AddWithValue("@s", stkId);
                 cmd.Parameters.AddWithValue("@f", formulaId);
@@ -322,11 +322,11 @@ namespace CIMS.Services
             wb.SaveAs(path);
             wb.Dispose();
         }
-        // คำนวณ (sp_MaxMin_Calculate): stkId null = ทุกคลังที่เปิด AUTO CALC / ptId = เฉพาะสินค้านั้น
+        // คำนวณ (CIMS.sp_MaxMin_Calculate): stkId null = ทุกคลังที่เปิด AUTO CALC / ptId = เฉพาะสินค้านั้น
         public (int Updated, int Skipped, int Stocks) Calculate(int? stkId, int? ptId, string userId)
         {
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("sp_MaxMin_Calculate", conn) { CommandType = CommandType.StoredProcedure, CommandTimeout = 300 })
+            using (var cmd = new SqlCommand("CIMS.sp_MaxMin_Calculate", conn) { CommandType = CommandType.StoredProcedure, CommandTimeout = 300 })
             {
                 cmd.Parameters.AddWithValue("@StkId", (object)stkId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PtId", (object)ptId ?? DBNull.Value);
@@ -344,7 +344,7 @@ namespace CIMS.Services
         public DateTime? GetLatestImportMonth()
         {
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT MAX(TARGET_DATE) FROM TRN_IMPORT_STAGE WHERE TARGET_DATE < DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))", conn))
+            using (var cmd = new SqlCommand("SELECT MAX(TargetDate) FROM CIMS.ForecastOrderImports WHERE TargetDate < DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))", conn))
             {
                 conn.Open();
                 object v = cmd.ExecuteScalar();
@@ -363,12 +363,12 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(@"
                 WITH c AS (
-                    SELECT LTRIM(RTRIM(PT_CUST)) AS CUST FROM MST_PART WHERE IS_ACTIVE = 1 AND ISNULL(LTRIM(RTRIM(PT_CUST)), '') <> ''
-                    UNION SELECT LTRIM(RTRIM(CUST_CODE)) FROM TRN_IMPORT_STAGE WHERE ISNULL(LTRIM(RTRIM(CUST_CODE)), '') <> ''
-                    UNION SELECT CUST_CODE FROM MST_CUST_WORKDAY)
+                    SELECT LTRIM(RTRIM(Customer)) AS CUST FROM CIMS.Parts WHERE IsActive = 1 AND ISNULL(LTRIM(RTRIM(Customer)), '') <> ''
+                    UNION SELECT LTRIM(RTRIM(CustomerCode)) FROM CIMS.ForecastOrderImports WHERE ISNULL(LTRIM(RTRIM(CustomerCode)), '') <> ''
+                    UNION SELECT CustomerCode FROM CIMS.CustomerWorkdays)
                 SELECT c.CUST,
-                       (SELECT COUNT(*) FROM MST_CUST_WORKDAY w WHERE w.CUST_CODE = c.CUST AND YEAR(w.WORK_DATE) = @y) AS DAYS_,
-                       (SELECT COUNT(DISTINCT MONTH(w.WORK_DATE)) FROM MST_CUST_WORKDAY w WHERE w.CUST_CODE = c.CUST AND YEAR(w.WORK_DATE) = @y) AS MONTHS_
+                       (SELECT COUNT(*) FROM CIMS.CustomerWorkdays w WHERE w.CustomerCode = c.CUST AND YEAR(w.WorkDate) = @y) AS DAYS_,
+                       (SELECT COUNT(DISTINCT MONTH(w.WorkDate)) FROM CIMS.CustomerWorkdays w WHERE w.CustomerCode = c.CUST AND YEAR(w.WorkDate) = @y) AS MONTHS_
                 FROM c ORDER BY c.CUST", conn))
             {
                 cmd.Parameters.AddWithValue("@y", year);
@@ -384,7 +384,7 @@ namespace CIMS.Services
         {
             var set = new HashSet<DateTime>();
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT WORK_DATE FROM MST_CUST_WORKDAY WHERE CUST_CODE = @c AND YEAR(WORK_DATE) = @y", conn))
+            using (var cmd = new SqlCommand("SELECT WorkDate FROM CIMS.CustomerWorkdays WHERE CustomerCode = @c AND YEAR(WorkDate) = @y", conn))
             {
                 cmd.Parameters.AddWithValue("@c", customer);
                 cmd.Parameters.AddWithValue("@y", year);
@@ -406,9 +406,9 @@ namespace CIMS.Services
                     foreach (var d in dates.Select(x => x.Date).Distinct())
                     {
                         string sql = working
-                            ? @"IF NOT EXISTS (SELECT 1 FROM MST_CUST_WORKDAY WHERE CUST_CODE = @c AND WORK_DATE = @d)
-                                    INSERT INTO MST_CUST_WORKDAY (CUST_CODE, WORK_DATE, UPDATED_BY) VALUES (@c, @d, @u)"
-                            : "DELETE FROM MST_CUST_WORKDAY WHERE CUST_CODE = @c AND WORK_DATE = @d";
+                            ? @"IF NOT EXISTS (SELECT 1 FROM CIMS.CustomerWorkdays WHERE CustomerCode = @c AND WorkDate = @d)
+                                    INSERT INTO CIMS.CustomerWorkdays (CustomerCode, WorkDate, UpdatedBy) VALUES (@c, @d, @u)"
+                            : "DELETE FROM CIMS.CustomerWorkdays WHERE CustomerCode = @c AND WorkDate = @d";
                         using (var cmd = new SqlCommand(sql, conn, tr))
                         {
                             cmd.Parameters.AddWithValue("@c", customer);
@@ -555,9 +555,9 @@ namespace CIMS.Services
                 {
                     foreach (var key in valid.Select(v => new { v.Customer, Part = v.Part ?? "", v.Month }).Distinct())
                     {
-                        using (var cmd = new SqlCommand(@"DELETE FROM TRN_IMPORT_STAGE
-                                                          WHERE LTRIM(RTRIM(ISNULL(CUST_CODE, ''))) = @c AND LTRIM(RTRIM(ISNULL(PT_ACODE, ''))) = @p
-                                                            AND TARGET_DATE >= @m AND TARGET_DATE < DATEADD(MONTH, 1, @m)", conn, tr))
+                        using (var cmd = new SqlCommand(@"DELETE FROM CIMS.ForecastOrderImports
+                                                          WHERE LTRIM(RTRIM(ISNULL(CustomerCode, ''))) = @c AND LTRIM(RTRIM(ISNULL(PartACode, ''))) = @p
+                                                            AND TargetDate >= @m AND TargetDate < DATEADD(MONTH, 1, @m)", conn, tr))
                         {
                             cmd.Parameters.AddWithValue("@c", key.Customer);
                             cmd.Parameters.AddWithValue("@p", key.Part);
@@ -567,7 +567,7 @@ namespace CIMS.Services
                     }
                     foreach (var v in valid)
                     {
-                        using (var cmd = new SqlCommand(@"INSERT INTO TRN_IMPORT_STAGE (CUST_CODE, PT_ACODE, FORECAST_QTY, ORDER_QTY, DELIVERY_QTY, WORK_DAYS, TARGET_DATE, GUID_RUN, CREATED_AT, CREATED_BY)
+                        using (var cmd = new SqlCommand(@"INSERT INTO CIMS.ForecastOrderImports (CustomerCode, PartACode, ForecastQuantity, OrderQuantity, DeliveryQuantity, WorkDays, TargetDate, RunGuid, CreatedAt, CreatedBy)
                                                           VALUES (@c, @p, @f, @o, @d, @w, @m, @g, GETDATE(), @u)", conn, tr))
                         {
                             cmd.Parameters.AddWithValue("@c", v.Customer);
@@ -743,9 +743,9 @@ namespace CIMS.Services
 
                     // MAX / MIN (BOX): คลังที่เทียบ MAX/MIN เป็นกล่อง เก็บเป็นกล่อง / คลังอื่นแปลงเป็นหน่วยของคลัง (x Pack Size)
                     string boxSql = (stock.IsMain
-                        ? "UPDATE p SET QTY_MAX = ISNULL(@mx * {0}, p.QTY_MAX), QTY_MIN = ISNULL(@mn * {0}, p.QTY_MIN) FROM MST_PART p WHERE p.PT_ID = @p"
-                        : "UPDATE ps SET QTY_MAX = ISNULL(@mx * {0}, ps.QTY_MAX), QTY_MIN = ISNULL(@mn * {0}, ps.QTY_MIN), UPDATED_DATE = GETDATE() FROM MST_PART_STOCK ps JOIN MST_PART p ON p.PT_ID = ps.PT_ID WHERE ps.STK_ID = @s AND ps.PT_ID = @p");
-                    string mult = string.Equals(stock.MaxMinBasis, "BOX", StringComparison.OrdinalIgnoreCase) ? "1" : "CASE WHEN ISNULL(p.PT_PSZ, 0) > 0 THEN p.PT_PSZ ELSE 1 END";
+                        ? "UPDATE p SET MaxQuantity = ISNULL(@mx * {0}, p.MaxQuantity), MinQuantity = ISNULL(@mn * {0}, p.MinQuantity) FROM CIMS.Parts p WHERE p.PartID = @p"
+                        : "UPDATE ps SET MaxQuantity = ISNULL(@mx * {0}, ps.MaxQuantity), MinQuantity = ISNULL(@mn * {0}, ps.MinQuantity), UpdatedDate = GETDATE() FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = @s AND ps.PartID = @p");
+                    string mult = string.Equals(stock.MaxMinBasis, "BOX", StringComparison.OrdinalIgnoreCase) ? "1" : "CASE WHEN ISNULL(p.PackSize, 0) > 0 THEN p.PackSize ELSE 1 END";
                     foreach (var v in valid.Where(x => x.HasBox))
                     {
                         using (var cmd = new SqlCommand(string.Format(boxSql, mult), conn, tr))
@@ -807,7 +807,7 @@ namespace CIMS.Services
                 {
                     foreach (var m in months)
                     {
-                        using (var cmd = new SqlCommand("DELETE FROM MST_CUST_WORKDAY WHERE CUST_CODE = @c AND WORK_DATE >= @m AND WORK_DATE < DATEADD(MONTH, 1, @m)", conn, tr))
+                        using (var cmd = new SqlCommand("DELETE FROM CIMS.CustomerWorkdays WHERE CustomerCode = @c AND WorkDate >= @m AND WorkDate < DATEADD(MONTH, 1, @m)", conn, tr))
                         {
                             cmd.Parameters.AddWithValue("@c", m.Customer);
                             cmd.Parameters.Add("@m", SqlDbType.Date).Value = m.Month;
@@ -816,7 +816,7 @@ namespace CIMS.Services
                     }
                     foreach (var d in valid.Select(v => new { v.Customer, v.Date }).Distinct())
                     {
-                        using (var cmd = new SqlCommand("INSERT INTO MST_CUST_WORKDAY (CUST_CODE, WORK_DATE, UPDATED_BY) VALUES (@c, @d, @u)", conn, tr))
+                        using (var cmd = new SqlCommand("INSERT INTO CIMS.CustomerWorkdays (CustomerCode, WorkDate, UpdatedBy) VALUES (@c, @d, @u)", conn, tr))
                         {
                             cmd.Parameters.AddWithValue("@c", d.Customer);
                             cmd.Parameters.Add("@d", SqlDbType.Date).Value = d.Date;

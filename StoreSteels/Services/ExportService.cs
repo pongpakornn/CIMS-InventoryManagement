@@ -103,14 +103,14 @@ namespace CIMS.Services
                     foreach (var item in dataList)
                     {
                         var dateCell = worksheet.Cell(currentRow, 1);
-                        dateCell.Value = item.PR_DATE;
+                        dateCell.Value = item.PRDate;
                         dateCell.Style.DateFormat.Format = "dd/MM/yyyy";
 
                         worksheet.Cell(currentRow, 2).Value = item.Department;
                         worksheet.Cell(currentRow, 3).Value = item.PartCode;
                         worksheet.Cell(currentRow, 4).Value = item.PartName;
                         worksheet.Cell(currentRow, 5).Value = item.QTY;
-                        worksheet.Cell(currentRow, 6).Value = item.PR_REM;
+                        worksheet.Cell(currentRow, 6).Value = item.Remark;
                         worksheet.Cell(currentRow, 7).Value = "ชนนิกานต์";
                         worksheet.Cell(currentRow, 8).Value = "41304131-ปั๊ม 1@469214,403";           // <-- เพิ่มเติม : ถ้าเป็นค่า Fix นอกเหนือจากโปรแกรมสามารถเพิ่มเข้าไปที่ช่องนี้ได้เลยครับ
 

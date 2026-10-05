@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace CIMS.Services
 {
     // ประวัติการพิมพ์ Packing Card เก็บไว้ที่ฐานของเราเอง (Stock DB / GlobalConfig.ConnStr)
-    // คนละฐานกับ ERP - ตาราง dbo.PackingPrintLog (ดู Database/PackingPrintLog.sql สำหรับสร้างตาราง)
+    // คนละฐานกับ ERP - ตาราง CIMS.PickListPrintLogs (ดู Database/CIMS.PickListPrintLogs.sql สำหรับสร้างตาราง)
     public class PackingPrintLogService
     {
         private readonly string _connStr = GlobalConfig.ConnStr;
@@ -21,7 +21,7 @@ namespace CIMS.Services
         {
             var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            const string sql = "SELECT TicketNo, ItemNo FROM dbo.PackingPrintLog";
+            const string sql = "SELECT TicketNo, ItemNo FROM CIMS.PickListPrintLogs";
 
             using (var conn = new SqlConnection(_connStr))
             using (var cmd = new SqlCommand(sql, conn))
@@ -40,7 +40,7 @@ namespace CIMS.Services
         }
 
         // ป้องกัน "String or binary data would be truncated" เผื่อฐานที่ deploy จริงยังเป็นสคีมาเดิม
-        // (LabelRef VARCHAR(50) ก่อนที่จะขยายเป็น 200 ใน PackingPrintLog.sql) - ตัดให้พอดี 50 เสมอ
+        // (LabelRef VARCHAR(50) ก่อนที่จะขยายเป็น 200 ใน CIMS.PickListPrintLogs.sql) - ตัดให้พอดี 50 เสมอ
         private const int LabelRefMaxLength = 50;
 
         public void LogPrinted(PackingCardModel item, string userId)
@@ -54,8 +54,8 @@ namespace CIMS.Services
             }
 
             const string sql = @"
-                IF NOT EXISTS (SELECT 1 FROM dbo.PackingPrintLog WHERE TicketNo = @TicketNo AND ItemNo = @ItemNo)
-                INSERT INTO dbo.PackingPrintLog
+                IF NOT EXISTS (SELECT 1 FROM CIMS.PickListPrintLogs WHERE TicketNo = @TicketNo AND ItemNo = @ItemNo)
+                INSERT INTO CIMS.PickListPrintLogs
                     (TicketNo, ItemNo, Warehouse, LotNo, MaterialCode, WorkOrder, TicketDate, JobName, Qty, PrintedBy, LabelRef)
                 VALUES
                     (@TicketNo, @ItemNo, @Warehouse, @LotNo, @MaterialCode, @WorkOrder, @TicketDate, @JobName, @Qty, @PrintedBy, @LabelRef)";

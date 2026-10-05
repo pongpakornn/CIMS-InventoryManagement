@@ -78,14 +78,14 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="PR NO" Binding="{Binding PR_NO}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="PR NO" Binding="{Binding PRNumber}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="APPROVED" Binding="{Binding AppDateDisplay}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="REQUESTER" Binding="{Binding Requester}" Width="1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="DEPARTMENT" Binding="{Binding Department}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="2*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="QTY" Binding="{Binding QTY, StringFormat=N0}" Width="0.6*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
-                    <DataGridTextColumn Header="REMARK" Binding="{Binding PR_REM}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="REMARK" Binding="{Binding Remark}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="EXPORTED" Binding="{Binding ExportDisplay}" Width="1.1*" IsReadOnly="True" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTemplateColumn Header="ACTION" Width="168">
                         <DataGridTemplateColumn.CellTemplate>

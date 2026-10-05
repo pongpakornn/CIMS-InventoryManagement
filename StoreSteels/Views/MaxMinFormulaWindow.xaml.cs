@@ -9,7 +9,7 @@ using System.Windows.Input;
 
 namespace CIMS.Views
 {
-    // ⚙ รายการสูตรคำนวณ MAX / MIN (MST_CALC_FORMULA) - เพิ่ม / แก้ไข / ลบ เหมือน Barcode Formats
+    // ⚙ รายการสูตรคำนวณ MAX / MIN (CIMS.MaxMinFormulas) - เพิ่ม / แก้ไข / ลบ เหมือน Barcode Formats
     public partial class MaxMinFormulaWindow : Window
     {
         private readonly MaxMinCalcService _service = new MaxMinCalcService();

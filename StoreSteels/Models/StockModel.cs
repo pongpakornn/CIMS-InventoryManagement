@@ -4,8 +4,8 @@ using System.Runtime.CompilerServices;
 
 namespace CIMS.Models
 {
-    // 1 แถวของ MST_STOCK (คลัง) + ค่าตั้งค่าการแสดงผล/ช่องทางแสกนของคลังนั้น
-    // Stock-CHR (IsMain) ยังใช้ยอดใน MST_PART เหมือนเดิม คลังอื่นใช้ MST_PART_STOCK
+    // 1 แถวของ CIMS.Stocks (คลัง) + ค่าตั้งค่าการแสดงผล/ช่องทางแสกนของคลังนั้น
+    // Stock-CHR (IsMain) ยังใช้ยอดใน CIMS.Parts เหมือนเดิม คลังอื่นใช้ CIMS.PartStocks
     public class StockModel : INotifyPropertyChanged
     {
         public int StkId { get; set; }
@@ -36,7 +36,7 @@ namespace CIMS.Models
         public bool ColStockBox { get; set; }
         public bool ColStockPcs { get; set; }
         public bool ColNo { get; set; }       // No. = ลำดับในแต่ละกลุ่ม (กลุ่ม A 1-5, กลุ่ม B 1-3 ...)
-        public bool ColModel { get; set; }    // MODEL (รหัสโมเดล PT_MODEL)
+        public bool ColModel { get; set; }    // MODEL (รหัสโมเดล Model)
 
         // จัดกลุ่มตาราง: CATEGORY (ค่าเดิม) หรือ CUSTOMER
         public string GroupBy { get; set; } = "CATEGORY";
@@ -64,7 +64,7 @@ namespace CIMS.Models
 
         public int SortNo { get; set; }
 
-        // รูปแบบบาร์โค้ด Supplier ที่คลังนี้รับได้ (MST_STOCK_FMT)
+        // รูปแบบบาร์โค้ด Supplier ที่คลังนี้รับได้ (CIMS.StockBarcodeFormats)
         public List<int> FormatIds { get; set; } = new List<int>();
 
         // จำนวนรายการสินค้าในคลัง (ไม่ใช่ยอดจำนวนเหล็ก) - ใช้แสดงบนการ์ด
@@ -74,12 +74,13 @@ namespace CIMS.Models
         public bool CanScanIn => InPickList || InSupplier || InSysQr;
         public bool CanScanOut => OutPickList || OutSupplier || OutSysQr;
 
-        // ทุกคลัง (รวมคลังหลัก) ใช้รหัสคลังเป็น SYS_ID เลย (เช่น STOCK-MAT, STOCK-PANTA) ดูในตารางสิทธิ์แล้วรู้ทันทีว่าคลังไหน
+        // ทุกคลัง (รวมคลังหลัก) ใช้รหัสคลังเป็น SystemID เลย (เช่น STOCK-MAT, STOCK-PANTA) ดูในตารางสิทธิ์แล้วรู้ทันทีว่าคลังไหน
         public string PermSysId => Code;
 
-        // รหัสคลังห้ามชนกับ SYS_ID ของระบบ (เพราะใช้เป็นชื่อสิทธิ์)
+        // รหัสคลังห้ามชนกับ SystemID ของระบบ (เพราะใช้เป็นชื่อสิทธิ์)
         public static readonly string[] ReservedCodes =
-            { "STK", "STOCK_MGR", "SCAN_IN", "SCAN_OUT", "STORE", "SCANNER", "DASHBOARD", "PDCONTROL", "PACKINGCARD", "PR", "MAXMINCALC", "ACTIVITYLOG", "USERMGMT" };
+            { "STK", "STOCK_MGR", "SCAN_IN", "SCAN_OUT", "STORE", "SCANNER", "DASHBOARD", "PDCONTROL", "PACKINGCARD", "PR", "MAXMINCALC", "ACTIVITYLOG", "USERMGMT",
+              "STOREMAXMIN", "MULTISCANNER", "PRODUCTCONTROL", "USERMANAGEMENT", "FORECASTORDER" };
 
         private string UnitText => string.IsNullOrWhiteSpace(Unit) ? "KG" : Unit;
         public string UnitDisplay => UnitText;
@@ -111,7 +112,7 @@ namespace CIMS.Models
         public string Code { get; set; }
         public decimal Qty { get; set; }
 
-        // เติมหลังตรวจสอบกับ MST_PART
+        // เติมหลังตรวจสอบกับ CIMS.Parts
         public int PartId { get; set; }
         public string PartCode { get; set; }
         public string Error { get; set; }

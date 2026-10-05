@@ -43,7 +43,7 @@ namespace CIMS.Models
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    // สูตรคำนวณ 1 รายการ (MST_CALC_FORMULA) - เพิ่มได้หลายสูตรเหมือน Barcode Formats แล้วแต่ละคลังเลือกใช้
+    // สูตรคำนวณ 1 รายการ (CIMS.MaxMinFormulas) - เพิ่มได้หลายสูตรเหมือน Barcode Formats แล้วแต่ละคลังเลือกใช้
     public class MaxMinFormula
     {
         public int FormulaId { get; set; }
@@ -76,7 +76,7 @@ namespace CIMS.Models
         }
     }
 
-    // การตั้งค่าของคลัง (MST_CALC_STOCK): ใช้สูตรไหน + AUTO CALC (ไม่ได้เลือก = สูตร DEFAULT)
+    // การตั้งค่าของคลัง (CIMS.MaxMinStockSettings): ใช้สูตรไหน + AUTO CALC (ไม่ได้เลือก = สูตร DEFAULT)
     public class StockCalcSetting
     {
         public int StkId { get; set; }

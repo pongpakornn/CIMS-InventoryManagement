@@ -94,7 +94,7 @@ namespace CIMS.Views
 
         #region --- Multi-Stock ---
 
-        // คลังหลักจาก MST_STOCK - ถ้ายังไม่ได้รัน Database/MultiStock.sql ให้ใช้ค่าเริ่มต้น (แสดงทุกคอลัมน์เหมือนเดิม)
+        // คลังหลักจาก CIMS.Stocks - ถ้ายังไม่ได้รัน Database/MultiStock.sql ให้ใช้ค่าเริ่มต้น (แสดงทุกคอลัมน์เหมือนเดิม)
         private static StockModel ResolveMainStock()
         {
             try
@@ -716,7 +716,29 @@ namespace CIMS.Views
             if (_rotating) return; // แค่ย้ายแถวตอนวนตาราง ไม่ต้องสร้างการ์ดใหม่
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset ||
                 e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+            {
                 QueueCardRebuild();
+                QueueColumnRefit();
+            }
+        }
+
+        // ข้อมูลโหลดเบื้องหลังมาถึงหลังตารางวัดความกว้างไปแล้ว -> คำนวณความกว้างคอลัมน์แบบ * ใหม่ 1 ครั้งหลังแถวชุดใหม่เข้ามา
+        private bool _refitQueued;
+        private void QueueColumnRefit()
+        {
+            if (_refitQueued) return;
+            _refitQueued = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                _refitQueued = false;
+                foreach (var col in dgStore.Columns)
+                {
+                    if (col.Visibility != Visibility.Visible) continue;
+                    var w = col.Width;
+                    col.Width = new DataGridLength(0);
+                    col.Width = w;
+                }
+            }));
         }
 
         private void QueueCardRebuild()

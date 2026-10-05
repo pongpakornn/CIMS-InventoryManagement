@@ -1,4 +1,4 @@
-<Page x:Class="CIMS.Views.UserManagementView"
+﻿<Page x:Class="CIMS.Views.UserManagementView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="User Management" Background="Transparent">
@@ -55,7 +55,8 @@
                     <Border Background="#FFEBEE" CornerRadius="12" Padding="14,6" Margin="0,0,16,0">
                         <TextBlock x:Name="txtLocked" FontWeight="Black" Foreground="#C62828"/>
                     </Border>
-                    <Button x:Name="btnImport" Content="📥 IMPORT USER" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,0,8,0"/>
+                    <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource StkButton}" Background="#49454F" Click="Template_Click" Margin="0,0,8,0" ToolTip="Excel template for importing users and permissions"/>
+                    <Button x:Name="btnImport" Content="📥 IMPORT USER / PERMISSION" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,0,8,0"/>
                     <Button x:Name="btnAdd" Content="＋ ADD USER" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Add_Click"/>
                 </StackPanel>
             </Grid>

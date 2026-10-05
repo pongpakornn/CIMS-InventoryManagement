@@ -21,7 +21,7 @@
             public ObservableCollection<PRModel> PRHistory { get; set; } = new ObservableCollection<PRModel>();
             public ObservableCollection<string> ProductSuggestions { get; set; } = new ObservableCollection<string>();
 
-            // ช่องที่พิมพ์เองได้ + แนะนำค่าที่เคยใช้ (MST_PR_LOOKUP)
+            // ช่องที่พิมพ์เองได้ + แนะนำค่าที่เคยใช้ (CIMS.PRLookups)
             public ObservableCollection<string> RequesterSuggestions { get; } = new ObservableCollection<string>();
             public ObservableCollection<string> DeptSuggestions { get; } = new ObservableCollection<string>();
             public ObservableCollection<string> RemarkSuggestions { get; } = new ObservableCollection<string>();
@@ -62,15 +62,15 @@
             public async Task RefreshIfChanged(string search)
             {
                 var data = await Task.Run(() => _prService.GetPRList(search ?? ""));
-                string sig = string.Join("|", data.Select(x => $"{x.PR_NO}:{x.Status}:{x.QTY}"));
+                string sig = string.Join("|", data.Select(x => $"{x.PRNumber}:{x.Status}:{x.QTY}"));
                 if (sig == _lastSignature) return;
                 _lastSignature = sig;
 
-                var selected = new HashSet<string>(PRHistory.Where(x => x.IsSelected).Select(x => x.PR_NO));
+                var selected = new HashSet<string>(PRHistory.Where(x => x.IsSelected).Select(x => x.PRNumber));
                 PRHistory.Clear();
                 foreach (var item in data)
                 {
-                    item.IsSelected = selected.Contains(item.PR_NO);
+                    item.IsSelected = selected.Contains(item.PRNumber);
                     PRHistory.Add(item);
                 }
             }
@@ -105,7 +105,7 @@
                         PRHistory.Clear();
                         foreach (var item in data) PRHistory.Add(item);
                     });
-                    _lastSignature = string.Join("|", data.Select(x => $"{x.PR_NO}:{x.Status}:{x.QTY}"));
+                    _lastSignature = string.Join("|", data.Select(x => $"{x.PRNumber}:{x.Status}:{x.QTY}"));
                 }
                 catch (Exception ex)
                 {
@@ -145,7 +145,7 @@
                     bool success = await Task.Run(() =>
                     {
                         finalPRNo = _prService.GetNextPRNo();
-                        item.PR_DATE = DateTime.Now;
+                        item.PRDate = DateTime.Now;
                         bool ok = _prService.InsertPR(finalPRNo, CurrentUser.UserId, useDept, item.PartName, item.QTY, useRemark, useTarget, reqName);
                         if (ok)
                         {
@@ -190,11 +190,11 @@
                 try
                 {
                     string uid = CurrentUser.UserId;
-                    string newPr = await Task.Run(() => _prService.ApprovePR(item.PR_NO, qty, keepRemainder, uid));
-                    string detail = qty == item.QTY ? $"Approved PR No: {item.PR_NO} | QTY: {qty}"
-                                  : $"Approved PR No: {item.PR_NO} | QTY: {item.QTY}->{qty}" + (newPr != null ? $" | Remaining {item.QTY - qty} -> new PR {newPr} (Waiting)" : $" | Remaining {item.QTY - qty} not kept");
-                    LogService.WritePRLog(uid, "APPROVE_PR", detail, item.PR_NO);
-                    NotificationManager.Show("Approved", $"อนุมัติ {item.PR_NO} จำนวน {qty:N0} แล้ว" + (newPr != null ? $"\nยอดที่เหลือ {item.QTY - qty:N0} -> PR ใหม่ {newPr}" : ""), true);
+                    string newPr = await Task.Run(() => _prService.ApprovePR(item.PRNumber, qty, keepRemainder, uid));
+                    string detail = qty == item.QTY ? $"Approved PR No: {item.PRNumber} | QTY: {qty}"
+                                  : $"Approved PR No: {item.PRNumber} | QTY: {item.QTY}->{qty}" + (newPr != null ? $" | Remaining {item.QTY - qty} -> new PR {newPr} (Waiting)" : $" | Remaining {item.QTY - qty} not kept");
+                    LogService.WritePRLog(uid, "APPROVE_PR", detail, item.PRNumber);
+                    NotificationManager.Show("Approved", $"อนุมัติ {item.PRNumber} จำนวน {qty:N0} แล้ว" + (newPr != null ? $"\nยอดที่เหลือ {item.QTY - qty:N0} -> PR ใหม่ {newPr}" : ""), true);
                     await LoadAllPR();
                 }
                 catch (Exception ex) { DialogHelper.ShowError("อนุมัติไม่สำเร็จ: " + ex.Message); }
@@ -214,16 +214,16 @@
                 }
 
                 // คืนค่าการ Confirm ก่อนลบ/ปฏิเสธ
-                bool isConfirm = DialogHelper.ShowConfirm($"คุณต้องการ Reject รายการ {item.PR_NO} ใช่หรือไม่?", "ยืนยัน");
+                bool isConfirm = DialogHelper.ShowConfirm($"คุณต้องการ Reject รายการ {item.PRNumber} ใช่หรือไม่?", "ยืนยัน");
                 if (!isConfirm) return;
 
                 try
                 {
-                    bool success = await Task.Run(() => _prService.UpdatePRStatus(item.PR_NO, "Rejected", CurrentUser.UserId));
+                    bool success = await Task.Run(() => _prService.UpdatePRStatus(item.PRNumber, "Rejected", CurrentUser.UserId));
                     if (success)
                     {
                         // ใช้ WritePRLog เหมือนของเดิม
-                        LogService.WritePRLog(CurrentUser.UserId, "REJECT_PR", $"Rejected PR No: {item.PR_NO}", item.PR_NO);
+                        LogService.WritePRLog(CurrentUser.UserId, "REJECT_PR", $"Rejected PR No: {item.PRNumber}", item.PRNumber);
                         await LoadAllPR();
                     }
                 }
@@ -252,9 +252,9 @@
                     {
                         foreach (var item in items)
                         {
-                            if (_prService.UpdateAfterExport(item.PR_NO, CurrentUser.UserId))
+                            if (_prService.UpdateAfterExport(item.PRNumber, CurrentUser.UserId))
                             {
-                                LogService.WriteLog(CurrentUser.UserId, "EXPORT_PR", $"Exported PR No: {item.PR_NO}", item.PR_NO);
+                                LogService.WriteLog(CurrentUser.UserId, "EXPORT_PR", $"Exported PR No: {item.PRNumber}", item.PRNumber);
                             }
                         }
                     });

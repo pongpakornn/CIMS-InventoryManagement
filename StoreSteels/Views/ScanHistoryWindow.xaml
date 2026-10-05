@@ -78,7 +78,7 @@
                     <DataGridTextColumn Header="DATE TIME" Binding="{Binding DateText}" Width="1.3*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="STOCK" Binding="{Binding StockCode}" Width="1*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="TYPE" Binding="{Binding TxType}" Width="0.7*" ElementStyle="{StaticResource Cell}"/>
-                    <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.2*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding CodeText}" Width="1.2*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="1.8*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="QTY" Binding="{Binding Qty, StringFormat=N0}" Width="0.6*" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="USER" Binding="{Binding UserText}" Width="1.1*" ElementStyle="{StaticResource Cell}"/>

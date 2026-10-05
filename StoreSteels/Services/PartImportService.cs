@@ -248,7 +248,7 @@ namespace CIMS.Services
         {
             var existing = new HashSet<string>();
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("SELECT PT_CODE, ISNULL(PT_PARTA, '') FROM MST_PART", conn))
+            using (var cmd = new SqlCommand("SELECT PartCode, ISNULL(PartA, '') FROM CIMS.Parts", conn))
             {
                 conn.Open();
                 using (var rdr = cmd.ExecuteReader())
@@ -279,12 +279,12 @@ namespace CIMS.Services
                     {
                         int ptId;
                         using (var cmd = new SqlCommand(@"
-                            INSERT INTO MST_PART (PT_CODE, PT_DESC, PT_PSZ, PT_QR, QTY_MAX, QTY_MIN, PT_CAT,
-                                                  PT_BIN, QTY_STKB, IS_ACTIVE, IS_SHOW_MST, PT_IMG, PT_SUPPLIER,
-                                                  PT_CUST, PT_PARTA, PT_PARTNO, PT_MODEL)
+                            INSERT INTO CIMS.Parts (PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category,
+                                                  Bin, StockQuantity, IsActive, IsShowInMaster, ImageFileName, Supplier,
+                                                  Customer, PartA, PartNumber, Model)
                             VALUES (@code, @name, @psz, @qr, @mmax, @mmin, @cat, @bin, @mqty, 1, @show, NULL, @sup,
                                     @cust, @parta, @partno, @model);
-                            IF @inMain = 1 AND @rmk IS NOT NULL UPDATE MST_PART SET PT_REMARK = @rmk WHERE PT_ID = SCOPE_IDENTITY();
+                            IF @inMain = 1 AND @rmk IS NOT NULL UPDATE CIMS.Parts SET Remark = @rmk WHERE PartID = SCOPE_IDENTITY();
                             SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@code", r.Code);
@@ -315,7 +315,7 @@ namespace CIMS.Services
                             // STOCK (PCS) + STOCK (BOX): ใส่ทั้งคู่ = ตามไฟล์ / ใส่ PCS อย่างเดียว = BOX คำนวณจาก PACKSIZE / ใส่ BOX อย่างเดียว = PCS = BOX x PACKSIZE
                             int pcs = r.StockPcs ?? (r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0);
                             int box = r.StockBox ?? 0;
-                            using (var cmd = new SqlCommand(@"INSERT INTO MST_PART_STOCK (STK_ID, PT_ID, QTY, QTY_BOX, QTY_MAX, QTY_MIN, REMARK, IS_SHOW)
+                            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.PartStocks (StockID, PartID, Quantity, BoxQuantity, MaxQuantity, MinQuantity, Remark, IsShow)
                                                               VALUES (@s, @p, @qty, @box, @max, @min, @rmk, @show)", conn, trans))
                             {
                                 cmd.Parameters.AddWithValue("@s", stkId);

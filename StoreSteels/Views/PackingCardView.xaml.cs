@@ -168,7 +168,7 @@ namespace CIMS.Views
                 string userId = _viewModel.CurrentUser?.UserId ?? "Unknown";
                 foreach (var item in printedItems)
                 {
-                    // บันทึกประวัติการพิมพ์ลง PackingPrintLog (ฐานของเราเอง) - รอบถัดไป ERP query
+                    // บันทึกประวัติการพิมพ์ลง CIMS.PickListPrintLogs (ฐานของเราเอง) - รอบถัดไป ERP query
                     // จะไม่ดึงรายการนี้กลับมาอีก และตัดออกจากลิสต์ที่แสดงอยู่ทันทีด้านล่าง
                     _printLogService.LogPrinted(item, userId);
                     LogService.WriteLog(userId, "PRINT_PACKING_CARD", $"Printed Packing Card | Ticket: {item.TicketNo} | Lot: {item.LotNo}", item.MaterialCode);

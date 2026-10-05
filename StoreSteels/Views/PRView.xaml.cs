@@ -170,7 +170,7 @@ namespace CIMS.Views
                 return;
             }
 
-            // ตรวจสอบสินค้าใน MST_PART
+            // ตรวจสอบสินค้าใน CIMS.Parts
             bool exists = await Task.Run(() => _prService.IsProductExists(partName));
             if (!exists)
             {
@@ -240,7 +240,7 @@ namespace CIMS.Views
         {
             if (sender is Button btn && btn.DataContext is PRModel selected)
             {
-                if (DialogHelper.ShowConfirm($"ปฏิเสธรายการ {selected.PR_NO}?", "ยืนยัน"))
+                if (DialogHelper.ShowConfirm($"ปฏิเสธรายการ {selected.PRNumber}?", "ยืนยัน"))
                 {
                     await _viewModel.RejectPR(selected);
                 }

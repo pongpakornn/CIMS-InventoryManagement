@@ -14,7 +14,7 @@ using System.Windows.Media;
 
 namespace CIMS.Views
 {
-    // 📅 วันทำงานของลูกค้า (MST_CUST_WORKDAY) - ใช้คำนวณ Order / Workdays ในหน้า Max-Min Calculator
+    // 📅 วันทำงานของลูกค้า (CIMS.CustomerWorkdays) - ใช้คำนวณ Order / Workdays ในหน้า Max-Min Calculator
     public partial class WorkdayWindow : Window
     {
         private readonly MaxMinCalcService _service = new MaxMinCalcService();

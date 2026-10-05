@@ -15,7 +15,7 @@ using System.Windows.Threading;
 namespace CIMS.Views
 {
     // ✏️ ADJUST SCAN (Level 1 admin เท่านั้น): แก้จำนวน / ลบ (ยกเลิก) รายการสแกน ยอดคลังปรับย้อนให้อัตโนมัติ
-    // ทุกครั้งต้องกรอกหมายเหตุ - รายการที่ลบยังเก็บไว้ (CANCELLED) และบันทึกลง TRN_SCAN_ADJ + Activity Log
+    // ทุกครั้งต้องกรอกหมายเหตุ - รายการที่ลบยังเก็บไว้ (CANCELLED) และบันทึกลง CIMS.ScanAdjustments + Activity Log
     public partial class ScanAdjustWindow : Window
     {
         private readonly ScanAdjustService _service = new ScanAdjustService();

@@ -7,14 +7,14 @@ namespace CIMS.Helpers
 {
     // 🖼 ที่เก็บรูปสินค้า
     //   ใหม่: \\192.168.10.56\ProgramCHR\2. Store Only\1. CIMS - Inventory Management\1. Image Stock\<STOCK CODE>\<STOCK CODE>-01.png
-    //         PT_IMG เก็บเป็น "<STOCK CODE>\<STOCK CODE>-01.png"
-    //   เดิม: ...\2. Store Only\StoreSteels\Image\<ชื่อไฟล์>  (PT_IMG ไม่มี "\" = รูปเก่า ยังเปิดได้เหมือนเดิม)
+    //         ImageFileName เก็บเป็น "<STOCK CODE>\<STOCK CODE>-01.png"
+    //   เดิม: ...\2. Store Only\StoreSteels\Image\<ชื่อไฟล์>  (ImageFileName ไม่มี "\" = รูปเก่า ยังเปิดได้เหมือนเดิม)
     public static class ImagePaths
     {
         public const string StockRoot = @"\\192.168.10.56\ProgramCHR\2. Store Only\1. CIMS - Inventory Management\1. Image Stock";
         public const string LegacyRoot = @"\\192.168.10.56\ProgramCHR\2. Store Only\StoreSteels\Image";
 
-        // PT_IMG -> path เต็ม (ไม่เช็กว่ามีไฟล์จริง)
+        // ImageFileName -> path เต็ม (ไม่เช็กว่ามีไฟล์จริง)
         public static string Resolve(string imageFileName)
         {
             if (string.IsNullOrWhiteSpace(imageFileName)) return null;

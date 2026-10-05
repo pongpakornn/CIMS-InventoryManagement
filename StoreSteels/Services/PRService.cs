@@ -17,7 +17,7 @@ namespace CIMS.Services
             var list = new List<PRModel>();
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                using (SqlCommand cmd = new SqlCommand("sp_GetPRList", conn))
+                using (SqlCommand cmd = new SqlCommand("CIMS.sp_GetPRList", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@SearchText", searchText ?? "");
@@ -29,17 +29,17 @@ namespace CIMS.Services
                         {
                             list.Add(new PRModel
                             {
-                                PR_NO = reader["PR_NO"].ToString(),
-                                USR_ID = reader["USR_ID"].ToString(),
+                                PRNumber = reader["PRNumber"].ToString(),
+                                UserID = reader["UserID"].ToString(),
                                 Requester = reader["REQUESTER"].ToString(), // จะได้ 'N/A' แทน NULL เพราะ ISNULL ใน View
-                                PartCode = reader["PT_CODE"]?.ToString() ?? "N/A", // เพิ่มบรรทัดนี้เพื่อรับค่า Code
-                                PartName = reader["PT_DESC"].ToString(),
-                                QTY = reader["QTY_REQ"] != DBNull.Value ? Convert.ToInt32(reader["QTY_REQ"]) : 0,
-                                Department = reader["REQ_DEPT"].ToString(),
-                                Status = reader["PR_STAT"].ToString(),
-                                PR_DATE = Convert.ToDateTime(reader["PR_DATE"]),
-                                PR_REM = reader["PR_REM"]?.ToString(),
-                                Unit = reader["QTY_UNIT"]?.ToString()
+                                PartCode = reader["PartCode"]?.ToString() ?? "N/A", // เพิ่มบรรทัดนี้เพื่อรับค่า Code
+                                PartName = reader["Description"].ToString(),
+                                QTY = reader["RequestQuantity"] != DBNull.Value ? Convert.ToInt32(reader["RequestQuantity"]) : 0,
+                                Department = reader["RequestDepartment"].ToString(),
+                                Status = reader["Status"].ToString(),
+                                PRDate = Convert.ToDateTime(reader["PRDate"]),
+                                Remark = reader["Remark"]?.ToString(),
+                                Unit = reader["Unit"]?.ToString()
                             });
                         }
                     }
@@ -57,7 +57,7 @@ namespace CIMS.Services
                 string prefix = year + "PR"; // ผลลัพธ์: 26PR
 
                 // 2. ค้นหาเลขล่าสุดที่ขึ้นต้นด้วย 26PR
-                string sql = "SELECT TOP 1 PR_NO FROM TRN_PR_H WHERE PR_NO LIKE @Prefix + '%' ORDER BY PR_NO DESC";
+                string sql = "SELECT TOP 1 PRNumber FROM CIMS.PRHeaders WHERE PRNumber LIKE @Prefix + '%' ORDER BY PRNumber DESC";
 
                 conn.Open();
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
@@ -101,18 +101,18 @@ namespace CIMS.Services
                 if (newStatus == "Rejected")
                 {
                     // ลบตามลำดับ: ลบรายการสินค้า (D) ก่อน แล้วค่อยลบหัวเอกสาร (H)
-                    sql = @"DELETE FROM TRN_PR_D WHERE PR_NO = @PrNo;
-                    DELETE FROM TRN_PR_H WHERE PR_NO = @PrNo;";
+                    sql = @"DELETE FROM CIMS.PRDetails WHERE PRNumber = @PrNo;
+                    DELETE FROM CIMS.PRHeaders WHERE PRNumber = @PrNo;";
                 }
                 else
                 {
                     // ถ้า Approved หรือสถานะอื่น ให้ Update ปกติ
-                    sql = @"UPDATE TRN_PR_H 
-                    SET PR_STAT = @Status, 
-                        APP_USR_ID = CASE WHEN @Status = 'Approved' THEN @AppUserId ELSE NULL END, 
-                        APP_DATE = CASE WHEN @Status = 'Approved' THEN GETDATE() ELSE NULL END,
-                        IS_EXPORT = CASE WHEN @Status = 'Approved' THEN 'Y' ELSE 'N' END
-                    WHERE PR_NO = @PrNo";
+                    sql = @"UPDATE CIMS.PRHeaders 
+                    SET Status = @Status, 
+                        ApprovedBy = CASE WHEN @Status = 'Approved' THEN @AppUserId ELSE NULL END, 
+                        ApprovedDate = CASE WHEN @Status = 'Approved' THEN GETDATE() ELSE NULL END,
+                        IsExported = CASE WHEN @Status = 'Approved' THEN 'Y' ELSE 'N' END
+                    WHERE PRNumber = @PrNo";
                 }
 
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
@@ -128,7 +128,7 @@ namespace CIMS.Services
             }
         }
 
-        // requesterName: ชื่อผู้ขอที่พิมพ์เอง (ว่าง = ใช้ชื่อผู้ใช้ที่ Login) - USR_ID ยังเป็นคนที่ทำรายการเหมือนเดิม
+        // requesterName: ชื่อผู้ขอที่พิมพ์เอง (ว่าง = ใช้ชื่อผู้ใช้ที่ Login) - UserID ยังเป็นคนที่ทำรายการเหมือนเดิม
         public bool InsertPR(string prNo, string userId, string dept, string partDesc, int qty, string remark, string targetDept, string requesterName = null)
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -139,10 +139,10 @@ namespace CIMS.Services
                     try
                     {
                         // เปลี่ยน 'Waiting' เป็น @Status เพื่อให้ตรงกับ Parameters.Add ด้านล่าง
-                        string sqlHeader = @"INSERT INTO TRN_PR_H (PR_NO, PR_DATE, USR_ID, REQ_DEPT, TRG_DEPT, PR_STAT, PR_REM, REQ_NAME, PR_SOURCE)
+                        string sqlHeader = @"INSERT INTO CIMS.PRHeaders (PRNumber, PRDate, UserID, RequestDepartment, TargetDepartment, Status, Remark, RequesterName, Source)
                                    VALUES (@PrNo, GETDATE(), @UserId, @Dept, @TrgDept, @Status, @Remark, @ReqName, 'MANUAL')";
 
-                        string sqlDetail = @"INSERT INTO TRN_PR_D (PR_NO, PT_DESC, QTY_REQ) 
+                        string sqlDetail = @"INSERT INTO CIMS.PRDetails (PRNumber, Description, RequestQuantity) 
                                    VALUES (@PrNo, @PartDesc, @Qty)";
 
                         using (SqlCommand cmdH = new SqlCommand(sqlHeader, conn, trans))
@@ -179,16 +179,16 @@ namespace CIMS.Services
         }
 
         #region === [ Lookup ช่องพิมพ์เอง (Requester / Department / Remark / Target Dept) ] ===
-        // field: REQUESTER / DEPT / REMARK / TARGET (MST_PR_LOOKUP ใน Database/PRView.sql)
+        // field: REQUESTER / DEPT / REMARK / TARGET (CIMS.PRLookups ใน Database/PRView.sql)
 
         // ค่าที่เคยพิมพ์ไว้ ที่มีคำที่พิมพ์อยู่ (ว่าง = ทั้งหมด) เรียงจากใช้บ่อย/ล่าสุดก่อน
         public List<string> GetLookupValues(string field, string text, int top = 30)
         {
             var list = new List<string>();
             using (SqlConnection conn = new SqlConnection(_connectionString))
-            using (SqlCommand cmd = new SqlCommand(@"SELECT TOP (@top) LOOKUP_VALUE FROM MST_PR_LOOKUP
-                                                     WHERE FIELD = @field AND (@text = '' OR LOOKUP_VALUE LIKE '%' + @text + '%')
-                                                     ORDER BY USE_COUNT DESC, LAST_USED DESC", conn))
+            using (SqlCommand cmd = new SqlCommand(@"SELECT TOP (@top) LookupValue FROM CIMS.PRLookups
+                                                     WHERE FieldName = @field AND (@text = '' OR LookupValue LIKE '%' + @text + '%')
+                                                     ORDER BY UseCount DESC, LastUsed DESC", conn))
             {
                 cmd.Parameters.AddWithValue("@top", top);
                 cmd.Parameters.AddWithValue("@field", field);
@@ -209,7 +209,7 @@ namespace CIMS.Services
                 foreach (var kv in values)
                 {
                     if (string.IsNullOrWhiteSpace(kv.Value)) continue;
-                    using (SqlCommand cmd = new SqlCommand("sp_PR_SaveLookup", conn) { CommandType = CommandType.StoredProcedure })
+                    using (SqlCommand cmd = new SqlCommand("CIMS.sp_PR_SaveLookup", conn) { CommandType = CommandType.StoredProcedure })
                     {
                         cmd.Parameters.AddWithValue("@Field", kv.Key);
                         cmd.Parameters.AddWithValue("@Value", kv.Value.Trim());
@@ -229,18 +229,18 @@ namespace CIMS.Services
             {
                 // ชื่อสินค้าที่ใกล้เคียงที่สุด 5 รายการ (ทุกคลัง): ค้นจากชื่อ / รหัส / Part No / Model
                 // เรียง: ชื่อตรงเป๊ะ > ชื่อขึ้นต้นด้วยคำที่พิมพ์ > รหัสขึ้นต้น > มีคำที่พิมพ์อยู่ในชื่อ/รหัส แล้วชื่อสั้นก่อน
-                string sql = @"SELECT TOP 5 PT_DESC FROM (
-                                   SELECT PT_DESC,
-                                          MIN(CASE WHEN PT_DESC = @Search THEN 0
-                                                   WHEN PT_DESC LIKE @Search + '%' THEN 1
-                                                   WHEN PT_CODE LIKE @Search + '%' THEN 2
+                string sql = @"SELECT TOP 5 Description FROM (
+                                   SELECT Description,
+                                          MIN(CASE WHEN Description = @Search THEN 0
+                                                   WHEN Description LIKE @Search + '%' THEN 1
+                                                   WHEN PartCode LIKE @Search + '%' THEN 2
                                                    ELSE 3 END) AS RANK_NO
-                                   FROM MST_PART
-                                   WHERE IS_ACTIVE = 1 AND ISNULL(PT_DESC, '') <> ''
-                                     AND (PT_DESC LIKE '%' + @Search + '%' OR PT_CODE LIKE '%' + @Search + '%'
-                                          OR ISNULL(PT_PARTNO, '') LIKE '%' + @Search + '%' OR ISNULL(PT_MODEL, '') LIKE '%' + @Search + '%')
-                                   GROUP BY PT_DESC) x
-                               ORDER BY RANK_NO, LEN(PT_DESC), PT_DESC";
+                                   FROM CIMS.Parts
+                                   WHERE IsActive = 1 AND ISNULL(Description, '') <> ''
+                                     AND (Description LIKE '%' + @Search + '%' OR PartCode LIKE '%' + @Search + '%'
+                                          OR ISNULL(PartNumber, '') LIKE '%' + @Search + '%' OR ISNULL(Model, '') LIKE '%' + @Search + '%')
+                                   GROUP BY Description) x
+                               ORDER BY RANK_NO, LEN(Description), Description";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@Search", searchText);
@@ -249,7 +249,7 @@ namespace CIMS.Services
                     {
                         while (reader.Read())
                         {
-                            suggestions.Add(reader["PT_DESC"].ToString());
+                            suggestions.Add(reader["Description"].ToString());
                         }
                     }
                 }
@@ -257,12 +257,12 @@ namespace CIMS.Services
             return suggestions;
         }
 
-        // ตรวจสอบว่าสินค้ามีอยู่ใน MST_PART หรือไม่
+        // ตรวจสอบว่าสินค้ามีอยู่ใน CIMS.Parts หรือไม่
         public bool IsProductExists(string productName)
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string sql = "SELECT COUNT(1) FROM MST_PART WHERE PT_DESC = @Name AND IS_ACTIVE = 1";
+                string sql = "SELECT COUNT(1) FROM CIMS.Parts WHERE Description = @Name AND IsActive = 1";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@Name", productName);
@@ -279,7 +279,7 @@ namespace CIMS.Services
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 // แนะนำให้ใส่เงื่อนไขดักไว้อีกชั้นใน SQL เลยครับนนท์ เพื่อความชัวร์
-                string sql = "SELECT * FROM v_PRReady WHERE IS_EXPORT = 'Y' ORDER BY PR_NO ASC";
+                string sql = "SELECT * FROM CIMS.vw_PRReady WHERE IsExported = 'Y' ORDER BY PRNumber ASC";
 
                 conn.Open();
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
@@ -290,7 +290,7 @@ namespace CIMS.Services
                         {
                             list.Add(new PRModel
                             {
-                                PR_NO = reader["PR_NO"].ToString(),
+                                PRNumber = reader["PRNumber"].ToString(),
                                 // ... (แมพค่าอื่นๆ ตามเดิม)
                             });
                         }
@@ -312,7 +312,7 @@ namespace CIMS.Services
                 using (var tr = conn.BeginTransaction())
                 {
                     int req;
-                    using (var cmd = new SqlCommand("SELECT TOP 1 QTY_REQ FROM TRN_PR_D WITH (UPDLOCK) WHERE PR_NO = @p ORDER BY PR_D_ID", conn, tr))
+                    using (var cmd = new SqlCommand("SELECT TOP 1 RequestQuantity FROM CIMS.PRDetails WITH (UPDLOCK) WHERE PRNumber = @p ORDER BY PRDetailID", conn, tr))
                     {
                         cmd.Parameters.AddWithValue("@p", prNo);
                         object v = cmd.ExecuteScalar();
@@ -324,7 +324,7 @@ namespace CIMS.Services
                     string newPr = null;
                     if (qty < req)
                     {
-                        using (var cmd = new SqlCommand("UPDATE TRN_PR_D SET QTY_REQ = @q WHERE PR_NO = @p", conn, tr))
+                        using (var cmd = new SqlCommand("UPDATE CIMS.PRDetails SET RequestQuantity = @q WHERE PRNumber = @p", conn, tr))
                         {
                             cmd.Parameters.AddWithValue("@q", qty);
                             cmd.Parameters.AddWithValue("@p", prNo);
@@ -333,18 +333,18 @@ namespace CIMS.Services
                         if (keepRemainder)
                         {
                             string prefix = DateTime.Now.ToString("yy", System.Globalization.CultureInfo.InvariantCulture) + "PR";
-                            using (var cmd = new SqlCommand(@"SELECT ISNULL(MAX(TRY_CAST(RIGHT(PR_NO, 8) AS INT)), 0) FROM TRN_PR_H WITH (UPDLOCK, HOLDLOCK)
-                                                              WHERE PR_NO LIKE @x + '%' AND LEN(PR_NO) = 12", conn, tr))
+                            using (var cmd = new SqlCommand(@"SELECT ISNULL(MAX(TRY_CAST(RIGHT(PRNumber, 8) AS INT)), 0) FROM CIMS.PRHeaders WITH (UPDLOCK, HOLDLOCK)
+                                                              WHERE PRNumber LIKE @x + '%' AND LEN(PRNumber) = 12", conn, tr))
                             {
                                 cmd.Parameters.AddWithValue("@x", prefix);
                                 newPr = prefix + (Convert.ToInt32(cmd.ExecuteScalar()) + 1).ToString("D8");
                             }
                             using (var cmd = new SqlCommand(@"
-                                INSERT INTO TRN_PR_H (PR_NO, PR_DATE, USR_ID, REQ_DEPT, TRG_DEPT, PR_STAT, PR_REM, IS_EXPORT, CREATED_AT, REQ_NAME, PR_SOURCE)
-                                SELECT @n, PR_DATE, USR_ID, REQ_DEPT, TRG_DEPT, N'Waiting', PR_REM, 'N', GETDATE(), REQ_NAME, ISNULL(PR_SOURCE, 'MANUAL')
-                                FROM TRN_PR_H WHERE PR_NO = @p;
-                                INSERT INTO TRN_PR_D (PR_NO, PT_DESC, QTY_REQ, QTY_UNIT)
-                                SELECT TOP 1 @n, PT_DESC, @rest, QTY_UNIT FROM TRN_PR_D WHERE PR_NO = @p ORDER BY PR_D_ID;", conn, tr))
+                                INSERT INTO CIMS.PRHeaders (PRNumber, PRDate, UserID, RequestDepartment, TargetDepartment, Status, Remark, IsExported, CreatedAt, RequesterName, Source)
+                                SELECT @n, PRDate, UserID, RequestDepartment, TargetDepartment, N'Waiting', Remark, 'N', GETDATE(), RequesterName, ISNULL(Source, 'MANUAL')
+                                FROM CIMS.PRHeaders WHERE PRNumber = @p;
+                                INSERT INTO CIMS.PRDetails (PRNumber, Description, RequestQuantity, Unit)
+                                SELECT TOP 1 @n, Description, @rest, Unit FROM CIMS.PRDetails WHERE PRNumber = @p ORDER BY PRDetailID;", conn, tr))
                             {
                                 cmd.Parameters.AddWithValue("@n", newPr);
                                 cmd.Parameters.AddWithValue("@p", prNo);
@@ -354,7 +354,7 @@ namespace CIMS.Services
                         }
                     }
 
-                    using (var cmd = new SqlCommand(@"UPDATE TRN_PR_H SET PR_STAT = 'Approved', APP_USR_ID = @u, APP_DATE = GETDATE(), IS_EXPORT = 'Y' WHERE PR_NO = @p", conn, tr))
+                    using (var cmd = new SqlCommand(@"UPDATE CIMS.PRHeaders SET Status = 'Approved', ApprovedBy = @u, ApprovedDate = GETDATE(), IsExported = 'Y' WHERE PRNumber = @p", conn, tr))
                     {
                         cmd.Parameters.AddWithValue("@u", (object)approverId ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@p", prNo);
@@ -372,16 +372,16 @@ namespace CIMS.Services
             var list = new List<PRModel>();
             using (var conn = new SqlConnection(_connectionString))
             using (var cmd = new SqlCommand(@"
-                SELECT * FROM v_PRReady
-                WHERE PR_STAT = 'Approved' AND ISNULL(APP_DATE, PR_DATE) >= @from AND ISNULL(APP_DATE, PR_DATE) < @to
-                  AND (@k = '' OR PR_NO LIKE '%' + @k + '%' OR PT_DESC LIKE '%' + @k + '%' OR PT_CODE LIKE '%' + @k + '%'
-                       OR REQUESTER LIKE '%' + @k + '%' OR ISNULL(REQ_DEPT, '') LIKE '%' + @k + '%' OR ISNULL(TRG_DEPT, '') LIKE '%' + @k + '%'
-                       OR ISNULL(PR_REM, '') LIKE '%' + @k + '%')
+                SELECT * FROM CIMS.vw_PRReady
+                WHERE Status = 'Approved' AND ISNULL(ApprovedDate, PRDate) >= @from AND ISNULL(ApprovedDate, PRDate) < @to
+                  AND (@k = '' OR PRNumber LIKE '%' + @k + '%' OR Description LIKE '%' + @k + '%' OR PartCode LIKE '%' + @k + '%'
+                       OR REQUESTER LIKE '%' + @k + '%' OR ISNULL(RequestDepartment, '') LIKE '%' + @k + '%' OR ISNULL(TargetDepartment, '') LIKE '%' + @k + '%'
+                       OR ISNULL(Remark, '') LIKE '%' + @k + '%')
                 ORDER BY CASE WHEN @k = '' THEN 0
-                              WHEN PR_NO = @k OR PT_CODE = @k OR PT_DESC = @k THEN 0
-                              WHEN PR_NO LIKE @k + '%' OR PT_CODE LIKE @k + '%' OR PT_DESC LIKE @k + '%' THEN 1
-                              WHEN REQUESTER LIKE @k + '%' OR ISNULL(REQ_DEPT, '') LIKE @k + '%' THEN 2 ELSE 3 END,
-                         ISNULL(APP_DATE, PR_DATE) DESC, PR_NO DESC", conn))
+                              WHEN PRNumber = @k OR PartCode = @k OR Description = @k THEN 0
+                              WHEN PRNumber LIKE @k + '%' OR PartCode LIKE @k + '%' OR Description LIKE @k + '%' THEN 1
+                              WHEN REQUESTER LIKE @k + '%' OR ISNULL(RequestDepartment, '') LIKE @k + '%' THEN 2 ELSE 3 END,
+                         ISNULL(ApprovedDate, PRDate) DESC, PRNumber DESC", conn))
             {
                 cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = from.Date;
                 cmd.Parameters.Add("@to", SqlDbType.DateTime).Value = to.Date.AddDays(1);
@@ -391,20 +391,20 @@ namespace CIMS.Services
                     while (r.Read())
                         list.Add(new PRModel
                         {
-                            PR_NO = r["PR_NO"].ToString(),
-                            USR_ID = r["USR_ID"].ToString(),
+                            PRNumber = r["PRNumber"].ToString(),
+                            UserID = r["UserID"].ToString(),
                             Requester = r["REQUESTER"].ToString(),
-                            PartCode = r["PT_CODE"]?.ToString() ?? "N/A",
-                            PartName = r["PT_DESC"].ToString(),
-                            QTY = r["QTY_REQ"] != DBNull.Value ? Convert.ToInt32(r["QTY_REQ"]) : 0,
-                            Unit = r["QTY_UNIT"]?.ToString(),
-                            Department = r["REQ_DEPT"].ToString(),
-                            TargetDept = r["TRG_DEPT"]?.ToString(),
-                            Status = r["PR_STAT"].ToString(),
-                            PR_DATE = Convert.ToDateTime(r["PR_DATE"]),
-                            PR_REM = r["PR_REM"]?.ToString(),
-                            AppDate = r["APP_DATE"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["APP_DATE"]),
-                            ExportDate = r["EXPORT_DATE"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["EXPORT_DATE"])
+                            PartCode = r["PartCode"]?.ToString() ?? "N/A",
+                            PartName = r["Description"].ToString(),
+                            QTY = r["RequestQuantity"] != DBNull.Value ? Convert.ToInt32(r["RequestQuantity"]) : 0,
+                            Unit = r["Unit"]?.ToString(),
+                            Department = r["RequestDepartment"].ToString(),
+                            TargetDept = r["TargetDepartment"]?.ToString(),
+                            Status = r["Status"].ToString(),
+                            PRDate = Convert.ToDateTime(r["PRDate"]),
+                            Remark = r["Remark"]?.ToString(),
+                            AppDate = r["ApprovedDate"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["ApprovedDate"]),
+                            ExportDate = r["ExportDate"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["ExportDate"])
                         });
             }
             return list;
@@ -414,8 +414,8 @@ namespace CIMS.Services
         public void UpdatePR(string prNo, int qty, string dept, string target, string remark)
         {
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand(@"UPDATE TRN_PR_D SET QTY_REQ = @q WHERE PR_NO = @p;
-                                              UPDATE TRN_PR_H SET REQ_DEPT = @d, TRG_DEPT = @t, PR_REM = @r WHERE PR_NO = @p;", conn))
+            using (var cmd = new SqlCommand(@"UPDATE CIMS.PRDetails SET RequestQuantity = @q WHERE PRNumber = @p;
+                                              UPDATE CIMS.PRHeaders SET RequestDepartment = @d, TargetDepartment = @t, Remark = @r WHERE PRNumber = @p;", conn))
             {
                 cmd.Parameters.AddWithValue("@q", qty);
                 cmd.Parameters.AddWithValue("@d", (object)dept ?? "");
@@ -431,7 +431,7 @@ namespace CIMS.Services
         public void DeletePR(string prNo)
         {
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("DELETE FROM TRN_PR_D WHERE PR_NO = @p; DELETE FROM TRN_PR_H WHERE PR_NO = @p;", conn))
+            using (var cmd = new SqlCommand("DELETE FROM CIMS.PRDetails WHERE PRNumber = @p; DELETE FROM CIMS.PRHeaders WHERE PRNumber = @p;", conn))
             {
                 cmd.Parameters.AddWithValue("@p", prNo);
                 conn.Open();
@@ -445,11 +445,11 @@ namespace CIMS.Services
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string sql = @"UPDATE TRN_PR_H 
-                       SET IS_EXPORT = 'N', 
-                           EXPORT_REMARK = @UserId, 
-                           EXPORT_DATE = GETDATE() 
-                       WHERE PR_NO = @PrNo";
+                string sql = @"UPDATE CIMS.PRHeaders 
+                       SET IsExported = 'N', 
+                           ExportRemark = @UserId, 
+                           ExportDate = GETDATE() 
+                       WHERE PRNumber = @PrNo";
                 conn.Open();
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {

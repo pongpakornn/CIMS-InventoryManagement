@@ -90,6 +90,10 @@ namespace CIMS.Views
             {
                 NavigateToPage(new MaxMinCalculatorView(this.CurrentUser), "MAX-MIN CALCULATOR");
             }
+            else if (CurrentUser.CanViewForecastOrder)
+            {
+                NavigateToPage(new ForecastOrderView(this.CurrentUser), "FORECAST / ORDER / DELIVERY");
+            }
             else if (CurrentUser.CanViewActivityLog)
             {
                 NavigateToPage(new ActivityLogView(this.CurrentUser), "ACTIVITY LOG");
@@ -262,6 +266,16 @@ namespace CIMS.Views
                 return;
             }
             NavigateToPage(new MaxMinCalculatorView(this.CurrentUser), "MAX-MIN CALCULATOR");
+        }
+
+        private void BtnForecastOrder_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CurrentUser.CanViewForecastOrder)
+            {
+                NotificationManager.Show("Access Denied", "คุณไม่มีสิทธิ์เข้าใช้งานหน้า Forecast / Order / Delivery", false);
+                return;
+            }
+            NavigateToPage(new ForecastOrderView(this.CurrentUser), "FORECAST / ORDER / DELIVERY");
         }
 
         private void BtnPR_Click(object sender, RoutedEventArgs e)

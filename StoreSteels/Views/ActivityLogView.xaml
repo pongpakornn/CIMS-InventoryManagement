@@ -3,7 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="Activity Log" Background="Transparent">
 
-    <!-- 🕘 การเคลื่อนไหวของผู้ใช้งานทั้งระบบ (SYS_LOGS): ค้นหา / วันที่ / ผู้ใช้ / ประเภท / Export
+    <!-- 🕘 การเคลื่อนไหวของผู้ใช้งานทั้งระบบ (CIMS.SystemLogs): ค้นหา / วันที่ / ผู้ใช้ / ประเภท / Export
          1 หน้า = 50 รายการ: แสดง 20 แถวแรก เลื่อนลงเพิ่มทีละ 15 แล้ว NEXT / PREV -->
     <Border Background="White" CornerRadius="25" Padding="30" Margin="20" BorderBrush="#F0F0F0" BorderThickness="1">
         <Grid>

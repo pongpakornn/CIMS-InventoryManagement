@@ -1,0 +1,93 @@
+<Window x:Class="CIMS.Views.AdminDeleteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Admin Delete" Width="760" Height="720"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 🗑 ADMIN DELETE (Level 1): เลือกคลัง -> ลบรายการที่ติ๊ก หรือลบทั้งหมดในคลัง (ลบสินค้าออกจากระบบ แม้ยังมียอด) -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="#B3261E" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="🗑 ADMIN DELETE" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock Text="ADMIN ONLY  •  Delete products from the whole system (every stock, scan history and Max-Min settings)"
+                                   Foreground="#FFDAD6" FontSize="12" FontWeight="Bold" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Cancel_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="1" Margin="26,16,26,6">
+                <TextBlock Text="1. SELECT STOCK" FontWeight="Black" FontSize="13" Foreground="#6750A4"/>
+                <TextBlock Text="Only products that are in the selected stock(s) are deleted." FontSize="12" Foreground="#8A8490" FontWeight="SemiBold"/>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2" Margin="26,4,26,0" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="icStocks">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="12" BorderThickness="1.5" Padding="14,10" Margin="0,0,10,10" Width="216" Cursor="Hand" MouseLeftButtonUp="Card_Click">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="#E2DEEA"/>
+                                        <Setter Property="Background" Value="#FFFFFF"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                                                <Setter Property="BorderBrush" Value="#B3261E"/>
+                                                <Setter Property="Background" Value="#FFF4F2"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="14" Foreground="#2D2A32"/>
+                                        <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding CountText}" FontSize="12" Foreground="#B3261E" FontWeight="Bold" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Top" IsHitTestVisible="False"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="3" Margin="26,10,26,0">
+                <TextBlock Text="2. WHAT TO DELETE" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,6"/>
+                <RadioButton x:Name="rbSelected" GroupName="mode" FontWeight="Bold" Margin="0,0,0,4" Checked="Mode_Changed"/>
+                <RadioButton x:Name="rbAll" GroupName="mode" Content="DELETE ALL PRODUCTS IN THE SELECTED STOCK(S)" FontWeight="Bold" Checked="Mode_Changed"/>
+                <TextBlock Text="3. REASON (required)" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,12,0,6"/>
+                <TextBox x:Name="txtReason" Height="42" Style="{StaticResource StkInput}" Tag="Why are these products being deleted?" TextChanged="Reason_Changed"/>
+                <TextBlock x:Name="txtSummary" FontWeight="Bold" FontSize="13" Foreground="#B3261E" Margin="0,10,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Grid Grid.Row="4" Margin="26,14,26,20">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="btnDelete" Content="🗑 DELETE" Style="{StaticResource StkButton}" Background="#C62828" Click="Delete_Click" IsEnabled="False"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

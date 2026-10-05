@@ -519,7 +519,7 @@
                     <!-- End : Function STATUS -->
 
                     <!-- DataGridHeader : Function DATE -->
-                    <DataGridTextColumn Header="DATE" Binding="{Binding PR_DATE, StringFormat='dd/MM/yyyy'}" Width="1.2*">
+                    <DataGridTextColumn Header="DATE" Binding="{Binding PRDate, StringFormat='dd/MM/yyyy'}" Width="1.2*">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="HorizontalAlignment" Value="Center"/>

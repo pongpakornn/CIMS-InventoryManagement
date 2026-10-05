@@ -20,7 +20,7 @@ namespace CIMS.Services
                        COUNT(*) AS Items,
                        SUM(CASE WHEN StockStatus IN ('OVER_MAX', 'NORMAL_GOOD') AND ISNULL([Max], 0) > 0 THEN 1 ELSE 0 END) AS MaxCount,
                        SUM(CASE WHEN StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK') AND ISNULL([Min], 0) > 0 THEN 1 ELSE 0 END) AS MinCount
-                FROM VW_StockMonitoring
+                FROM CIMS.vw_StockMonitoring
                 GROUP BY StkId", conn))
             {
                 conn.Open();
@@ -49,25 +49,25 @@ namespace CIMS.Services
             {
                 conn.Open();
 
-                // Card 1: แสดงจำนวนซัพพลายเออร์ทั้งหมดที่มี IS_SHOW_MST = 1 (นับแบบ DISTINCT)
-                // schema ใหม่ PT_CUST เปลี่ยนชื่อเป็น PT_SUPPLIER
-                string sqlCust = @"SELECT COUNT(DISTINCT PT_SUPPLIER)
-                                   FROM MST_PART
-                                   WHERE IS_ACTIVE = 1
-                                     AND IS_SHOW_MST = 1
-                                     AND PT_SUPPLIER IS NOT NULL
-                                     AND PT_SUPPLIER <> ''";
+                // Card 1: แสดงจำนวนซัพพลายเออร์ทั้งหมดที่มี IsShowInMaster = 1 (นับแบบ DISTINCT)
+                // schema ใหม่ Customer เปลี่ยนชื่อเป็น Supplier
+                string sqlCust = @"SELECT COUNT(DISTINCT Supplier)
+                                   FROM CIMS.Parts
+                                   WHERE IsActive = 1
+                                     AND IsShowInMaster = 1
+                                     AND Supplier IS NOT NULL
+                                     AND Supplier <> ''";
                 using (SqlCommand cmd = new SqlCommand(sqlCust, conn))
                 {
                     totalCustomers = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
                 }
 
-                // Card 2: แสดงจำนวนสินค้าทั้งหมดที่มี IS_SHOW_MST = 1
-                // schema ใหม่ตัด PT_ACODE ออกแล้ว - นับจาก PT_CODE ซึ่งเป็นตัวระบุหลักตัวเดียว
-                string sqlProd = @"SELECT COUNT(DISTINCT PT_CODE)
-                                   FROM MST_PART
-                                   WHERE IS_ACTIVE = 1
-                                     AND IS_SHOW_MST = 1";
+                // Card 2: แสดงจำนวนสินค้าทั้งหมดที่มี IsShowInMaster = 1
+                // schema ใหม่ตัด PartACode ออกแล้ว - นับจาก PartCode ซึ่งเป็นตัวระบุหลักตัวเดียว
+                string sqlProd = @"SELECT COUNT(DISTINCT PartCode)
+                                   FROM CIMS.Parts
+                                   WHERE IsActive = 1
+                                     AND IsShowInMaster = 1";
                 using (SqlCommand cmd = new SqlCommand(sqlProd, conn))
                 {
                     totalProducts = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
@@ -77,7 +77,7 @@ namespace CIMS.Services
                 // ไม่นับรายการที่ Max และ Min เป็น 0
                 string sqlMax = @"
 SELECT COUNT(*)
-FROM VW_StoreMonitoring
+FROM CIMS.vw_StoreMonitoring
 WHERE StockStatus IN ('OVER_MAX', 'NORMAL_GOOD')
   AND ISNULL([Max], 0) > 0"; // ป้องกันกรณีเป็น 0 ทั้งคู่
 
@@ -90,7 +90,7 @@ WHERE StockStatus IN ('OVER_MAX', 'NORMAL_GOOD')
                 // ย้ำว่าเฉพาะที่น้อยกว่า Min และไม่นับกรณี Max Min เป็น 0
                 string sqlMin = @"
 SELECT COUNT(*)
-FROM VW_StoreMonitoring
+FROM CIMS.vw_StoreMonitoring
 WHERE StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK')
   AND ISNULL([Min], 0) > 0"; // ป้องกันกรณีไม่มีคอนฟิก Min
 
@@ -137,21 +137,21 @@ WHERE StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK')
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
             {
                 conn.Open();
-                // schema ใหม่ PT_CUST เปลี่ยนชื่อเป็น PT_SUPPLIER
-                string sql = @"SELECT DISTINCT PT_SUPPLIER
-                       FROM MST_PART
-                       WHERE IS_ACTIVE = 1
-                         AND IS_SHOW_MST = 1
-                         AND PT_SUPPLIER IS NOT NULL
-                         AND PT_SUPPLIER <> ''
-                       ORDER BY PT_SUPPLIER";
+                // schema ใหม่ Customer เปลี่ยนชื่อเป็น Supplier
+                string sql = @"SELECT DISTINCT Supplier
+                       FROM CIMS.Parts
+                       WHERE IsActive = 1
+                         AND IsShowInMaster = 1
+                         AND Supplier IS NOT NULL
+                         AND Supplier <> ''
+                       ORDER BY Supplier";
 
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 using (SqlDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        customers.Add(reader["PT_SUPPLIER"].ToString());
+                        customers.Add(reader["Supplier"].ToString());
                     }
                 }
             }
@@ -164,7 +164,7 @@ WHERE StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK')
         //    using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
         //    {
         //        conn.Open();
-        //        string sql = "SELECT * FROM VW_Dashboard_PieChart";
+        //        string sql = "SELECT * FROM CIMS.vw_DashboardPieChart";
         //        using (SqlCommand cmd = new SqlCommand(sql, conn))
         //        using (SqlDataReader reader = cmd.ExecuteReader())
         //        {
@@ -188,7 +188,7 @@ WHERE StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK')
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
             {
                 conn.Open();
-                string sql = "SELECT * FROM VW_Dashboard_PieChart"; // วิ่งไปเรียกคำสั่งใหม่ที่เรา ALTER ไว้
+                string sql = "SELECT * FROM CIMS.vw_DashboardPieChart"; // วิ่งไปเรียกคำสั่งใหม่ที่เรา ALTER ไว้
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 using (SqlDataReader reader = cmd.ExecuteReader())
                 {
@@ -213,7 +213,7 @@ WHERE StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK')
         //    using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
         //    {
         //        conn.Open();
-        //        string sql = "SELECT * FROM VW_Dashboard_BarChart ORDER BY MonthOrder";
+        //        string sql = "SELECT * FROM CIMS.vw_DashboardBarChart ORDER BY MonthOrder";
         //        using (SqlCommand cmd = new SqlCommand(sql, conn))
         //        using (SqlDataReader reader = cmd.ExecuteReader())
         //        {
@@ -236,7 +236,7 @@ WHERE StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK')
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
             {
                 conn.Open();
-                string sql = "SELECT * FROM VW_Dashboard_BarChart ORDER BY MonthOrder";
+                string sql = "SELECT * FROM CIMS.vw_DashboardBarChart ORDER BY MonthOrder";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 using (SqlDataReader reader = cmd.ExecuteReader())
                 {

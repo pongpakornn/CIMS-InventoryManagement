@@ -64,7 +64,7 @@ namespace CIMS.Models
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    // ยอดสรุปต่อคลัง (VW_StockMonitoring)
+    // ยอดสรุปต่อคลัง (CIMS.vw_StockMonitoring)
     public class StockDashboardSummary
     {
         public StockModel Stock { get; set; }

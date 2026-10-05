@@ -34,7 +34,7 @@ namespace CIMS.ViewModels
 
         public UserSession CurrentUser { get; set; }
 
-        // คลังที่กำลังแสดง (Stock-CHR = พฤติกรรมเดิมทุกอย่าง, คลังอื่นอ่าน/แก้ไขที่ MST_PART_STOCK)
+        // คลังที่กำลังแสดง (Stock-CHR = พฤติกรรมเดิมทุกอย่าง, คลังอื่นอ่าน/แก้ไขที่ CIMS.PartStocks)
         public StockModel Stock { get; }
 
         public ICollectionView GroupedProducts { get; set; }
@@ -127,7 +127,7 @@ namespace CIMS.ViewModels
             return _service.UpdateRemark(Stock, product.PartCode, product.Remark, product.PartId);
         }
 
-        // แก้ MAX / MIN / QTY / STOCK(BOX) / STOCK(PCS) = สิทธิ์ EDIT ของคลังนั้น (SYS_ID = รหัสคลัง รวมคลังหลัก)
+        // แก้ MAX / MIN / QTY / STOCK(BOX) / STOCK(PCS) = สิทธิ์ EDIT ของคลังนั้น (SystemID = รหัสคลัง รวมคลังหลัก)
         public bool CanEditMaster => Stock != null && CurrentUser != null && CurrentUser.CanEditStock(Stock);
 
         // ต่อท้าย Log ให้รู้ว่าแก้ไขคลังไหน (คลังหลักไม่ต่อ เพื่อให้ Log เหมือนเดิม)
@@ -149,38 +149,33 @@ namespace CIMS.ViewModels
 
         #region === [ Function : LoadData ] ===
 
-        public void LoadData(string searchKeyword = "", bool isLoadMore = false)
+        // ⚡ ดึงข้อมูลเบื้องหลัง (หน้าจอไม่ค้างระหว่างรอฐานข้อมูล) - กดกรอง / ค้นหาซ้อนกัน ใช้ผลของคำสั่งล่าสุดเท่านั้น
+        private int _loadVersion;
+
+        public async void LoadData(string searchKeyword = "", bool isLoadMore = false)
         {
-            if (_isLoading || (isLoadMore && !_hasMoreData))
+            if (isLoadMore && (_isLoading || !_hasMoreData))
                 return;
+
+            int ver = isLoadMore ? _loadVersion : ++_loadVersion;
+            int offset = isLoadMore ? _currentOffset : 0;
+            int pageSize = isLoadMore ? 30 : (LoadAllMode ? 1000000 : 50);
+            string catFilter = IsAll(SelectedCategory) ? "" : SelectedCategory;
+            string filterType = SelectedFilterType;
+            var stock = Stock;
 
             try
             {
                 _isLoading = true;
-
-                int pageSize;
+                var newData = await Task.Run(() => _service.GetProducts(stock, searchKeyword, catFilter, filterType, offset, pageSize));
+                if (ver != _loadVersion) return;   // มีคำสั่งใหม่กว่าแล้ว ทิ้งผลนี้
 
                 if (!isLoadMore)
                 {
                     _currentOffset = 0;
                     _hasMoreData = true;
                     Products.Clear();
-                    pageSize = LoadAllMode ? 1000000 : 50;
                 }
-                else
-                {
-                    pageSize = 30;
-                }
-
-                string catFilter = IsAll(SelectedCategory) ? "" : SelectedCategory;
-
-                var newData = _service.GetProducts(
-                    Stock,
-                    searchKeyword,
-                    catFilter,
-                    SelectedFilterType,
-                    _currentOffset,
-                    pageSize);
 
                 if (newData == null || newData.Count == 0)
                 {
@@ -197,9 +192,14 @@ namespace CIMS.ViewModels
                 if (newData.Count < pageSize)
                     _hasMoreData = false;
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Store LoadData: {ex}");
+                if (ver == _loadVersion) DialogHelper.ShowError("โหลดข้อมูลคลังไม่สำเร็จ\n" + ex.Message);
+            }
             finally
             {
-                _isLoading = false;
+                if (ver == _loadVersion) _isLoading = false;
             }
         }
 
@@ -258,7 +258,7 @@ namespace CIMS.ViewModels
                 await App.Current.Dispatcher.InvokeAsync(() =>
                 {
                     // ToLookup รองรับ key ซ้ำได้ - วน loop อัปเดตทุก row ที่ PartCode ตรงกันพร้อมกันทุกครั้ง
-                    // จับคู่ด้วย PT_ID (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - ไม่มี PT_ID ใช้ PartCode แบบเดิม
+                    // จับคู่ด้วย PartID (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - ไม่มี PartID ใช้ PartCode แบบเดิม
                     var lookup = Products
                         .Where(x => !string.IsNullOrWhiteSpace(x.PartCode))
                         .ToLookup(x => x.PartId > 0 ? "#" + x.PartId : x.PartCode);

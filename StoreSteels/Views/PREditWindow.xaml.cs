@@ -18,12 +18,12 @@ namespace CIMS.Views
             InitializeComponent();
             var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive && w != this) ?? Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) { Owner = owner; WindowStartupLocation = WindowStartupLocation.CenterOwner; }
-            txtPrNo.Text = pr.PR_NO;
+            txtPrNo.Text = pr.PRNumber;
             txtProduct.Text = pr.PartName;
             txtQty.Text = pr.QTY.ToString();
             txtDept.Text = pr.Department;
             txtTarget.Text = pr.TargetDept;
-            txtRemark.Text = pr.PR_REM;
+            txtRemark.Text = pr.Remark;
             Loaded += (s, e) => { txtQty.Focus(); txtQty.SelectAll(); };
         }
 

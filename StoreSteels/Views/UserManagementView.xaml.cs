@@ -1,4 +1,4 @@
-using CIMS.Helpers;
+﻿using CIMS.Helpers;
 using CIMS.Models;
 using CIMS.Services;
 using System;
@@ -26,6 +26,7 @@ namespace CIMS.Views
             _session = session;
             btnAdd.Visibility = session?.CanAddUser == true ? Visibility.Visible : Visibility.Collapsed;
             btnImport.Visibility = session?.CanAddUser == true && session.CanEditUser ? Visibility.Visible : Visibility.Collapsed;
+            btnTemplate.Visibility = btnImport.Visibility;
             Loaded += async (s, e) => await ReloadAsync();
         }
 
@@ -157,30 +158,56 @@ namespace CIMS.Views
             catch (Exception ex) { DialogHelper.ShowError("ลบผู้ใช้ไม่สำเร็จ\n" + ex.Message); }
         }
 
-        // 📥 Import ผู้ใช้จาก Excel (มี USER ID แล้ว = อัพเดท / ยังไม่มี = เพิ่มใหม่)
+        // 📥 Import ผู้ใช้ + สิทธิ์จาก Excel (ชีทผู้ใช้: USERID / FULLNAME ... / ชีทสิทธิ์: USERID / SYSTEMID / CANVIEW ...)
+        //    ผู้ใช้: มี USERID แล้ว = อัพเดท / ยังไม่มี = เพิ่มใหม่  •  สิทธิ์: ตั้งตามไฟล์เฉพาะระบบที่มีในไฟล์ (ต้องมีสิทธิ์กำหนดสิทธิ์)
         private async void Import_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Import User", Filter = "Excel Files (*.xlsx)|*.xlsx" };
+            var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Import User / Permission", Filter = "Excel Files (*.xlsx)|*.xlsx" };
             if (dlg.ShowDialog() != true) return;
-            List<UserAdminService.ImportRow> rows;
-            try { rows = await Task.Run(() => _service.ReadImport(dlg.FileName)); }
+            bool allowMaster = _session?.UserLevel == 1 || _session?.IsMasterAdmin == true;
+            UserAdminService.ImportFile file;
+            try { file = await Task.Run(() => _service.ReadImport(dlg.FileName, allowMaster)); }
             catch (Exception ex) { DialogHelper.ShowError("อ่านไฟล์ Excel ไม่สำเร็จ\n" + ex.Message); return; }
 
-            var valid = rows.Where(r => r.IsValid).ToList();
-            var bad = rows.Where(r => !r.IsValid).ToList();
-            string errs = string.Join("\n", bad.Take(8).Select(r => $"• แถว {r.RowNumber}: {(string.IsNullOrEmpty(r.User.UserId) ? "-" : r.User.UserId)} - {r.Error}")) +
-                          (bad.Count > 8 ? $"\n• ... และอีก {bad.Count - 8:N0} แถว" : "");
-            if (valid.Count == 0) { DialogHelper.ShowError("ไม่พบรายการที่นำเข้าได้ในไฟล์นี้\n\n" + errs); return; }
-            if (!DialogHelper.ShowConfirm($"ไฟล์: {Path.GetFileName(dlg.FileName)}\n\nเพิ่มผู้ใช้ใหม่ {valid.Count(r => r.IsNew):N0} คน  •  อัพเดทผู้ใช้เดิม {valid.Count(r => !r.IsNew):N0} คน" +
-                                          (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{errs}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?", "IMPORT USER")) return;
+            // ไม่มีสิทธิ์กำหนดสิทธิ์ -> ข้ามชีทสิทธิ์
+            bool permsSkipped = file.Perms.Count > 0 && _session?.CanSetPermissions != true;
+            if (permsSkipped) foreach (var p in file.Perms.Where(p => p.IsValid)) p.Error = "ไม่มีสิทธิ์กำหนดสิทธิ์ผู้ใช้ (APPROVE ของ UserManagement)";
+
+            var users = file.Users.Where(r => r.IsValid).ToList();
+            var perms = file.Perms.Where(r => r.IsValid).ToList();
+            var bad = file.Users.Where(r => !r.IsValid).Select(r => $"• {r.Sheet} แถว {r.RowNumber}: {(string.IsNullOrEmpty(r.User.UserId) ? "-" : r.User.UserId)} - {r.Error}")
+                      .Concat(file.Perms.Where(r => !r.IsValid).Select(r => $"• {r.Sheet} แถว {r.RowNumber}: {(string.IsNullOrEmpty(r.UserId) ? "-" : r.UserId)} {r.SysId} - {r.Error}")).ToList();
+            string errs = string.Join("\n", bad.Take(10)) + (bad.Count > 10 ? $"\n• ... และอีก {bad.Count - 10:N0} แถว" : "");
+            if (users.Count == 0 && perms.Count == 0) { DialogHelper.ShowError("ไม่พบรายการที่นำเข้าได้ในไฟล์นี้\n\n" + errs); return; }
+
+            string summary = $"ไฟล์: {Path.GetFileName(dlg.FileName)}\n\n" +
+                             $"ผู้ใช้: เพิ่มใหม่ {users.Count(r => r.IsNew):N0} คน  •  อัพเดท {users.Count(r => !r.IsNew):N0} คน\n" +
+                             $"สิทธิ์: ตั้งค่า {perms.Count:N0} รายการ ({perms.Select(p => p.UserId).Distinct(StringComparer.OrdinalIgnoreCase).Count():N0} คน)" +
+                             (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{errs}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?";
+            if (!DialogHelper.ShowConfirm(summary, "IMPORT USER / PERMISSION")) return;
             try
             {
-                var r = await Task.Run(() => _service.ApplyImport(rows));
-                LogService.WriteLog(_session?.UserId, "USER_IMPORT", $"Import Excel: {Path.GetFileName(dlg.FileName)} | Added: {r.Added} | Updated: {r.Updated} | Skipped rows: {bad.Count}", "");
-                DialogHelper.ShowSuccess($"นำเข้าผู้ใช้สำเร็จ\nเพิ่มใหม่ {r.Added:N0} คน  •  อัพเดท {r.Updated:N0} คน");
+                var r = await Task.Run(() => _service.ApplyImport(file));
+                LogService.WriteLog(_session?.UserId, "USER_IMPORT",
+                    $"Import Excel: {Path.GetFileName(dlg.FileName)} | Added: {r.Added} | Updated: {r.Updated} | Permissions: {r.Perms} | Skipped rows: {bad.Count}", "");
+                DialogHelper.ShowSuccess($"นำเข้าสำเร็จ\nผู้ใช้เพิ่มใหม่ {r.Added:N0} คน  •  อัพเดท {r.Updated:N0} คน\nสิทธิ์ {r.Perms:N0} รายการ");
                 await ReloadAsync();
             }
-            catch (Exception ex) { DialogHelper.ShowError("นำเข้าไม่สำเร็จ (ยกเลิกทั้งไฟล์)\n" + ex.Message); }
+            catch (Exception ex) { DialogHelper.ShowError("นำเข้าไม่สำเร็จ (ยกเลิกทั้งไฟล์ ไม่มีรายการใดถูกบันทึก)\n" + ex.Message); }
+        }
+
+        // 📄 แบบฟอร์ม Import (ชีท USERS / PERMISSIONS / SYSTEM IDS)
+        private void Template_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog { Title = "Save Import Template", Filter = "Excel Files (*.xlsx)|*.xlsx", FileName = "CIMS_User_Permission_Template.xlsx" };
+            if (dlg.ShowDialog() != true) return;
+            try
+            {
+                _service.CreateImportTemplate(dlg.FileName);
+                NotificationManager.Show("Template", "บันทึกแบบฟอร์ม Import แล้ว", true);
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dlg.FileName) { UseShellExecute = true }); } catch { }
+            }
+            catch (Exception ex) { DialogHelper.ShowError("สร้างแบบฟอร์มไม่สำเร็จ (ปิดไฟล์ Excel เดิมก่อน)\n" + ex.Message); }
         }
     }
 }

@@ -10,7 +10,7 @@ using System.Windows.Input;
 
 namespace CIMS.Views
 {
-    // เพิ่ม / แก้ไขคลัง - ตอนสร้างเสร็จ ระบบให้สิทธิ์ VIEW กับผู้ใช้ทุกคนอัตโนมัติ (sp_Stock_GrantViewAll)
+    // เพิ่ม / แก้ไขคลัง - ตอนสร้างเสร็จ ระบบให้สิทธิ์ VIEW กับผู้ใช้ทุกคนอัตโนมัติ (CIMS.sp_Stock_GrantViewAll)
     public partial class StockEditorWindow : Window
     {
         private readonly UserSession _session;
@@ -129,7 +129,7 @@ namespace CIMS.Views
             if (string.IsNullOrEmpty(code)) { DialogHelper.ShowWarning("กรุณากรอกรหัสคลัง (STOCK CODE)"); txtCode.Focus(); return; }
             if (string.IsNullOrEmpty(name)) { DialogHelper.ShowWarning("กรุณากรอกชื่อคลัง (STOCK NAME)"); txtName.Focus(); return; }
 
-            // รหัสคลังใช้เป็นชื่อสิทธิ์ (SYS_ID) -> ห้ามชนกับสิทธิ์ของระบบ และยาวได้ไม่เกิน 30 ตัว
+            // รหัสคลังใช้เป็นชื่อสิทธิ์ (SystemID) -> ห้ามชนกับสิทธิ์ของระบบ และยาวได้ไม่เกิน 30 ตัว
             if (StockModel.ReservedCodes.Contains(code.ToUpperInvariant()))
             {
                 DialogHelper.ShowWarning($"รหัสคลัง \"{code}\" ซ้ำกับชื่อสิทธิ์ของระบบ กรุณาใช้รหัสอื่น");
