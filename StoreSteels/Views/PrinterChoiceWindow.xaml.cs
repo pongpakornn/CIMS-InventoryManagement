@@ -36,7 +36,8 @@ namespace CIMS.Views
         public PrintQueue SelectedQueue { get; private set; }
         public bool IsA4 { get; private set; }
         public int Cols => 2;
-        public int Rows => 5;   // A4 = 2 x 5 = 10 ใบต่อแผ่น
+        // A4: 10 ใบ (2 x 5) / 12 ใบ (2 x 6) / 14 ใบ (2 x 7) ต่อแผ่น
+        public int Rows => rb14.IsChecked == true ? 7 : rb12.IsChecked == true ? 6 : 5;
 
         private PrinterChoiceWindow(IList<PackingCardModel> items, List<PrinterItem> printers)
         {
@@ -51,6 +52,8 @@ namespace CIMS.Views
             lbPrinters.SelectedItem = printers.FirstOrDefault(p => p.Name == last)
                                       ?? printers.FirstOrDefault(p => p.IsDefault)
                                       ?? printers.FirstOrDefault();
+            int lastRows = UiPrefs.GetInt("PickListA4Rows", 5);
+            (lastRows == 7 ? rb14 : lastRows == 6 ? rb12 : rb10).IsChecked = true;
             _ready = true;
             Refresh();
         }
@@ -94,6 +97,7 @@ namespace CIMS.Views
         private PrinterItem Current => lbPrinters.SelectedItem as PrinterItem;
 
         private void Printers_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => Refresh();
+        private void Layout_Checked(object sender, RoutedEventArgs e) => Refresh();
 
         // สรุป + ตัวอย่างหน้าแรก ตามเครื่องพิมพ์ / รูปแบบที่เลือก
         private void Refresh()
@@ -133,6 +137,7 @@ namespace CIMS.Views
             SelectedQueue = p.Queue;
             IsA4 = !p.IsLabel;
             UiPrefs.Set("PickListPrinter", p.Name);
+            UiPrefs.Set("PickListA4Rows", Rows);
             DialogResult = true;
         }
 

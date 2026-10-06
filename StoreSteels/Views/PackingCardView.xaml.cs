@@ -170,11 +170,14 @@ namespace CIMS.Views
                 });
 
                 string userId = _viewModel.CurrentUser?.UserId ?? "Unknown";
+                string logError = null;
                 foreach (var item in printedItems)
                 {
                     // บันทึกประวัติการพิมพ์ลง CIMS.PickListPrintLogs (ฐานของเราเอง) - รอบถัดไป ERP query
                     // จะไม่ดึงรายการนี้กลับมาอีก และตัดออกจากลิสต์ที่แสดงอยู่ทันทีด้านล่าง
-                    _printLogService.LogPrinted(item, userId);
+                    // พิมพ์ออกไปแล้ว -> บันทึกไม่สำเร็จต้องแจ้งให้รู้ (ไม่ใช่ "พิมพ์ไม่สำเร็จ") เพราะรายการจะกลับมาให้พิมพ์ซ้ำ
+                    try { _printLogService.LogPrinted(item, userId); }
+                    catch (Exception ex) { logError ??= ex.Message; }
                     LogService.WriteLog(userId, "PRINT_PACKING_CARD", $"Printed Packing Card | Ticket: {item.TicketNo} | Lot: {item.LotNo} | Printer: {choice.SelectedQueue.FullName}{(choice.IsA4 ? $" (A4 {choice.Cols}x{choice.Rows})" : "")}", item.MaterialCode);
                 }
 
@@ -182,7 +185,8 @@ namespace CIMS.Views
                 {
                     _viewModel.RemoveItems(printedItems);
                     UpdateItemCountText();
-                    DialogHelper.ShowSuccess($"พิมพ์ Packing Card สำเร็จ {printedItems.Count} ใบ");
+                    if (logError == null) DialogHelper.ShowSuccess($"พิมพ์ Packing Card สำเร็จ {printedItems.Count} ใบ");
+                    else DialogHelper.ShowWarning($"พิมพ์ Packing Card แล้ว {printedItems.Count} ใบ แต่บันทึกประวัติการพิมพ์ไม่สำเร็จ\nรายการนี้อาจกลับมาแสดงให้พิมพ์อีกครั้ง\n\n{logError}");
                 }
             }
             catch (Exception ex)

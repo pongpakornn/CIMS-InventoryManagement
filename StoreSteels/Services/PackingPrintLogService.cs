@@ -56,7 +56,7 @@ namespace CIMS.Services
             const string sql = @"
                 IF NOT EXISTS (SELECT 1 FROM CIMS.PickListPrintLogs WHERE TicketNo = @TicketNo AND ItemNo = @ItemNo)
                 INSERT INTO CIMS.PickListPrintLogs
-                    (TicketNo, ItemNo, Warehouse, LotNo, MaterialCode, WorkOrder, TicketDate, JobName, Qty, PrintedBy, LabelRef)
+                    (TicketNo, ItemNo, Warehouse, LotNo, MaterialCode, WorkOrder, TicketDate, JobName, Quantity, PrintedBy, LabelRef)
                 VALUES
                     (@TicketNo, @ItemNo, @Warehouse, @LotNo, @MaterialCode, @WorkOrder, @TicketDate, @JobName, @Qty, @PrintedBy, @LabelRef)";
 

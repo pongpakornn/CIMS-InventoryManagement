@@ -150,7 +150,7 @@ namespace CIMS.Services
                 };
                 var holder = new Grid();
                 holder.Children.Add(dash);
-                if (i < pageItems.Count) { cell.BorderThickness = new Thickness(0); cell.Child = BuildA4Card(pageItems[i]); }
+                if (i < pageItems.Count) { cell.BorderThickness = new Thickness(0); cell.Child = BuildA4Card(pageItems[i], rows); }
                 holder.Children.Add(cell);
                 cards.Children.Add(holder);
             }
@@ -167,18 +167,34 @@ namespace CIMS.Services
             return root;
         }
 
-        // การ์ด A4 (10 ใบต่อแผ่น ~97 x 55mm) = ข้อมูลชุดเดียวกับการ์ด Pick List เดิม (CH + ชื่อบริษัท / QR / Bill-Group,
+        // การ์ด A4 (10 / 12 / 14 ใบต่อแผ่น) = ข้อมูลชุดเดียวกับการ์ด Pick List เดิม (โลโก้บริษัท / QR / Bill-Group,
         // Work Order-LOT NO., Part Name, Quantity-TicketDate) จัดให้พอดีช่อง: QR อยู่ขวาข้างหัวการ์ด + แถว Bill-Group
         // แถวที่เหลือยาวเต็มการ์ด - ข้อมูลแสดงอย่างเดียว ไม่แก้ไขอะไร
-        public FrameworkElement BuildA4Card(PackingCardModel item, double s = 0.82, double qrMm = 19)
+        // ขนาดตามจำนวนใบต่อแผ่น (2 คอลัมน์ x rows แถว): 10 ใบ = 2x5 / 12 ใบ = 2x6 / 14 ใบ = 2x7
+        private static (double S, double QrMm, double LogoMm) CardSizes(int rows) =>
+            rows >= 7 ? (0.64, 13.5, 6.2) : rows == 6 ? (0.72, 16, 7.4) : (0.82, 19, 8.8);
+
+        private static readonly Lazy<System.Windows.Media.Imaging.BitmapImage> Logo = new Lazy<System.Windows.Media.Imaging.BitmapImage>(() =>
         {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri("pack://application:,,,/CIMS;component/Assets/Images/CH_Logo.png");
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        });
+
+        public FrameworkElement BuildA4Card(PackingCardModel item, int rows = 5)
+        {
+            var (s, qrMm, logoMm) = CardSizes(rows);
             var card = new Border
             {
                 Background = Brushes.White,
                 BorderBrush = Brushes.Black,
                 BorderThickness = new Thickness(1.2),
                 CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(3 * MmToPx, 2.2 * MmToPx, 3 * MmToPx, 2 * MmToPx)
+                Padding = new Thickness(3 * MmToPx * s, 2.2 * MmToPx * s, 3 * MmToPx * s, 2 * MmToPx * s)
             };
             var g = new Grid();
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -187,18 +203,18 @@ namespace CIMS.Services
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 1 divider
             for (int i = 0; i < 4; i++) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });   // 2-5
 
-            // หัวการ์ด: CH + ชื่อบริษัท (Grid ให้ชื่อรู้ความกว้างจริง ไม่ถูก QR ทับ)
-            var company = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3 * s, 0) };
-            company.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            company.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            company.Children.Add(new TextBlock { Text = "CH", FontWeight = FontWeights.Black, FontSize = 28 * s, Foreground = Brushes.Black, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6 * s, 0) });
-            var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(names, 1);
-            names.Children.Add(new TextBlock { Text = "CH. RADIATORS CO.LTD.", FontWeight = FontWeights.Black, FontSize = 13 * s, Foreground = Brushes.Black, TextTrimming = TextTrimming.CharacterEllipsis });
-            names.Children.Add(new TextBlock { Text = "บริษัท ซีเอชเรดิเอเตอร์ จำกัด", FontSize = 10.5 * s, Foreground = Brushes.Black, TextTrimming = TextTrimming.CharacterEllipsis });
-            company.Children.Add(names);
-            g.Children.Add(company);
-
+            // หัวการ์ด: โลโก้บริษัท (รูป CH. RADIATORS CO.,LTD. + ชื่อไทย) อย่างเดียว
+            var logo = new Image
+            {
+                Source = Logo.Value,
+                Height = logoMm * MmToPx,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 3 * s, 0)
+            };
+            RenderOptions.SetBitmapScalingMode(logo, BitmapScalingMode.HighQuality);
+            g.Children.Add(logo);
             // QR มุมขวาบน กินความสูงหัวการ์ด + แถว Bill-Group
             double qr = qrMm * MmToPx;
             var qrBox = new Border { Width = qr, Height = qr, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.8), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(2 * MmToPx, 0, 0, 0) };
@@ -208,7 +224,7 @@ namespace CIMS.Services
             Grid.SetRowSpan(qrBox, 3);
             g.Children.Add(qrBox);
 
-            var divider = new Border { Height = 1, Background = Brushes.Gray, Margin = new Thickness(0, 1.5 * MmToPx, 0, 0.5 * MmToPx) };
+            var divider = new Border { Height = 1, Background = Brushes.Gray, Margin = new Thickness(0, 1.5 * MmToPx * s, 0, 0.5 * MmToPx * s) };
             Grid.SetRow(divider, 1);
             g.Children.Add(divider);
 
@@ -225,7 +241,7 @@ namespace CIMS.Services
         // แถวของการ์ด A4: ป้ายชื่อตัวหนา + ค่าบนเส้นใต้ (แบบเดียวกับการ์ดเดิม) - 1 หรือ 2 คู่ต่อแถว
         private static void AddA4Row(Grid g, int row, int colSpan, double s, params (string Label, string Value)[] fields)
         {
-            var line = new Grid { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 0.6 * MmToPx) };
+            var line = new Grid { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 0.6 * MmToPx * s) };
             for (int i = 0; i < fields.Length; i++)
             {
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
