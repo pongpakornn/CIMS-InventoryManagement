@@ -63,6 +63,17 @@ namespace CIMS.Helpers
 
         // 5. สำหรับกรอกจำนวน (ใช้กับ "คืนเหล็ก" ในหน้า Multi-Scanner และโอนย้ายบางส่วน) - คืนค่า null เมื่อกด Cancel
         //    maxQty: ถ้าระบุ ห้ามกรอกเกินค่านี้ (เช่น ยอดคงเหลือในคลังต้นทาง)
+        // กรอกจำนวนแบบทศนิยมได้ (คลังที่เปิด DECIMAL QTY) - allowDecimal = false ปัดเป็นจำนวนเต็มเหมือนเดิม
+        public static decimal? ShowDecimalQuantityInput(string message, string title, bool allowDecimal, decimal? maxQty = null)
+        {
+            return OnUi(() =>
+            {
+                var win = new QuantityInputDialog(title, message, maxQty, allowDecimal);
+                SetOwner(win);
+                bool? result = win.ShowDialog();
+                return result == true ? win.DecimalQuantity : (decimal?)null;
+            });
+        }
         public static int? ShowQuantityInput(string message, string title = "ENTER QUANTITY", int? maxQty = null)
         {
             return OnUi(() =>

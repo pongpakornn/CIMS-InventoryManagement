@@ -30,14 +30,15 @@ namespace CIMS.Models
         public int DayMin { get => _dayMin; set { _dayMin = value; OnPropertyChanged(); } }
 
         // ค่า MAX / MIN ปัจจุบันในหน้า Store (Max-Min) - 0 แสดงเป็น "-"
-        private int _qtyMax;
-        public int QtyMax { get => _qtyMax; set { _qtyMax = value; OnPropertyChanged(); OnPropertyChanged(nameof(QtyMaxText)); } }
+        // ทศนิยมได้ (คลังที่เปิด DECIMAL QTY แก้ MAX / MIN เป็นทศนิยมเองในหน้า Store)
+        private decimal _qtyMax;
+        public decimal QtyMax { get => _qtyMax; set { _qtyMax = value; OnPropertyChanged(); OnPropertyChanged(nameof(QtyMaxText)); } }
 
-        private int _qtyMin;
-        public int QtyMin { get => _qtyMin; set { _qtyMin = value; OnPropertyChanged(); OnPropertyChanged(nameof(QtyMinText)); } }
+        private decimal _qtyMin;
+        public decimal QtyMin { get => _qtyMin; set { _qtyMin = value; OnPropertyChanged(); OnPropertyChanged(nameof(QtyMinText)); } }
 
-        public string QtyMaxText => QtyMax > 0 ? QtyMax.ToString("N0") : "-";
-        public string QtyMinText => QtyMin > 0 ? QtyMin.ToString("N0") : "-";
+        public string QtyMaxText => QtyMax > 0 ? CIMS.Helpers.Qty.Plain(QtyMax) : "-";
+        public string QtyMinText => QtyMin > 0 ? CIMS.Helpers.Qty.Plain(QtyMin) : "-";
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

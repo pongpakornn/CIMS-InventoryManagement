@@ -19,13 +19,15 @@ namespace CIMS.Services
 
         #region === [ Stocks ] ===
 
-        private const string StockColumns = @"
+        // ฐานที่ยังไม่รัน Update_20261006.sql -> AllowDecimal = 0 (จำนวนเต็ม) แทนที่จะ Error
+        private static string StockColumns => @"
             s.StockID, s.StockCode, s.StockName, s.Unit, s.IsMain, s.UseMaxMin,
             s.ShowColImage, s.ShowColCode, s.ShowColName, s.ShowColQuantity, s.ShowColRemark,
             s.InPickList, s.InSupplier, s.InSystemQR, s.InExcel,
             s.OutPickList, s.OutSupplier, s.OutSystemQR, s.SortNo,
             s.GroupBy, s.MaxMinBasis, s.ShowColCustomer, s.ShowColPartA, s.ShowColPartNumber, s.ShowColStockBox, s.ShowColStockPcs,
-            s.ShowColNo, s.ShowColModel, s.OutExcel";
+            s.ShowColNo, s.ShowColModel, s.OutExcel, "
+            + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "s.AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal");
 
         // คลังทั้งหมด (คลังหลักอยู่บนสุด) พร้อมจำนวนรายการสินค้าในแต่ละคลัง
         public List<StockModel> GetStocks()
@@ -129,7 +131,8 @@ namespace CIMS.Services
                 ColStockPcs = Convert.ToBoolean(rdr["ShowColStockPcs"]),
                 ColNo = Convert.ToBoolean(rdr["ShowColNo"]),
                 ColModel = Convert.ToBoolean(rdr["ShowColModel"]),
-                OutExcel = Convert.ToBoolean(rdr["OutExcel"])
+                OutExcel = Convert.ToBoolean(rdr["OutExcel"]),
+                AllowDecimal = Convert.ToBoolean(rdr["AllowDecimal"])
             };
         }
 
@@ -171,14 +174,15 @@ namespace CIMS.Services
                         INSERT INTO CIMS.Stocks (StockCode, StockName, Unit, IsMain, UseMaxMin,
                             ShowColImage, ShowColCode, ShowColName, ShowColQuantity, ShowColRemark,
                             InPickList, InSupplier, InSystemQR, InExcel, OutPickList, OutSupplier, OutSystemQR,
-                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel,
+                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel, AllowDecimal,
                             SortNo, CreatedBy)
                         VALUES (@code, @name, @unit, 0, @maxmin,
                             @cimg, @ccode, @cname, @cqty, @crmk,
                             @ipl, @isup, @isys, @ixls, @opl, @osup, @osys,
-                            @grp, @mmb, @ccust, @cparta, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls,
+                            @grp, @mmb, @ccust, @cparta, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls, @dec,
                             (SELECT ISNULL(MAX(SortNo), 0) + 1 FROM CIMS.Stocks), @uid);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);";
+                    if (!CIMS.Helpers.DbSchema.HasAllowDecimal) sql = sql.Replace(" AllowDecimal,", "").Replace(" @dec,", "");
 
                     int newId;
                     using (var cmd = new SqlCommand(sql, conn, trans))
@@ -229,9 +233,10 @@ namespace CIMS.Services
                             OutPickList = @opl, OutSupplier = @osup, OutSystemQR = @osys,
                             GroupBy = @grp, MaxMinBasis = @mmb, ShowColCustomer = @ccust, ShowColPartA = @cparta,
                             ShowColPartNumber = @cpartno, ShowColStockBox = @cbox, ShowColStockPcs = @cpcs,
-                                 ShowColNo = @cno, ShowColModel = @cmodel, OutExcel = @oxls,
+                                 ShowColNo = @cno, ShowColModel = @cmodel, OutExcel = @oxls, AllowDecimal = @dec,
                             UpdatedBy = @uid, UpdatedDate = GETDATE()
                         WHERE StockID = @id";
+                    if (!CIMS.Helpers.DbSchema.HasAllowDecimal) sql = sql.Replace(" AllowDecimal = @dec,", "");
 
                     using (var cmd = new SqlCommand(sql, conn, trans))
                     {
@@ -292,6 +297,7 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@cno", s.ColNo);
             cmd.Parameters.AddWithValue("@cmodel", s.ColModel);
             cmd.Parameters.AddWithValue("@oxls", s.OutExcel);
+            cmd.Parameters.AddWithValue("@dec", s.AllowDecimal);
         }
 
         private static void SaveFormatLinks(SqlConnection conn, SqlTransaction trans, int stkId, IEnumerable<int> fmtIds)
@@ -526,12 +532,13 @@ namespace CIMS.Services
         }
 
         // บวกจำนวนเพิ่มจากยอดเดิม (เดิม 100 + Import 100 = 200) ทุกแถวใน Transaction เดียว - พังแถวเดียวยกเลิกทั้งไฟล์
-        // จำนวนเป็นจำนวนเต็มเหมือนยอดคลังเดิม (ทศนิยมปัดเป็นจำนวนเต็มที่ใกล้ที่สุด)
-        public (int Items, int TotalQty) ApplyImport(int stkId, List<StockImportRow> rows, string fileName, string userId)
+        // คลังที่เปิด DECIMAL QTY เก็บทศนิยม (3 ตำแหน่ง) / คลังอื่นปัดเป็นจำนวนเต็มที่ใกล้ที่สุดเหมือนเดิม
+        public (int Items, decimal TotalQty) ApplyImport(int stkId, List<StockImportRow> rows, string fileName, string userId)
         {
+            bool dec = IsDecimalStock(stkId);
             var valid = rows.Where(r => r.IsValid)
                             .GroupBy(r => r.PartId)
-                            .Select(g => new { PartId = g.Key, PartCode = g.First().PartCode, Qty = (int)Math.Round(g.Sum(x => x.Qty), MidpointRounding.AwayFromZero) })
+                            .Select(g => new { PartId = g.Key, PartCode = g.First().PartCode, Qty = CIMS.Helpers.Qty.Round(g.Sum(x => x.Qty), dec) })
                             .Where(x => x.Qty > 0)
                             .ToList();
             if (valid.Count == 0) return (0, 0);
@@ -544,16 +551,16 @@ namespace CIMS.Services
                 {
                     foreach (var v in valid)
                     {
-                        int newBal;
+                        decimal newBal;
                         using (var cmd = new SqlCommand("CIMS.sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
                         {
                             cmd.Parameters.AddWithValue("@StkId", stkId);
                             cmd.Parameters.AddWithValue("@PtId", v.PartId);
-                            cmd.Parameters.AddWithValue("@Qty", v.Qty);
-                            var outBal = cmd.Parameters.Add("@NewBal", SqlDbType.Int);
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", v.Qty));
+                            var outBal = cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@NewBal", 0m));
                             outBal.Direction = ParameterDirection.Output;
                             cmd.ExecuteNonQuery();
-                            newBal = outBal.Value == DBNull.Value ? 0 : Convert.ToInt32(outBal.Value);
+                            newBal = CIMS.Helpers.Qty.Read(outBal.Value);
                         }
 
                         using (var cmd = new SqlCommand(@"INSERT INTO CIMS.StockImports (BatchID, StockID, PartID, PartCode, Quantity, BalanceAfter, FileName, UserID)
@@ -574,6 +581,20 @@ namespace CIMS.Services
                 }
             }
             return (valid.Count, valid.Sum(v => v.Qty));
+        }
+
+        // คลังนี้เปิด DECIMAL QTY ไหม
+        public bool IsDecimalStock(int stkId)
+        {
+            if (!CIMS.Helpers.DbSchema.HasAllowDecimal) return false;
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("SELECT AllowDecimal FROM CIMS.Stocks WHERE StockID = @s", conn))
+            {
+                cmd.Parameters.AddWithValue("@s", stkId);
+                conn.Open();
+                object v = cmd.ExecuteScalar();
+                return v != null && v != DBNull.Value && Convert.ToBoolean(v);
+            }
         }
 
         #endregion

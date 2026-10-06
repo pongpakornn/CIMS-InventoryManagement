@@ -165,6 +165,7 @@ namespace CIMS.Views
                 int n = await Task.Run(() => _service.Export(filter, path));
                 LogService.WriteLog(_session?.UserId, "ACTIVITY_LOG_EXPORT", $"Rows: {n} | {filter.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} - {filter.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} | Key: {filter.Keyword} | File: {file}", "");
                 NotificationManager.Show("Export complete", $"Export Activity Log {n:N0} รายการ\nDesktop\\CIMS_Export\\{file}", true);
+                CIMS.Services.ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (System.IO.IOException) { DialogHelper.ShowError("บันทึกไฟล์ไม่สำเร็จ กรุณาปิดไฟล์ Excel ที่เปิดอยู่ก่อนแล้วลองใหม่"); }
             catch (Exception ex) { DialogHelper.ShowError("Export ไม่สำเร็จ\n" + ex.Message); }

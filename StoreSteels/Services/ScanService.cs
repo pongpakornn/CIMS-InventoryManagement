@@ -199,7 +199,7 @@ namespace CIMS.Services
                                 PartName = rdr["Description"].ToString(),
                                 PartACode = rdr["PartACode"].ToString(),
                                 PartNo = string.Empty,
-                                Qty = Convert.ToInt32(rdr["Quantity"]),
+                                Qty = CIMS.Helpers.Qty.Read(rdr["Quantity"]),
                                 UpdateTime = Convert.ToDateTime(rdr["TransactionDate"]),
                                 Status = rdr["TransactionType"].ToString(),
                                 PartA = rdr["PartA"].ToString(),
@@ -223,8 +223,10 @@ namespace CIMS.Services
         // txType: ปกติ "IN" (ค่า default คงพฤติกรรมเดิม) ใช้ "RETURN" สำหรับกรณีรับคืนเหล็กเหลือจากการผลิต
         // เพื่อแยกสถานะออกจากการรับเข้าปกติใน CIMS.ScanTransactions (คอลัมน์ TransactionType เป็น varchar(20) รองรับได้สบาย)
         // stock: คลังที่รับเข้า (null / Stock-CHR = CIMS.Parts.StockQuantity เหมือนเดิม, คลังอื่น = CIMS.PartStocks ผ่าน CIMS.sp_Stock_AddQty)
-        public bool UpdateStock(int ptId, string partCode, string partACode, int qty, string userId, string refNo, string txType = "IN", StockModel stock = null, bool remainder = false)
+        public bool UpdateStock(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo, string txType = "IN", StockModel stock = null, bool remainder = false)
         {
+            // กันพลาด: ปัดตาม DECIMAL QTY ของคลัง (คลังที่ไม่เปิด = จำนวนเต็มเสมอ)
+            if (stock != null) qty = CIMS.Helpers.Qty.Round(qty, stock.AllowDecimal);
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
@@ -250,8 +252,8 @@ namespace CIMS.Services
                         {
                             cmdAdd.Parameters.AddWithValue("@StkId", stock.StkId);
                             cmdAdd.Parameters.AddWithValue("@PtId", ptId);
-                            cmdAdd.Parameters.AddWithValue("@Qty", qty);
-                            cmdAdd.Parameters.Add("@NewBal", SqlDbType.Int).Direction = ParameterDirection.Output;
+                            cmdAdd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
+                            cmdAdd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@NewBal", 0m)).Direction = ParameterDirection.Output;
                             // แบบ StorePC: สแกน 1 ป้าย = +1 กล่อง (ชิ้น = ตามป้าย) / คืนเหล็ก (กรอกจำนวนเอง) = กล่องคิดจากชิ้น
                             cmdAdd.Parameters.AddWithValue("@Box", boxMove);
                             cmdAdd.ExecuteNonQuery();
@@ -261,7 +263,7 @@ namespace CIMS.Services
                     {
                         using (SqlCommand cmdUpdate = new SqlCommand(updateSql, conn, trans))
                         {
-                            cmdUpdate.Parameters.AddWithValue("@Qty", qty);
+                            cmdUpdate.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
                             cmdUpdate.Parameters.AddWithValue("@PtId", ptId);
                             cmdUpdate.ExecuteNonQuery();
                         }
@@ -271,7 +273,7 @@ namespace CIMS.Services
                     {
                         cmdLog.Parameters.Add("@StkId", SqlDbType.Int).Value = (object)stock?.StkId ?? DBNull.Value;
                         cmdLog.Parameters.AddWithValue("@UserId", userId);
-                        cmdLog.Parameters.AddWithValue("@Qty", qty);
+                        cmdLog.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
                         cmdLog.Parameters.AddWithValue("@TxType", string.IsNullOrWhiteSpace(txType) ? "IN" : txType);
                         cmdLog.Parameters.Add("@Box", SqlDbType.Int).Value = boxMove;
                         cmdLog.Parameters.AddWithValue("@PtId", ptId);
@@ -306,17 +308,18 @@ namespace CIMS.Services
         public class DeductResult
         {
             public bool Saved { get; set; }
-            public int Deducted { get; set; }          // ตัดจากคลังต้นทางได้จริง
-            public int SourceBefore { get; set; }      // ยอดคลังต้นทางก่อนตัด
-            public int SourceAfter { get; set; }
+            public decimal Deducted { get; set; }      // ตัดจากคลังต้นทางได้จริง
+            public decimal SourceBefore { get; set; }  // ยอดคลังต้นทางก่อนตัด
+            public decimal SourceAfter { get; set; }
             public string SourceCode { get; set; }
             public bool Short => Saved && Deducted < RequestedQty;
-            public int RequestedQty { get; set; }
+            public decimal RequestedQty { get; set; }
         }
 
-        public DeductResult UpdateStockWithDeduct(int ptId, string partCode, string partACode, int qty, string userId, string refNo,
+        public DeductResult UpdateStockWithDeduct(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo,
                                                   StockModel mainStock, int sourceStkId)
         {
+            if (mainStock != null) qty = CIMS.Helpers.Qty.Round(qty, mainStock.AllowDecimal);
             var result = new DeductResult { RequestedQty = qty };
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
@@ -328,7 +331,7 @@ namespace CIMS.Services
                         // 1) รับเข้าคลังหลัก
                         using (var cmd = new SqlCommand("UPDATE CIMS.Parts SET StockQuantity = ISNULL(StockQuantity, 0) + @Qty WHERE PartID = @PtId", conn, trans))
                         {
-                            cmd.Parameters.AddWithValue("@Qty", qty);
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
                             cmd.Parameters.AddWithValue("@PtId", ptId);
                             cmd.ExecuteNonQuery();
                         }
@@ -337,7 +340,7 @@ namespace CIMS.Services
                                                           VALUES (@UserId, @Qty, 'IN', GETDATE(), @PtId, @PtACode, @RefNo, @StkId)", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@UserId", userId);
-                            cmd.Parameters.AddWithValue("@Qty", qty);
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
                             cmd.Parameters.AddWithValue("@PtId", ptId);
                             cmd.Parameters.AddWithValue("@PtACode", string.IsNullOrWhiteSpace(partACode) ? DBNull.Value : (object)partACode.Trim());
                             string safeRefNo = string.IsNullOrWhiteSpace(refNo) ? null : (refNo.Length > RefNoMaxLength ? refNo.Substring(0, RefNoMaxLength) : refNo);
@@ -358,7 +361,7 @@ namespace CIMS.Services
                             cmd.Parameters.AddWithValue("@s", sourceStkId);
                             cmd.Parameters.AddWithValue("@p", ptId);
                             object r = cmd.ExecuteScalar();
-                            result.SourceBefore = r == null || r == DBNull.Value ? 0 : Convert.ToInt32(r);
+                            result.SourceBefore = CIMS.Helpers.Qty.Read(r);
                         }
 
                         result.Deducted = Math.Max(0, Math.Min(qty, result.SourceBefore));
@@ -368,7 +371,7 @@ namespace CIMS.Services
                         {
                             using (var cmd = new SqlCommand("UPDATE CIMS.PartStocks SET Quantity = Quantity - @q, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p", conn, trans))
                             {
-                                cmd.Parameters.AddWithValue("@q", result.Deducted);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@q", result.Deducted));
                                 cmd.Parameters.AddWithValue("@s", sourceStkId);
                                 cmd.Parameters.AddWithValue("@p", ptId);
                                 cmd.ExecuteNonQuery();
@@ -385,8 +388,8 @@ namespace CIMS.Services
                                 cmd.Parameters.AddWithValue("@mc", mainStock?.Code ?? "MAIN");
                                 cmd.Parameters.AddWithValue("@p", ptId);
                                 cmd.Parameters.AddWithValue("@pc", partCode ?? "");
-                                cmd.Parameters.AddWithValue("@q", result.Deducted);
-                                cmd.Parameters.AddWithValue("@fa", result.SourceAfter);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@q", result.Deducted));
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@fa", result.SourceAfter));
                                 cmd.Parameters.AddWithValue("@u", userId);
                                 cmd.ExecuteNonQuery();
                             }
@@ -409,8 +412,9 @@ namespace CIMS.Services
         // ==========================================
         // 📤 ขาออก: UpdateStockOut
         // ==========================================
-        public bool UpdateStockOut(int ptId, string partCode, string partACode, int qty, string userId, string refNo, StockModel stock = null, bool remainder = false)
+        public bool UpdateStockOut(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo, StockModel stock = null, bool remainder = false)
         {
+            if (stock != null) qty = CIMS.Helpers.Qty.Round(qty, stock.AllowDecimal);
             bool isOther = stock != null && !stock.IsMain;
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -423,7 +427,7 @@ namespace CIMS.Services
                         string checkSql = isOther
                             ? @"SELECT ISNULL(Quantity, 0), ISNULL(BoxQuantity, 0) FROM CIMS.PartStocks WITH (UPDLOCK, HOLDLOCK) WHERE StockID = @StkId AND PartID = @PtId"
                             : @"SELECT ISNULL(StockQuantity, 0), 0 FROM CIMS.Parts WHERE PartID = @PtId";
-                        int currentStock = 0, currentBox = 0;
+                        decimal currentStock = 0; int currentBox = 0;
                         using (SqlCommand cmdCheck = new SqlCommand(checkSql, conn, trans))
                         {
                             cmdCheck.Parameters.Add("@PtId", SqlDbType.Int).Value = ptId;
@@ -431,7 +435,7 @@ namespace CIMS.Services
                             using (var rd = cmdCheck.ExecuteReader())
                                 if (rd.Read())
                                 {
-                                    currentStock = Convert.ToInt32(rd[0]);
+                                    currentStock = CIMS.Helpers.Qty.Read(rd[0]);
                                     currentBox = Convert.ToInt32(rd[1]);
                                 }
                         }
@@ -452,7 +456,7 @@ namespace CIMS.Services
 
                         using (SqlCommand cmdUpdate = new SqlCommand(updateSql, conn, trans))
                         {
-                            cmdUpdate.Parameters.Add("@Qty", SqlDbType.Int).Value = qty;
+                            cmdUpdate.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
                             cmdUpdate.Parameters.Add("@PtId", SqlDbType.Int).Value = ptId;
                             if (isOther)
                             {
@@ -470,7 +474,7 @@ namespace CIMS.Services
                             cmdLog.Parameters.Add("@Box", SqlDbType.Int).Value = isOther ? (object)boxOut : DBNull.Value;
                             cmdLog.Parameters.Add("@StkId", SqlDbType.Int).Value = (object)stock?.StkId ?? DBNull.Value;
                             cmdLog.Parameters.Add("@UserId", SqlDbType.NVarChar).Value = userId;
-                            cmdLog.Parameters.Add("@Qty", SqlDbType.Int).Value = qty;
+                            cmdLog.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
                             cmdLog.Parameters.Add("@PtId", SqlDbType.Int).Value = ptId;
                             cmdLog.Parameters.Add("@PtACode", SqlDbType.NVarChar).Value =
                                 string.IsNullOrWhiteSpace(partACode) ? DBNull.Value : (object)partACode.Trim();
@@ -517,7 +521,7 @@ namespace CIMS.Services
             return ids;
         }
 
-        public int GetInventoryBalance(int ptId, StockModel stock = null)
+        public decimal GetInventoryBalance(int ptId, StockModel stock = null)
         {
             bool isOther = stock != null && !stock.IsMain;
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -534,7 +538,7 @@ namespace CIMS.Services
                     {
                         conn.Open();
                         var res = cmd.ExecuteScalar();
-                        return res != null ? Convert.ToInt32(res) : 0;
+                        return CIMS.Helpers.Qty.Read(res);
                     }
                     catch (Exception ex)
                     {

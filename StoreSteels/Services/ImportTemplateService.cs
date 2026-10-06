@@ -54,6 +54,31 @@ namespace CIMS.Services
             ws.Rows(2, lastRow).Height = 20.25;
         }
 
+        // ---------------------------------------------------------------- ไฟล์ EXPORT ทุกหน้าใช้รูปแบบเดียวกัน (หัวตาราง / เส้น / แถวกลุ่ม แบบเดียวกับ Export ของ Forecast)
+        // แถวคั่นกลุ่ม (เหมือนแถบกลุ่มในตารางของโปรแกรม)
+        public static void GroupRow(IXLWorksheet ws, int row, int cols, string text)
+        {
+            var g = ws.Range(row, 1, row, cols);
+            g.Merge();
+            g.FirstCell().Value = text;
+            g.Style.Font.Bold = true;
+            g.Style.Font.FontColor = XLColor.FromHtml("#002060");
+            g.Style.Fill.BackgroundColor = XLColor.FromHtml("#D9E1F2");
+            g.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            g.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            g.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        }
+
+        // ข้อความยาว (รายละเอียด / บาร์โค้ด / ชื่อสินค้า) ชิดซ้าย
+        public static void LeftAlign(IXLWorksheet ws, int lastRow, params int[] cols)
+        {
+            if (lastRow < 2) return;
+            foreach (int c in cols) ws.Range(2, c, lastRow, c).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        }
+
+        // ตัวเลขยอดตามการตั้งค่าคลัง (DECIMAL QTY = 1,234.50 / ไม่เปิด = 1,234)
+        public static string QtyFormat(bool allowDecimal) => allowDecimal ? "#,##0.00#" : "#,##0";
+
         public static void Guide(XLWorkbook wb, string title, IEnumerable<(string Col, string Text)> lines)
         {
             var g = wb.AddWorksheet("HOW TO");

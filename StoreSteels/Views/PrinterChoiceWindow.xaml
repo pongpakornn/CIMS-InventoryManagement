@@ -1,0 +1,126 @@
+﻿<Window x:Class="CIMS.Views.PrinterChoiceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Select Printer" Width="1040" Height="700"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 🖨 เลือกเครื่องพิมพ์ก่อนพิมพ์ Pick List: เครื่องฉลาก (QL-800) = ทีละดวงแบบเดิม / เครื่องอื่น (Fuji ApeosPort ฯลฯ) = A4 หลายใบต่อแผ่น -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="🖨 SELECT PRINTER" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock x:Name="txtSub" Text="Choose the printer for the selected cards" Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Cancel_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="26,18,26,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="420"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ซ้าย: รายชื่อเครื่องพิมพ์ + รูปแบบ A4 -->
+                <DockPanel Grid.Column="0" Margin="0,0,18,0">
+                    <TextBlock DockPanel.Dock="Top" Text="PRINTER" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
+
+                    <StackPanel x:Name="pnlLayout" DockPanel.Dock="Bottom" Margin="0,14,0,0">
+                        <TextBlock Text="A4 LAYOUT" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
+                        <Border Background="#EFE7FB" CornerRadius="12" Padding="14,10" BorderBrush="{StaticResource AccentPurple}" BorderThickness="2">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="2 × 5" FontSize="16" FontWeight="Black" Foreground="#2D2A32" VerticalAlignment="Center"/>
+                                <TextBlock Text="10 CARDS / PAGE  •  cut along the dashed lines" FontSize="11" FontWeight="Bold" Foreground="#6F6878" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <ListBox x:Name="lbPrinters" SelectionChanged="Printers_SelectionChanged" BorderThickness="0" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="bd" Background="#F7F5FA" CornerRadius="12" Padding="14,10" BorderBrush="#E4DDF0" BorderThickness="1.5">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
+                                                    <Setter TargetName="bd" Property="Background" Value="#EFE7FB"/>
+                                                    <Setter TargetName="bd" Property="BorderThickness" Value="2.5"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Black" Foreground="#2D2A32" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Detail}" FontSize="11" FontWeight="Bold" Foreground="#6F6878" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <Border Background="#E8F5E9" CornerRadius="8" Padding="8,3" Margin="0,0,6,0" Visibility="{Binding DefaultVisibility}">
+                                            <TextBlock Text="DEFAULT" FontSize="10" FontWeight="Black" Foreground="#2E7D32"/>
+                                        </Border>
+                                        <Border Background="{Binding KindBrush}" CornerRadius="8" Padding="8,3">
+                                            <TextBlock Text="{Binding Kind}" FontSize="10" FontWeight="Black" Foreground="White"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <!-- ขวา: ตัวอย่างหน้าแรกที่จะพิมพ์ -->
+                <Border Grid.Column="1" Background="#F4F2F7" CornerRadius="16" Padding="14">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" x:Name="txtPreviewTitle" Text="PREVIEW" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
+                        <Viewbox Stretch="Uniform">
+                            <Border x:Name="previewHost" Background="White" BorderBrush="#D6D0DE" BorderThickness="1">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.18" Color="Black"/>
+                                </Border.Effect>
+                            </Border>
+                        </Viewbox>
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="26,6,26,22">
+                <TextBlock x:Name="txtSummary" VerticalAlignment="Center" FontSize="14" FontWeight="Black" Foreground="{StaticResource AccentPurple}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Margin="0,0,10,0" Click="Cancel_Click"/>
+                    <Button x:Name="btnPrint" Content="🖨 PRINT" Style="{StaticResource StkButton}" Background="{StaticResource AccentPurple}" MinWidth="150" Click="Print_Click"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -48,6 +48,7 @@ namespace CIMS.Views
 
             chkColNo.IsChecked = s.ColNo;
             chkColModel.IsChecked = s.ColModel;
+            chkAllowDecimal.IsChecked = s.AllowDecimal;
             chkColCustomer.IsChecked = s.ColCustomer;
             chkColPartA.IsChecked = s.ColPartA;
             chkColPartNo.IsChecked = s.ColPartNo;
@@ -163,6 +164,7 @@ namespace CIMS.Views
             s.MaxMinBasis = MaxMinUnits[Math.Max(0, cbMaxMinBasis.SelectedIndex)];
             s.ColNo = chkColNo.IsChecked == true;
             s.ColModel = chkColModel.IsChecked == true;
+            s.AllowDecimal = chkAllowDecimal.IsChecked == true;
             s.ColCustomer = chkColCustomer.IsChecked == true;
             s.ColPartA = chkColPartA.IsChecked == true;
             s.ColPartNo = chkColPartNo.IsChecked == true;

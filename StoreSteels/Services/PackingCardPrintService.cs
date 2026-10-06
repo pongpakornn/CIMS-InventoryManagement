@@ -6,6 +6,8 @@ using System.Printing;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Media;
 
 namespace CIMS.Services
@@ -48,17 +50,215 @@ namespace CIMS.Services
             Path.Combine(AppContext.BaseDirectory, "Assets", "Labels", "PackingCard.lbx");
 
         // คืนรายการที่พิมพ์สำเร็จจริง (เรียงตามลำดับที่พิมพ์) - onProgress แจ้งความคืบหน้าจริงทีละใบ
-        public List<PackingCardModel> PrintCards(IList<PackingCardModel> items, Action<int, int> onProgress = null)
+        // queue = เครื่องพิมพ์ที่เลือกในหน้าต่าง SELECT PRINTER / a4 = true -> พิมพ์หลายใบต่อแผ่น A4 (cols x rows)
+        public List<PackingCardModel> PrintCards(IList<PackingCardModel> items, PrintQueue queue, bool a4, int cols, int rows, Action<int, int> onProgress = null)
         {
             var printed = new List<PackingCardModel>();
-            if (items == null || items.Count == 0) return printed;
+            if (items == null || items.Count == 0 || queue == null) return printed;
 
-            var printDialog = new PrintDialog();
-            if (printDialog.ShowDialog() != true) return printed;
+            var printDialog = new PrintDialog { PrintQueue = queue };
+            try { printDialog.PrintTicket = queue.UserPrintTicket ?? queue.DefaultPrintTicket; } catch { }
 
+            if (a4) return PrintA4(printDialog, items, cols, rows, onProgress);
+
+            // เครื่องพิมพ์ฉลาก QL-800 (62mm) เหมือนเดิม
             return File.Exists(TemplatePath)
                 ? PrintViaBpac(printDialog, items, onProgress)
                 : PrintViaPrintVisual(printDialog, items, onProgress);
+        }
+
+        // เครื่องพิมพ์ฉลาก Brother (QL-800 ฯลฯ) = พิมพ์ทีละดวงแบบเดิม / เครื่องอื่น (เช่น Fuji ApeosPort) = A4
+        public static bool IsLabelPrinter(string printerName)
+        {
+            string n = (printerName ?? "").ToUpperInvariant();
+            return n.Contains("QL-") || n.Contains("BROTHER") || n.Contains("P-TOUCH") || n.Contains("PTOUCH");
+        }
+
+        public static int PageCount(int cards, int cols, int rows) => Math.Max(1, (int)Math.Ceiling(cards / (double)Math.Max(1, cols * rows)));
+
+        // ================================================================================
+        // A4: การ์ดแบบเดียวกับ Pick List เดิม (ขยายใหญ่) หลายใบต่อแผ่น + เส้นประไว้ตัด
+        // ================================================================================
+        private const double A4WidthMm = 210, A4HeightMm = 297;
+        private const double A4MarginMm = 8;      // ขอบกระดาษ (เครื่องพิมพ์ส่วนใหญ่พิมพ์ชิดขอบได้ไม่เกิน ~4-5mm)
+        private const double A4FooterMm = 6;      // บรรทัดท้ายหน้า (เลขหน้า)
+
+        private List<PackingCardModel> PrintA4(PrintDialog printDialog, IList<PackingCardModel> items, int cols, int rows, Action<int, int> onProgress)
+        {
+            try
+            {
+                printDialog.PrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA4);
+                printDialog.PrintTicket.PageOrientation = PageOrientation.Portrait;
+            }
+            catch
+            {
+                // driver บางรุ่นไม่ให้ตั้งค่าจากโปรแกรม - ใช้ค่ากระดาษของเครื่อง (ปกติ A4 อยู่แล้ว)
+            }
+
+            var doc = BuildA4Document(items, cols, rows, (done) => onProgress?.Invoke(done, items.Count));
+            printDialog.PrintDocument(doc.DocumentPaginator, $"Pick List A4 - {items.Count} cards");
+            onProgress?.Invoke(items.Count, items.Count);
+            return new List<PackingCardModel>(items);
+        }
+
+        public FixedDocument BuildA4Document(IList<PackingCardModel> items, int cols, int rows, Action<int> onBuilt = null)
+        {
+            double w = A4WidthMm * MmToPx, h = A4HeightMm * MmToPx;
+            int perPage = cols * rows, pages = PageCount(items.Count, cols, rows);
+            var doc = new FixedDocument();
+            doc.DocumentPaginator.PageSize = new Size(w, h);
+            for (int p = 0; p < pages; p++)
+            {
+                var pageItems = new List<PackingCardModel>();
+                for (int i = p * perPage; i < Math.Min(items.Count, (p + 1) * perPage); i++) pageItems.Add(items[i]);
+
+                var page = new FixedPage { Width = w, Height = h, Background = Brushes.White };
+                var content = BuildA4Page(pageItems, cols, rows, p + 1, pages);
+                content.Measure(new Size(w, h));
+                content.Arrange(new Rect(0, 0, w, h));
+                page.Children.Add(content);
+                var pc = new PageContent();
+                ((System.Windows.Markup.IAddChild)pc).AddChild(page);
+                doc.Pages.Add(pc);
+                onBuilt?.Invoke(Math.Min(items.Count, (p + 1) * perPage));
+            }
+            return doc;
+        }
+
+        // 1 หน้า A4: ตาราง cols x rows ของการ์ด / ช่องที่ไม่มีการ์ดปล่อยว่าง / เลขหน้าด้านล่าง
+        public FrameworkElement BuildA4Page(IList<PackingCardModel> pageItems, int cols, int rows, int pageNo, int pageCount)
+        {
+            double w = A4WidthMm * MmToPx, h = A4HeightMm * MmToPx, m = A4MarginMm * MmToPx;
+            var root = new Grid { Width = w, Height = h, Background = Brushes.White };
+
+            var cards = new UniformGrid { Columns = cols, Rows = rows, Margin = new Thickness(m, m, m, m + A4FooterMm * MmToPx) };
+
+            for (int i = 0; i < cols * rows; i++)
+            {
+                // เส้นประรอบช่อง = แนวตัดการ์ด
+                var cell = new Border
+                {
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0)),
+                    BorderThickness = new Thickness(0.6),
+                    Padding = new Thickness(1.8 * MmToPx)
+                };
+                var dash = new System.Windows.Shapes.Rectangle
+                {
+                    Stroke = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E)),
+                    StrokeThickness = 0.8,
+                    StrokeDashArray = new DoubleCollection { 6, 4 }
+                };
+                var holder = new Grid();
+                holder.Children.Add(dash);
+                if (i < pageItems.Count) { cell.BorderThickness = new Thickness(0); cell.Child = BuildA4Card(pageItems[i]); }
+                holder.Children.Add(cell);
+                cards.Children.Add(holder);
+            }
+            root.Children.Add(cards);
+
+            var footer = new TextBlock
+            {
+                Text = $"CIMS  •  PICK LIST  •  PAGE {pageNo} / {pageCount}",
+                FontSize = 9, Foreground = Brushes.Gray,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 0, m)
+            };
+            root.Children.Add(footer);
+            return root;
+        }
+
+        // การ์ด A4 (10 ใบต่อแผ่น ~97 x 55mm) = ข้อมูลชุดเดียวกับการ์ด Pick List เดิม (CH + ชื่อบริษัท / QR / Bill-Group,
+        // Work Order-LOT NO., Part Name, Quantity-TicketDate) จัดให้พอดีช่อง: QR อยู่ขวาข้างหัวการ์ด + แถว Bill-Group
+        // แถวที่เหลือยาวเต็มการ์ด - ข้อมูลแสดงอย่างเดียว ไม่แก้ไขอะไร
+        public FrameworkElement BuildA4Card(PackingCardModel item, double s = 0.82, double qrMm = 19)
+        {
+            var card = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = Brushes.Black,
+                BorderThickness = new Thickness(1.2),
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(3 * MmToPx, 2.2 * MmToPx, 3 * MmToPx, 2 * MmToPx)
+            };
+            var g = new Grid();
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 0 header
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 1 divider
+            for (int i = 0; i < 4; i++) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });   // 2-5
+
+            // หัวการ์ด: CH + ชื่อบริษัท (Grid ให้ชื่อรู้ความกว้างจริง ไม่ถูก QR ทับ)
+            var company = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3 * s, 0) };
+            company.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            company.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            company.Children.Add(new TextBlock { Text = "CH", FontWeight = FontWeights.Black, FontSize = 28 * s, Foreground = Brushes.Black, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6 * s, 0) });
+            var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(names, 1);
+            names.Children.Add(new TextBlock { Text = "CH. RADIATORS CO.LTD.", FontWeight = FontWeights.Black, FontSize = 13 * s, Foreground = Brushes.Black, TextTrimming = TextTrimming.CharacterEllipsis });
+            names.Children.Add(new TextBlock { Text = "บริษัท ซีเอชเรดิเอเตอร์ จำกัด", FontSize = 10.5 * s, Foreground = Brushes.Black, TextTrimming = TextTrimming.CharacterEllipsis });
+            company.Children.Add(names);
+            g.Children.Add(company);
+
+            // QR มุมขวาบน กินความสูงหัวการ์ด + แถว Bill-Group
+            double qr = qrMm * MmToPx;
+            var qrBox = new Border { Width = qr, Height = qr, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.8), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(2 * MmToPx, 0, 0, 0) };
+            qrBox.Child = new Image { Source = item.QrImage, Stretch = Stretch.Uniform, Margin = new Thickness(1.5) };
+            RenderOptions.SetBitmapScalingMode(qrBox.Child, BitmapScalingMode.NearestNeighbor);   // QR คมชัด สแกนติด
+            Grid.SetColumn(qrBox, 1);
+            Grid.SetRowSpan(qrBox, 3);
+            g.Children.Add(qrBox);
+
+            var divider = new Border { Height = 1, Background = Brushes.Gray, Margin = new Thickness(0, 1.5 * MmToPx, 0, 0.5 * MmToPx) };
+            Grid.SetRow(divider, 1);
+            g.Children.Add(divider);
+
+            // ปี ค.ศ. เสมอ ตรงกับพรีวิวการ์ดในหน้า Pick List (เครื่องที่ตั้งปฏิทินไทยจะได้ 2569 ถ้าใช้รูปแบบของเครื่อง)
+            string date = item.TicketDate == DateTime.MinValue ? "" : item.TicketDate.ToString("dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            AddA4Row(g, 2, 1, s, ("Bill", item.TicketNo), ("Group", item.GroupCode));
+            AddA4Row(g, 3, 2, s, ("Work Order", item.WorkOrder), ("LOT NO.", item.LotNo));
+            AddA4Row(g, 4, 2, s, ("Part Name", item.JobName));
+            AddA4Row(g, 5, 2, s, ("Quantity", $"{item.Qty:0.##}"), ("TicketDate", date));
+
+            card.Child = g;
+            return card;
+        }
+        // แถวของการ์ด A4: ป้ายชื่อตัวหนา + ค่าบนเส้นใต้ (แบบเดียวกับการ์ดเดิม) - 1 หรือ 2 คู่ต่อแถว
+        private static void AddA4Row(Grid g, int row, int colSpan, double s, params (string Label, string Value)[] fields)
+        {
+            var line = new Grid { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 0.6 * MmToPx) };
+            for (int i = 0; i < fields.Length; i++)
+            {
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var label = new TextBlock { Text = fields[i].Label, FontSize = 12 * s, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6 * s, 2 * s) };
+                Grid.SetColumn(label, i * 2);
+                bool wide = fields.Length == 1;
+                var value = new TextBlock
+                {
+                    Text = fields[i].Value ?? "",
+                    FontSize = 13 * s,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextAlignment = TextAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxHeight = (wide ? 2 : 1) * 13.5 * s * 1.6,   // Part Name ยาวได้ 2 บรรทัด / ค่าอื่น 1 บรรทัด
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    Padding = new Thickness(0, 0, 0, 1.5 * s)
+                };
+                var under = new Border
+                {
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)),
+                    BorderThickness = new Thickness(0, 0, 0, 1),
+                    Margin = new Thickness(0, 0, i < fields.Length - 1 ? 8 * s : 0, 0),
+                    Child = value
+                };
+                Grid.SetColumn(under, i * 2 + 1);
+                line.Children.Add(label);
+                line.Children.Add(under);
+            }
+            Grid.SetRow(line, row);
+            Grid.SetColumnSpan(line, colSpan);
+            g.Children.Add(line);
         }
 
         // ================================================================================

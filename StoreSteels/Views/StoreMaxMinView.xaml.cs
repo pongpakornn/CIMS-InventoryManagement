@@ -313,33 +313,47 @@ namespace CIMS.Views
                 System.IO.Directory.CreateDirectory(folder);
                 string path = System.IO.Path.Combine(folder, fileName);
                 string qtyHeader = _stock.QtyHeader;
+                string groupLabel = _viewModel.GroupLabel;
+                bool dec = _stock.AllowDecimal;
                 await Task.Run(() =>
                 {
                     using (var wb = new ClosedXML.Excel.XLWorkbook())
                     {
+                        // รูปแบบเดียวกับไฟล์ Export / Template ทั้งระบบ (หัวตาราง #002060 + เส้นตาราง + แถวกลุ่ม)
                         var ws = wb.Worksheets.Add("Store");
-                        ws.Cell(1, 1).Value = "PD CODE";
-                        ws.Cell(1, 2).Value = "PRODUCT NAME";
-                        ws.Cell(1, 3).Value = qtyHeader;
-                        var header = ws.Range(1, 1, 1, 3);
-                        header.Style.Font.Bold = true;
+                        string[] heads = { "NO", "PD CODE", "PRODUCT NAME", qtyHeader };
+                        ImportTemplateService.Header(ws, heads, new double[] { 6.4, 20, 46, 16 });
 
                         int r = 2;
-                        foreach (var p in rows)
+                        var groupRows = new List<(int Row, string Text)>();
+                        foreach (var g in rows.GroupBy(p => string.IsNullOrWhiteSpace(p.GroupKey) ? "-" : p.GroupKey))
                         {
-                            ws.Cell(r, 1).Value = p.PartCode;
-                            ws.Cell(r, 2).Value = p.PartName;
-                            // จำนวนเป็นตัวเลขใน Excel (คำนวณต่อได้)
-                            if (decimal.TryParse(p.Qty, out decimal q)) ws.Cell(r, 3).Value = q; else ws.Cell(r, 3).Value = p.Qty;
+                            groupRows.Add((r, $"{groupLabel} : {g.Key}   ({g.Count():N0} ITEMS)"));
                             r++;
+                            int no = 1;
+                            foreach (var p in g)
+                            {
+                                ws.Cell(r, 1).Value = no++;
+                                ws.Cell(r, 2).Value = p.PartCode;
+                                ws.Cell(r, 3).Value = p.PartName;
+                                // จำนวนเป็นตัวเลขใน Excel (คำนวณต่อได้)
+                                if (CIMS.Helpers.Qty.TryParse(p.Qty, out decimal q)) ws.Cell(r, 4).Value = q; else ws.Cell(r, 4).Value = p.Qty;
+                                r++;
+                            }
                         }
-                        ws.Columns(1, 3).AdjustToContents();
+                        int last = r - 1;
+                        ImportTemplateService.Body(ws, last, heads.Length);
+                        ImportTemplateService.LeftAlign(ws, last, 3);
+                        ws.Range(2, 1, last, 1).Style.Font.Bold = true;
+                        ws.Range(2, 4, last, 4).Style.NumberFormat.Format = ImportTemplateService.QtyFormat(dec);
+                        foreach (var (row, text) in groupRows) ImportTemplateService.GroupRow(ws, row, heads.Length, text);
                         wb.SaveAs(path);
                     }
                 });
 
                 LogService.WriteLog(_session?.UserId, "EXPORT_STORE_EXCEL", $"Exported {rows.Count} rows | Stock: {_stock.Code} | File: {System.IO.Path.GetFileName(path)}", _stock.Code);
-                DialogHelper.ShowInfo($"Export สำเร็จ {rows.Count:N0} รายการ\n\nบันทึกไฟล์ไว้ที่ Desktop\\CIMS_Export\n{fileName}", "EXPORT EXCEL");
+                NotificationManager.Show("Export complete", $"Export {_stock.Code} {rows.Count:N0} รายการ\nDesktop\\CIMS_Export\\{fileName}", true);
+                ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (System.IO.IOException)
             {
@@ -1064,7 +1078,9 @@ namespace CIMS.Views
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"CellEditEnding Error: {ex.Message}");
+                // บันทึกไม่สำเร็จ -> แจ้งผู้ใช้ + ดึงค่าจริงจากฐานกลับมาแสดง (ไม่ปล่อยให้ค่าในตารางค้างเหมือนบันทึกแล้ว)
+                DialogHelper.ShowError($"ไม่สามารถบันทึกข้อมูลได้\n{ex.Message}");
+                _viewModel.LoadData(txtSearch.Text);
             }
             finally
             {

@@ -314,8 +314,10 @@ namespace CIMS.ViewModels
             {
                 string uid = CurrentUser.UserId;
                 int psz = int.TryParse(model.PackSize, out int rPsz) ? rPsz : 0;
-                int max = int.TryParse(model.Max, out int rMax) ? rMax : 0;
-                int min = int.TryParse(model.Min, out int rMin) ? rMin : 0;
+                // สินค้าใหม่เข้าคลังหลัก -> MAX / MIN ทศนิยมได้ถ้าคลังหลักเปิด DECIMAL QTY (ไม่งั้นปัดเป็นจำนวนเต็ม)
+                bool mainDec = new StockService().GetStocks().FirstOrDefault(s => s.IsMain)?.AllowDecimal == true;
+                decimal max = CIMS.Helpers.Qty.TryParse(model.Max, out decimal rMax) ? CIMS.Helpers.Qty.Round(Math.Max(0, rMax), mainDec) : 0;
+                decimal min = CIMS.Helpers.Qty.TryParse(model.Min, out decimal rMin) ? CIMS.Helpers.Qty.Round(Math.Max(0, rMin), mainDec) : 0;
 
                 // 🎯 เช็คค่าซ้ำด้วยค่า PartACode
                 // PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน

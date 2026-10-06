@@ -9,10 +9,10 @@ namespace CIMS.Models
     public class ScanItemModel : INotifyPropertyChanged
     {
         private int _inCount;
-        private int _totalInQty;
+        private decimal _totalInQty;
         private int _outCount;
-        private int _totalOutQty;
-        private int _finalStock;
+        private decimal _totalOutQty;
+        private decimal _finalStock;
         private string _partNo;
         private string _partACode;
         private string _partCode;
@@ -69,15 +69,16 @@ namespace CIMS.Models
             set { _partACode = value; OnPropertyChanged(); }
         }
 
-        public int Qty { get; set; }
+        // ยอดเป็นทศนิยมได้ (คลังที่เปิด DECIMAL QTY เช่น KG) - คลังอื่นเป็นจำนวนเต็มเหมือนเดิม
+        public decimal Qty { get; set; }
         public string Status { get; set; }
         public DateTime UpdateTime { get; set; }
 
         public int InCount { get => _inCount; set { _inCount = value; OnPropertyChanged(); } }
-        public int TotalInQty { get => _totalInQty; set { _totalInQty = value; OnPropertyChanged(); } }
+        public decimal TotalInQty { get => _totalInQty; set { _totalInQty = value; OnPropertyChanged(); } }
         public int OutCount { get => _outCount; set { _outCount = value; OnPropertyChanged(); } }
-        public int TotalOutQty { get => _totalOutQty; set { _totalOutQty = value; OnPropertyChanged(); } }
-        public int FinalStock { get => _finalStock; set { _finalStock = value; OnPropertyChanged(); } }
+        public decimal TotalOutQty { get => _totalOutQty; set { _totalOutQty = value; OnPropertyChanged(); } }
+        public decimal FinalStock { get => _finalStock; set { _finalStock = value; OnPropertyChanged(); } }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null)

@@ -55,8 +55,8 @@ namespace CIMS.Services
                             HasOwnDays = own,
                             DayMax = r["MaxDays"] != DBNull.Value ? Convert.ToInt32(r["MaxDays"]) : formula.DefDayMax,
                             DayMin = r["MinDays"] != DBNull.Value ? Convert.ToInt32(r["MinDays"]) : formula.DefDayMin,
-                            QtyMax = Convert.ToInt32(r["QMAX"]),
-                            QtyMin = Convert.ToInt32(r["QMIN"])
+                            QtyMax = CIMS.Helpers.Qty.Read(r["QMAX"]),
+                            QtyMin = CIMS.Helpers.Qty.Read(r["QMIN"])
                         });
                     }
                 }

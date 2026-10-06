@@ -14,13 +14,20 @@ namespace CIMS.Views
 
         public int Quantity { get; private set; }
 
-        // จำนวนสูงสุดที่กรอกได้ (null = ไม่จำกัด) เช่น ยอดคงเหลือในคลังต้นทางตอนโอนย้ายบางส่วน
-        private readonly int? _maxQty;
+        // จำนวนที่กรอก (ทศนิยมได้เมื่อเปิด allowDecimal - คลังที่ตั้ง DECIMAL QTY เช่น KG)
+        public decimal DecimalQuantity { get; private set; }
 
-        public QuantityInputDialog(string title, string message, int? maxQty = null)
+        // จำนวนสูงสุดที่กรอกได้ (null = ไม่จำกัด) เช่น ยอดคงเหลือในคลังต้นทางตอนโอนย้ายบางส่วน
+        private readonly decimal? _maxQty;
+        private readonly bool _allowDecimal;
+
+        public QuantityInputDialog(string title, string message, int? maxQty = null) : this(title, message, maxQty, false) { }
+
+        public QuantityInputDialog(string title, string message, decimal? maxQty, bool allowDecimal)
         {
             InitializeComponent();
             _maxQty = maxQty;
+            _allowDecimal = allowDecimal;
 
             lblTitle.Text = title;
             lblMessage.Text = message;
@@ -34,6 +41,8 @@ namespace CIMS.Views
 
         private void txtQuantity_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
+            // ทศนิยม: ให้พิมพ์จุดได้ 1 ตัว
+            if (_allowDecimal && e.Text == "." && !txtQuantity.Text.Contains(".")) { e.Handled = false; return; }
             e.Handled = !DigitsOnly.IsMatch(e.Text);
         }
 
@@ -47,13 +56,17 @@ namespace CIMS.Views
 
         private void Confirm_Click(object sender, RoutedEventArgs e)
         {
-            if (int.TryParse(txtQuantity.Text, out int qty) && qty > 0 && _maxQty.HasValue && qty > _maxQty.Value)
+            bool ok = Qty.TryParse(txtQuantity.Text, out decimal qty) && qty > 0;
+            if (ok) qty = Qty.Round(qty, _allowDecimal);
+            if (ok && qty <= 0) ok = false;
+            if (ok && _maxQty.HasValue && qty > _maxQty.Value)
             {
-                DialogHelper.ShowWarning($"จำนวนที่กรอกเกินยอดคงเหลือ\nกรอกได้สูงสุด {_maxQty.Value:N0}");
+                DialogHelper.ShowWarning($"จำนวนที่กรอกเกินยอดคงเหลือ\nกรอกได้สูงสุด {Qty.Plain(_maxQty.Value)}");
             }
-            else if (int.TryParse(txtQuantity.Text, out qty) && qty > 0)
+            else if (ok)
             {
-                Quantity = qty;
+                DecimalQuantity = qty;
+                Quantity = (int)Math.Round(qty, MidpointRounding.AwayFromZero);
                 this.DialogResult = true;
                 CloseWindow();
             }

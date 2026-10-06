@@ -105,6 +105,12 @@
                                     </ComboBox>
                                 </StackPanel>
                             </Grid>
+                            <!-- 🔢 เก็บ / แสดงยอดเป็นทศนิยม (เช่น KG) - ปิด = จำนวนเต็มเหมือนเดิม -->
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <CheckBox x:Name="chkAllowDecimal" Content="DECIMAL QTY" Style="{StaticResource StkChip}" VerticalAlignment="Center"/>
+                                <TextBlock Text="Keep decimals in QTY / MAX / MIN and scans (e.g. 1,234.50 KG). Off = whole numbers."
+                                           FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

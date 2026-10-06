@@ -22,7 +22,7 @@ namespace CIMS.Services
         public List<StoreProductModel> GetProducts(StockModel stock, string searchKeyword, string category, string filterType, int skip, int take)
         {
             if (!UseStockView(stock)) return GetProducts(searchKeyword, category, filterType, skip, take);
-            return QueryProducts("CIMS.vw_StockMonitoring", stock.StkId, searchKeyword, category, filterType, skip, take);
+            return QueryProducts("CIMS.vw_StockMonitoring", stock.StkId, searchKeyword, category, filterType, skip, take, stock.AllowDecimal);
         }
 
         // ตัวเลือกกรองด้านบน (CATEGORY หรือ CUSTOMER ตามที่คลังจัดกลุ่ม)
@@ -50,7 +50,7 @@ namespace CIMS.Services
         public List<StoreProductModel> GetMinimalStockUpdates(StockModel stock, List<string> partCodes)
         {
             if (!UseStockView(stock)) return GetMinimalStockUpdates(partCodes);
-            return QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, partCodes);
+            return QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, partCodes, stock.AllowDecimal);
         }
 
         // ⚡ เรียลไทม์แบบเบา: ค่าเดียวที่เปลี่ยนเมื่อยอด / MAX / MIN / REMARK / SHOW ของคลังนี้เปลี่ยน (นับแถว + CHECKSUM)
@@ -75,15 +75,16 @@ namespace CIMS.Services
 
         // ตัวเลขล่าสุดของทั้งคลัง (เฉพาะคอลัมน์ที่เปลี่ยนได้) - ใช้ตอน GetChangeToken บอกว่ามีการเปลี่ยน
         public List<StoreProductModel> GetStockNumbers(StockModel stock) =>
-            QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, null);
+            QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, null, stock.AllowDecimal);
 
         // box: แก้ STOCK (BOX) -> คลังอื่นเก็บ BoxQuantity (Trigger คำนวณ QTY = BOX x Pack Size) / คลังหลักแปลงเป็นจำนวน x Pack Size
         // ptId: แถวที่แก้ (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - 0 = หาจากรหัสแบบเดิม
-        public bool UpdateProductMaster(StockModel stock, string partCode, string remark, int? max, int? min, double? qty, int? box = null, int ptId = 0)
+        public bool UpdateProductMaster(StockModel stock, string partCode, string remark, decimal? max, decimal? min, decimal? qty, int? box = null, int ptId = 0)
         {
             if (!IsOtherStock(stock))
             {
                 if (box.HasValue) qty = box.Value * Math.Max(1, GetPackSize(partCode, ptId));
+                if (qty.HasValue) qty = CIMS.Helpers.Qty.Round(Math.Max(0, qty.Value), stock?.AllowDecimal == true);
                 return UpdateProductMaster(partCode, remark, max, min, qty, ptId);
             }
 
@@ -102,10 +103,10 @@ namespace CIMS.Services
                 cmd.Parameters.AddWithValue("@code", partCode);
                 cmd.Parameters.AddWithValue("@pt", ptId);
                 cmd.Parameters.AddWithValue("@stk", stock.StkId);
-                if (max.HasValue) cmd.Parameters.AddWithValue("@max", max.Value);
-                if (min.HasValue) cmd.Parameters.AddWithValue("@min", min.Value);
-                // ยอดคลังเป็นจำนวนเต็ม (CHECK QTY >= 0 ในตาราง)
-                if (qty.HasValue) cmd.Parameters.AddWithValue("@qty", (int)Math.Round(Math.Max(0, qty.Value), MidpointRounding.AwayFromZero));
+                if (max.HasValue) cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@max", max.Value));
+                if (min.HasValue) cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@min", min.Value));
+                // ยอดคลัง: ทศนิยมตามการตั้งค่าคลัง (DECIMAL QTY) / ไม่ติดลบ (CHECK QTY >= 0 ในตาราง)
+                if (qty.HasValue) cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@qty", CIMS.Helpers.Qty.Round(Math.Max(0, qty.Value), stock.AllowDecimal)));
                 if (box.HasValue) cmd.Parameters.AddWithValue("@box", Math.Max(0, box.Value));
 
                 conn.Open();
@@ -154,7 +155,7 @@ namespace CIMS.Services
             }
         }
 
-        private List<StoreProductModel> QueryProducts(string viewName, int stkId, string searchKeyword, string category, string filterType, int skip, int take)
+        private List<StoreProductModel> QueryProducts(string viewName, int stkId, string searchKeyword, string category, string filterType, int skip, int take, bool dec = false)
         {
             var list = new List<StoreProductModel>();
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
@@ -195,9 +196,10 @@ namespace CIMS.Services
                             PartCode = rdr["PartCode"]?.ToString() ?? "",
                             PartName = rdr["PartName"]?.ToString() ?? "",
                             PackSize = rdr["PackSize"]?.ToString() ?? "",
-                            Max = rdr["Max"]?.ToString() ?? "",
-                            Min = rdr["Min"]?.ToString() ?? "",
-                            Qty = rdr["QtyStkb"]?.ToString() ?? "",
+                            // ยอด / MAX / MIN ตามการตั้งค่าคลัง: DECIMAL QTY = 1234.50 / ปกติ = 1234
+                            Max = rdr["Max"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), dec),
+                            Min = rdr["Min"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), dec),
+                            Qty = rdr["QtyStkb"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["QtyStkb"]), dec),
                             Remark = rdr["Remark"]?.ToString() ?? "",
                             Bin = rdr["Bin"]?.ToString() ?? "",
                             Priority = int.TryParse(rdr["Priority"]?.ToString(), out int pri) ? pri : 0,
@@ -207,7 +209,7 @@ namespace CIMS.Services
                             PartNo = rdr["PartNo"]?.ToString() ?? "",
                             Model = rdr["Model"]?.ToString() ?? "",
                             StockBox = FormatNum(rdr["StockBox"]),
-                            StockPcs = FormatNum(rdr["StockPcs"]),
+                            StockPcs = CIMS.Helpers.Qty.Text(rdr["StockPcs"], dec),
                             GroupKey = rdr["GroupKey"]?.ToString() ?? ""
                         });
                     }
@@ -223,7 +225,7 @@ namespace CIMS.Services
             return Convert.ToDecimal(v).ToString("#,0.##", System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private List<StoreProductModel> QueryMinimalUpdates(string viewName, int stkId, List<string> partCodes)
+        private List<StoreProductModel> QueryMinimalUpdates(string viewName, int stkId, List<string> partCodes, bool dec = false)
         {
             var list = new List<StoreProductModel>();
             // partCodes = null -> ทั้งคลัง / มีรายการ -> เฉพาะรหัสนั้น (SQL Server รับพารามิเตอร์ได้ไม่เกิน ~2,100 ตัว -> เกินนั้นดึงทั้งคลังแทน)
@@ -251,13 +253,13 @@ namespace CIMS.Services
                         {
                             PartId = Convert.ToInt32(rdr["PartID"]),
                             PartCode = rdr["PartCode"]?.ToString() ?? "",
-                            Max = rdr["Max"]?.ToString() ?? "0",
-                            Min = rdr["Min"]?.ToString() ?? "0",
-                            Qty = rdr["QtyStkb"]?.ToString() ?? "0",
+                            Max = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), dec),
+                            Min = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), dec),
+                            Qty = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["QtyStkb"]), dec),
                             Remark = rdr["Remark"]?.ToString() ?? "",
                             StockStatus = rdr["StockStatus"]?.ToString() ?? "NORMAL",
                             StockBox = FormatNum(rdr["StockBox"]),
-                            StockPcs = FormatNum(rdr["StockPcs"])
+                            StockPcs = CIMS.Helpers.Qty.Text(rdr["StockPcs"], dec)
                         });
                     }
                 }
@@ -335,9 +337,10 @@ namespace CIMS.Services
                             PartCode = rdr["PartCode"]?.ToString() ?? "",
                             PartName = rdr["PartName"]?.ToString() ?? "",
                             PackSize = rdr["PackSize"]?.ToString() ?? "",
-                            Max = rdr["Max"]?.ToString() ?? "",
-                            Min = rdr["Min"]?.ToString() ?? "",
-                            Qty = rdr["QtyStkb"]?.ToString() ?? "",
+                            // ยอด / MAX / MIN ตามการตั้งค่าคลัง: DECIMAL QTY = 1234.50 / ปกติ = 1234
+                            Max = rdr["Max"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), false),
+                            Min = rdr["Min"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), false),
+                            Qty = rdr["QtyStkb"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["QtyStkb"]), false),
                             Remark = rdr["Remark"]?.ToString() ?? "",
                             Bin = rdr["Bin"]?.ToString() ?? "",
 
@@ -357,7 +360,7 @@ namespace CIMS.Services
 
         #region === [ Update Product Master ] ===
 
-        public bool UpdateProductMaster(string partCode, string remark, int? max, int? min, double? qty, int ptId = 0)
+        public bool UpdateProductMaster(string partCode, string remark, decimal? max, decimal? min, decimal? qty, int ptId = 0)
         {
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
             {
@@ -375,9 +378,9 @@ namespace CIMS.Services
                 cmd.Parameters.AddWithValue("@code", partCode);
                 cmd.Parameters.AddWithValue("@pt", ptId);
 
-                if (max.HasValue) cmd.Parameters.AddWithValue("@max", max.Value);
-                if (min.HasValue) cmd.Parameters.AddWithValue("@min", min.Value);
-                if (qty.HasValue) cmd.Parameters.AddWithValue("@qty", qty.Value);
+                if (max.HasValue) cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@max", max.Value));
+                if (min.HasValue) cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@min", min.Value));
+                if (qty.HasValue) cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@qty", qty.Value));
 
                 conn.Open();
                 cmd.ExecuteNonQuery();
@@ -481,9 +484,9 @@ namespace CIMS.Services
                         list.Add(new StoreProductModel
                         {
                             PartCode = rdr["PartCode"]?.ToString() ?? "",
-                            Max = rdr["Max"]?.ToString() ?? "0",
-                            Min = rdr["Min"]?.ToString() ?? "0",
-                            Qty = rdr["QtyStkb"]?.ToString() ?? "0",
+                            Max = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), false),
+                            Min = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), false),
+                            Qty = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["QtyStkb"]), false),
                             Remark = rdr["Remark"]?.ToString() ?? "",
                             StockStatus = rdr["StockStatus"]?.ToString() ?? "NORMAL"
                         });

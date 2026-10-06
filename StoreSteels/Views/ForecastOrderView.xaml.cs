@@ -196,7 +196,7 @@ namespace CIMS.Views
             _searchTimer.Start();
         }
 
-        // 📤 Export ตามตาราง (ทุกแถวของเดือน + คำค้นหา) -> Desktop\CIMS_Export แล้วเปิดโฟลเดอร์
+        // 📤 Export ตามตาราง (ทุกแถวของเดือน + คำค้นหา) -> Desktop\CIMS_Export แล้วเปิดไฟล์
         private async void Export_Click(object sender, RoutedEventArgs e)
         {
             var month = SelectedMonth;
@@ -209,7 +209,7 @@ namespace CIMS.Views
                 string path = await Task.Run(() => _service.Export(month.Value, key, out count));
                 LogService.WriteLog(_session?.UserId, "FORECAST_EXPORT", $"Month: {month.Value.ToString("yyyy-MM", CultureInfo.InvariantCulture)} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
                 NotificationManager.Show("Export", $"Export แล้ว {count:N0} รายการ\n{path}", true);
-                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+                ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (Exception ex)
             {

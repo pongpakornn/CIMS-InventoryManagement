@@ -28,4 +28,5 @@ Run the dated update scripts in order (each one is safe to run more than once):
 | `Update_20261005.sql` | `Stocks.ScanDisplayField` (Multi-Scanner DISPLAY setting) and the rolling 3-month history triggers on ScanTransactions, ScanAdjustments and SystemLogs. |
 | `Update_20261005b.sql` | `BarcodeFormats.MatchBy` / `NameFields` (find the product by PRODUCT NAME from the label). |
 | `Update_20261005c.sql` | Store(Max-Min) can group a stock by SUPPLIER (`vw_StockMonitoring.GroupKey`, kept as NVARCHAR(200) so the Store page does not wait for a large memory grant). |
+| `Update_20261006.sql` | Quantities can have decimals: `Stocks.AllowDecimal` (DECIMAL QTY per stock, KG stocks start ON) and every quantity / balance / MAX / MIN column INT → DECIMAL(18,3). Box counts stay whole numbers. **Back up first.** Without this script the program still opens and every stock works in whole numbers (DECIMAL QTY stays off). |
 | `ClearOperationalData.sql` | Clears transactions / logs / stock quantities while keeping users, permissions and setup. Only run it when you really want to reset data. |

@@ -44,9 +44,10 @@ namespace CIMS.Services
                                 Category = rdr["Category"].ToString(),
                                 Location = rdr["Bin"].ToString(),
                                 QRCodeData = rdr["PT_QR_DISPLAY"].ToString(),
-                                Max = rdr["MaxQuantity"].ToString(),
-                                Min = rdr["MinQuantity"].ToString(),
-                                Stock = rdr["StockQuantity"].ToString(),
+                                // ยอดเป็นทศนิยมได้ (DECIMAL 18,3) - ตัดศูนย์ท้ายออก (613.000 -> 613)
+                                Max = rdr["MaxQuantity"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Plain(Convert.ToDecimal(rdr["MaxQuantity"])),
+                                Min = rdr["MinQuantity"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Plain(Convert.ToDecimal(rdr["MinQuantity"])),
+                                Stock = rdr["StockQuantity"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Plain(Convert.ToDecimal(rdr["StockQuantity"])),
 
                                 CustomerCode = rdr["Supplier"].ToString(),
                                 ModelCode = "",
@@ -222,7 +223,7 @@ namespace CIMS.Services
 
         // เพิ่มข้อมูลใหม่ (INSERT)
         // คืน PartID ของสินค้าใหม่ (0 = ไม่สำเร็จ)
-        public async Task<int> InsertNewPartAsync(string code, string name, int psz, string qrContent, int max, int min, string category, string imageFileName, string customerCode, string location,
+        public async Task<int> InsertNewPartAsync(string code, string name, int psz, string qrContent, decimal max, decimal min, string category, string imageFileName, string customerCode, string location,
                                                    string customer = null, string partA = null, string partNo = null, string model = null)
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -251,8 +252,8 @@ namespace CIMS.Services
                             cmd.Parameters.AddWithValue("@Name", name ?? "");
                             cmd.Parameters.AddWithValue("@Psz", psz);
                             cmd.Parameters.AddWithValue("@QR", qrContent ?? "");
-                            cmd.Parameters.AddWithValue("@Max", max);
-                            cmd.Parameters.AddWithValue("@Min", min);
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Max", max));
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Min", min));
                             cmd.Parameters.AddWithValue("@Cat", category ?? "GENERAL");
                             cmd.Parameters.AddWithValue("@ImageFileName", (object)imageFileName ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@CustomerCode", (object)customerCode ?? DBNull.Value);

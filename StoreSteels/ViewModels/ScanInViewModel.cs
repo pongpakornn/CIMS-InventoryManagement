@@ -137,7 +137,7 @@ using CIMS.Helpers;
 //                {
 //                    ShowCode = result.PartACode;
 //                    ShowName = result.PartName;
-//                    ShowQty = result.Qty.ToString(); // หน้าจอแสดงผลยอดตามระบบเก่าของคุณนนท์
+//                    ShowQty = Qty.Plain(result.Qty); // หน้าจอแสดงผลยอดตามระบบเก่าของคุณนนท์
 
 //                    // เส้นทางไฟล์รูปเครือข่าย IP เครื่องหลัก
 //                    string baseFolder = @"\\192.168.10.56\ProgramCHR\2. Store Only\StoreSteels\ImageStore";
@@ -190,7 +190,7 @@ using CIMS.Helpers;
 //                        PartName = result.PartName,
 //                        PartNo = result.PartNo,
 //                        PartACode = result.PartACode,
-//                        Qty = (int)result.Qty, // ปรับ Type ให้เป็น int ป้องกันตัวแดงเตือนบน Model เดิม
+//                        Qty = result.Qty, // ปรับ Type ให้เป็น int ป้องกันตัวแดงเตือนบน Model เดิม
 //                        Status = "IN",
 //                        UpdateTime = DateTime.Now,
 //                        ProductImagePath = ShowProductImage
@@ -733,11 +733,12 @@ namespace CIMS.ViewModels
         private string _showCode;
         public string ShowCode { get => _showCode; set { _showCode = value; OnPropertyChanged(); } }
 
-        private int _showQtyValue;
+        // ยอดล่าสุดที่สแกน (ทศนิยมได้ถ้าคลังเปิด DECIMAL QTY)
+        private decimal _showQtyValue;
         public string ShowQty
         {
-            get => _showQtyValue.ToString();
-            set { if (int.TryParse(value, out int res)) _showQtyValue = res; OnPropertyChanged(); }
+            get => CIMS.Helpers.Qty.Plain(_showQtyValue);
+            set { if (CIMS.Helpers.Qty.TryParse(value, out decimal res)) _showQtyValue = res; OnPropertyChanged(); }
         }
 
         private string _barcodeInput;
@@ -807,7 +808,7 @@ namespace CIMS.ViewModels
             {
                 // สแกนร่วมหลายคลัง: รวมรายการวันนี้ของทุกคลังที่เลือก เรียงตามเวลา (แต่ละแถวรู้ว่าเป็นของคลังไหน)
                 // ยอดคงเหลือของแต่ละสินค้าในตารางสรุปดึงเบื้องหลังพร้อมกัน (เดิมดึงทีละแถวบน UI Thread ทำให้หน้าจอค้างเมื่อวันนั้นสแกนเยอะ)
-                var balances = new Dictionary<(int, int), int>();
+                var balances = new Dictionary<(int, int), decimal>();
                 var data = await Task.Run(() =>
                 {
                     var rows = stocksForLoad
@@ -838,7 +839,7 @@ namespace CIMS.ViewModels
                         {
                             ScannedItems.Insert(0, item);
                         }
-                        UpdateSummary(item, balances.TryGetValue((item.StkId, item.PartId), out int bal) ? bal : (int?)null);
+                        UpdateSummary(item, balances.TryGetValue((item.StkId, item.PartId), out decimal bal) ? bal : (decimal?)null);
                     }
                 });
             }
@@ -960,18 +961,19 @@ namespace CIMS.ViewModels
                     var part = isSupplierScan ? FindPartByCodes(supplierFmt, supplierCodes) : _scanService.GetPartByScan(finalSearchCode);
                     if (part == null) return null;
 
-                    // สต็อก/Quantity เป็นจำนวนเต็ม ป้าย Supplier ที่มีทศนิยมจึงปัดเป็นจำนวนเต็มที่ใกล้ที่สุด
+                    // คลังที่เปิด DECIMAL QTY (เช่น KG) เก็บทศนิยมตามป้าย (สูงสุด 3 ตำแหน่ง) / คลังอื่นปัดเป็นจำนวนเต็มที่ใกล้ที่สุดเหมือนเดิม
                     // (ค่าเต็มยังอยู่ครบในบาร์โค้ดดิบที่บันทึกลง ReferenceNo) - รูปแบบที่ไม่ได้กำหนดช่องจำนวน ใช้ Pack Size
-                    int originalQty = isPackingCardScan ? (int)packingQty
-                                    : (isSupplierScan && supplierQty.HasValue) ? (int)Math.Round(supplierQty.Value, MidpointRounding.AwayFromZero)
-                                    : (int)part.Qty;
+                    bool dec = stock.AllowDecimal;
+                    decimal originalQty = Qty.Round(isPackingCardScan ? packingQty
+                                    : (isSupplierScan && supplierQty.HasValue) ? supplierQty.Value
+                                    : part.Qty, dec);
 
                     // 🔢 สแกนเศษ: กรอกจำนวนเอง (ไม่ใช้ Pack Size / จำนวนบนป้าย) และไม่นับกล่อง
                     if (remainder)
                     {
-                        int? typed = DialogHelper.ShowQuantityInput(
-                            $"{(isOut ? "สแกนออก (เศษ)" : "สแกนเข้า (เศษ)")}  •  {stock.Code}\n{part.PartCode}  {part.PartName}\n\nกรอกจำนวนเศษ (Pack Size {originalQty:N0})",
-                            "REMAINDER QTY");
+                        decimal? typed = DialogHelper.ShowDecimalQuantityInput(
+                            $"{(isOut ? "สแกนออก (เศษ)" : "สแกนเข้า (เศษ)")}  •  {stock.Code}\n{part.PartCode}  {part.PartName}\n\nกรอกจำนวนเศษ (Pack Size {Qty.Plain(originalQty)})",
+                            "REMAINDER QTY", dec);
                         if (typed == null || typed.Value <= 0) { remainderCancelled = true; return null; }
                         originalQty = typed.Value;
                     }
@@ -1020,7 +1022,7 @@ namespace CIMS.ViewModels
                 {
                     ShowCode = result.PartACode;
                     ShowName = result.PartName;
-                    ShowQty = result.Qty.ToString();
+                    ShowQty = Qty.Plain(result.Qty);
                     ShowStock = stock.Code;
 
                     LoadProductImage(result.PartId, result.PartACode);
@@ -1032,7 +1034,7 @@ namespace CIMS.ViewModels
                         PartName = result.PartName,
                         PartNo = result.PartNo,
                         PartACode = result.PartACode,
-                        Qty = (int)result.Qty,
+                        Qty = result.Qty,
                         StkId = stock.StkId,
                         StockCode = stock.Code,
                         ShowStockInCode = multiScope,
@@ -1067,9 +1069,9 @@ namespace CIMS.ViewModels
                     {
                         ScanWarning(
                             $"ยอดใน {deductResult.SourceCode} ไม่พอสำหรับรายการนี้\n\n" +
-                            $"{result.PartCode}\nจำนวนบนป้าย: {deductResult.RequestedQty:N0}\n" +
-                            $"มีใน {deductResult.SourceCode}: {deductResult.SourceBefore:N0}  (ตัดได้ {deductResult.Deducted:N0})\n\n" +
-                            $"รับเข้า {stock.Code} เต็มจำนวน {deductResult.RequestedQty:N0} แล้ว กรุณาตรวจสอบยอด {deductResult.SourceCode}",
+                            $"{result.PartCode}\nจำนวนบนป้าย: {Qty.Plain(deductResult.RequestedQty)}\n" +
+                            $"มีใน {deductResult.SourceCode}: {Qty.Plain(deductResult.SourceBefore)}  (ตัดได้ {Qty.Plain(deductResult.Deducted)})\n\n" +
+                            $"รับเข้า {stock.Code} เต็มจำนวน {Qty.Plain(deductResult.RequestedQty)} แล้ว กรุณาตรวจสอบยอด {deductResult.SourceCode}",
                             "SOURCE STOCK SHORT");
                     }
                 }
@@ -1227,14 +1229,14 @@ namespace CIMS.ViewModels
                     return;
                 }
 
-                int? enteredQty = DialogHelper.ShowQuantityInput(
+                decimal? enteredQty = DialogHelper.ShowDecimalQuantityInput(
                     $"{part.PartName}\nProduct Code: {part.PartCode}\n\nกรุณากรอกจำนวนที่รับคืนเข้าคลัง",
-                    "คืนเหล็กเข้าคลัง");
+                    "คืนเหล็กเข้าคลัง", stock.AllowDecimal);
 
                 if (enteredQty == null || enteredQty.Value <= 0)
                     return; // ผู้ใช้กด Cancel หรือปิดหน้าต่าง - ไม่ทำอะไรต่อ
 
-                int qty = enteredQty.Value;
+                decimal qty = enteredQty.Value;
                 bool isSaved = true;
 
                 if (!IsTestMode)
@@ -1255,7 +1257,7 @@ namespace CIMS.ViewModels
 
                 ShowCode = part.PartACode;
                 ShowName = part.PartName;
-                ShowQty = qty.ToString();
+                ShowQty = Qty.Plain(qty);
                 ShowStock = stock.Code;
 
                 LoadProductImage(part.PartId, part.PartACode);
@@ -1307,13 +1309,13 @@ namespace CIMS.ViewModels
         }
 
         // knownBalance: ยอดที่ดึงมาแล้วเบื้องหลัง (โหลดตารางวันนี้) / null = ดึงเองตอนนี้ (หลังสแกน 1 รายการ)
-        private void UpdateSummary(ScanItemModel item, int? knownBalance = null)
+        private void UpdateSummary(ScanItemModel item, decimal? knownBalance = null)
         {
             if (string.IsNullOrWhiteSpace(item.PartACode)) return;
 
             // ยอดคงเหลือของคลังที่รายการนั้นลงจริง (สแกนร่วมหลายคลังแยกแถวสรุปตามคลัง)
             var itemStock = Stocks.FirstOrDefault(s => s.StkId == item.StkId && item.StkId != 0) ?? SelectedStock;
-            int actualCurrentStock = knownBalance ?? _scanService.GetInventoryBalance(item.PartId, itemStock);
+            decimal actualCurrentStock = knownBalance ?? _scanService.GetInventoryBalance(item.PartId, itemStock);
             var existing = HistoryItems.FirstOrDefault(x => x.PartACode == item.PartACode && x.StkId == item.StkId);
 
             if (existing != null)

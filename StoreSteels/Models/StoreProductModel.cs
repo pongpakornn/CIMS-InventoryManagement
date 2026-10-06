@@ -65,10 +65,13 @@ namespace CIMS.Models
 
         #region === [ Max / Min ] ===
 
+        // ไม่มีค่า MAX / MIN (ว่าง / 0 / 0.00 ของคลังทศนิยม) -> แสดง "-" เหมือนกันทุกคลัง
+        private static bool IsEmptyQty(string v) => string.IsNullOrWhiteSpace(v) || (CIMS.Helpers.Qty.TryParse(v, out decimal d) && d == 0);
+
         private string _max;
         public string Max
         {
-            get => (_max == "0" || string.IsNullOrWhiteSpace(_max)) ? "-" : _max;
+            get => IsEmptyQty(_max) ? "-" : _max;
             set
             {
                 string val = (value == "-" || string.IsNullOrWhiteSpace(value)) ? "0" : value;
@@ -81,7 +84,7 @@ namespace CIMS.Models
         private string _min;
         public string Min
         {
-            get => (_min == "0" || string.IsNullOrWhiteSpace(_min)) ? "-" : _min;
+            get => IsEmptyQty(_min) ? "-" : _min;
             set
             {
                 string val = (value == "-" || string.IsNullOrWhiteSpace(value)) ? "0" : value;

@@ -1,4 +1,4 @@
-using CIMS.Helpers;
+﻿using CIMS.Helpers;
 using CIMS.Models;
 using CIMS.Services;
 using System;
@@ -110,21 +110,21 @@ namespace CIMS.Views
             if (sel.Count != 1) { DialogHelper.ShowWarning("กรุณาติ๊กเลือก 1 รายการที่ต้องการแก้ไขจำนวน"); return; }
             var row = sel[0];
 
-            int? qty = DialogHelper.ShowQuantityInput(
-                $"{row.TxType}  •  {row.StockCode}\n{row.PartCode}  {row.PartName}\n\nจำนวนเดิม {row.Qty:N0}  กรอกจำนวนที่ถูกต้อง", "EDIT SCAN QTY");
+            decimal? qty = DialogHelper.ShowDecimalQuantityInput(
+                $"{row.TxType}  •  {row.StockCode}\n{row.PartCode}  {row.PartName}\n\nจำนวนเดิม {row.QtyText}  กรอกจำนวนที่ถูกต้อง", "EDIT SCAN QTY", row.AllowDecimal);
             if (qty == null) return;
             if (qty.Value == row.Qty) { DialogHelper.ShowWarning("จำนวนใหม่เท่ากับจำนวนเดิม"); return; }
 
-            string reason = AskReason($"แก้จำนวน {row.PartCode} ({row.TxType} {row.StockCode})\nจาก {row.Qty:N0} เป็น {qty.Value:N0}", "EDIT SCAN QTY");
+            string reason = AskReason($"แก้จำนวน {row.PartCode} ({row.TxType} {row.StockCode})\nจาก {row.QtyText} เป็น {Qty.Plain(qty.Value)}", "EDIT SCAN QTY");
             if (reason == null) return;
 
             try
             {
                 var res = await Task.Run(() => _service.EditQty(row.TxId, qty.Value, reason, _session.UserId));
                 LogService.WriteLog(_session.UserId, "SCAN_ADJUST",
-                    $"Edit scan #{row.TxId} {row.TxType} {row.StockCode} {row.PartCode}: {row.Qty} -> {qty.Value} | Balance: {res.BalanceAfter} | Reason: {reason}", row.TxId.ToString());
+                    $"Edit scan #{row.TxId} {row.TxType} {row.StockCode} {row.PartCode}: {row.QtyText} -> {Qty.Plain(qty.Value)} | Balance: {Qty.Plain(res.BalanceAfter)} | Reason: {reason}", row.TxId.ToString());
                 Changed = true;
-                var msg = new StringBuilder($"แก้ไขจำนวนเรียบร้อย\nยอดคงเหลือ {res.StockCode} : {res.BalanceAfter:N0}");
+                var msg = new StringBuilder($"แก้ไขจำนวนเรียบร้อย\nยอดคงเหลือ {res.StockCode} : {Qty.Plain(res.BalanceAfter)}");
                 if (!string.IsNullOrEmpty(res.PrNo)) msg.Append($"\n\n⚠ รายการนี้มี PR {res.PrNo} ({res.PrStatus}) ผู้มีสิทธิ์ PR ต้องแก้ไขจำนวนใน PR เอง");
                 DialogHelper.ShowSuccess(msg.ToString());
                 await LoadAsync();
@@ -139,7 +139,7 @@ namespace CIMS.Views
             var sel = Selected();
             if (sel.Count == 0) { DialogHelper.ShowWarning("กรุณาติ๊กเลือกรายการที่ต้องการลบ"); return; }
 
-            string list = string.Join("\n", sel.Take(8).Select(r => $"• {r.TxType} {r.StockCode}  {r.PartCode}  x{r.Qty:N0}")) + (sel.Count > 8 ? $"\n... และอีก {sel.Count - 8} รายการ" : "");
+            string list = string.Join("\n", sel.Take(8).Select(r => $"• {r.TxType} {r.StockCode}  {r.PartCode}  x{r.QtyText}")) + (sel.Count > 8 ? $"\n... และอีก {sel.Count - 8} รายการ" : "");
             string reason = AskReason($"ลบรายการสแกน {sel.Count:N0} รายการ ยอด Stock จะถูกปรับย้อนกลับ\n\n{list}", "DELETE SCAN");
             if (reason == null) return;
 

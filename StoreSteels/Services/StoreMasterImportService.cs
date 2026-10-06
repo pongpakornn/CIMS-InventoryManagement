@@ -28,8 +28,8 @@ namespace CIMS.Services
         public string Remark { get; set; }
         public decimal? Qty { get; set; }
         public int? Box { get; set; }
-        public int? Max { get; set; }
-        public int? Min { get; set; }
+        public decimal? Max { get; set; }   // ทศนิยมได้ - บันทึกตาม DECIMAL QTY ของแต่ละคลัง
+        public decimal? Min { get; set; }
         public bool? ShowInMain { get; set; }
         public List<StockModel> Stocks { get; } = new List<StockModel>();   // คลังที่ระบุในไฟล์ (ว่าง = คลังของหน้านี้)
         public bool IsNew { get; set; }
@@ -153,8 +153,8 @@ namespace CIMS.Services
                     Num("PACKSIZE", "PACKSIZE", v => x.PackSize = (int)v, true);
                     Num("QTY", "QTY", v => x.Qty = v, false);
                     Num("BOX", "STOCK (BOX)", v => x.Box = (int)v, true);
-                    Num("MAX", "MAX", v => x.Max = (int)Math.Round(v, MidpointRounding.AwayFromZero), false);
-                    Num("MIN", "MIN", v => x.Min = (int)Math.Round(v, MidpointRounding.AwayFromZero), false);
+                    Num("MAX", "MAX", v => x.Max = v, false);
+                    Num("MIN", "MIN", v => x.Min = v, false);
                     if (x.Error == null && x.Max.HasValue && x.Min.HasValue && x.Min > x.Max && x.Max > 0) x.Error = $"MIN {x.Min} มากกว่า MAX {x.Max}";
 
                     string sh = (Get(r, "SHOWHIDE") ?? "").ToUpperInvariant();
@@ -279,12 +279,12 @@ namespace CIMS.Services
                             {
                                 cmd.Parameters.AddWithValue("@s", s.StkId);
                                 cmd.Parameters.AddWithValue("@p", x.PtId);
-                                // ยอดคงคลังเก็บเป็นจำนวนเต็มทุกคลัง
-                                object qty = x.Qty.HasValue ? (object)(int)Math.Round(x.Qty.Value, MidpointRounding.AwayFromZero) : DBNull.Value;
-                                cmd.Parameters.AddWithValue("@qty", qty);
+                                // คลังที่เปิด DECIMAL QTY เก็บทศนิยม (3 ตำแหน่ง) / คลังอื่นปัดเป็นจำนวนเต็มเหมือนเดิม
+                                decimal? Rnd(decimal? v) => v.HasValue ? CIMS.Helpers.Qty.Round(v.Value, s.AllowDecimal) : (decimal?)null;
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@qty", Rnd(x.Qty)));
                                 cmd.Parameters.AddWithValue("@box", (object)x.Box ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@max", (object)x.Max ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@min", (object)x.Min ?? DBNull.Value);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@max", Rnd(x.Max)));
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@min", Rnd(x.Min)));
                                 cmd.Parameters.AddWithValue("@rmk", string.IsNullOrEmpty(x.Remark) ? DBNull.Value : (object)x.Remark);
                                 cmd.Parameters.AddWithValue("@show", x.ShowInMain.HasValue ? (object)(x.ShowInMain.Value ? 1 : 0) : DBNull.Value);
                                 cmd.ExecuteNonQuery();

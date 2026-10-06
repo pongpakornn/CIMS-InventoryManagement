@@ -248,7 +248,7 @@
 //            if (item == null || string.IsNullOrWhiteSpace(item.PartACode)) return;
 
 //            // ดึงยอดคงเหลือจริงปัจจุบันจาก SQL ผ่าน PartId
-//            int actualCurrentStock = _scanService.GetInventoryBalance(item.PartId);
+//            decimal actualCurrentStock = _scanService.GetInventoryBalance(item.PartId);
 
 //            Application.Current.Dispatcher.Invoke(() =>
 //            {
@@ -598,7 +598,7 @@ namespace CIMS.ViewModels
         {
             if (item == null || string.IsNullOrWhiteSpace(item.PartACode)) return;
 
-            int actualCurrentStock = _scanService.GetInventoryBalance(item.PartId);
+            decimal actualCurrentStock = _scanService.GetInventoryBalance(item.PartId);
 
             Application.Current.Dispatcher.Invoke(() =>
             {

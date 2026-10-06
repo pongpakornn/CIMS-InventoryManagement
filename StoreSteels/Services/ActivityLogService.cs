@@ -139,27 +139,24 @@ namespace CIMS.Services
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.Worksheets.Add("Activity Log");
-                string[] head = { "DATE TIME", "USER", "ACTION", "DETAIL", "REF", "COMPUTER" };
-                for (int c = 0; c < head.Length; c++) ws.Cell(1, c + 1).Value = head[c];
-                var h = ws.Range(1, 1, 1, head.Length);
-                h.Style.Font.Bold = true;
-                h.Style.Fill.BackgroundColor = XLColor.FromHtml("#002060");
-                h.Style.Font.FontColor = XLColor.White;
+                // รูปแบบเดียวกับไฟล์ Export / Template ทั้งระบบ
+                string[] head = { "NO", "DATE TIME", "USER", "ACTION", "DETAIL", "REF", "COMPUTER" };
+                ImportTemplateService.Header(ws, head, new double[] { 7, 20, 26, 24, 90, 18, 18 });
                 int i = 2;
                 foreach (var x in rows)
                 {
-                    ws.Cell(i, 1).Value = x.LogDate; ws.Cell(i, 1).Style.DateFormat.Format = "yyyy-mm-dd hh:mm:ss";
-                    ws.Cell(i, 2).Value = x.UserText;
-                    ws.Cell(i, 3).Value = x.Action;
-                    ws.Cell(i, 4).Value = x.Detail;
-                    ws.Cell(i, 5).Value = x.RefCode;
-                    ws.Cell(i, 6).Value = x.Computer;
+                    ws.Cell(i, 1).Value = i - 1;
+                    ws.Cell(i, 2).Value = x.LogDate; ws.Cell(i, 2).Style.DateFormat.Format = "yyyy-mm-dd hh:mm:ss";
+                    ws.Cell(i, 3).Value = x.UserText;
+                    ws.Cell(i, 4).Value = x.Action;
+                    ws.Cell(i, 5).Value = x.Detail;
+                    ws.Cell(i, 6).Value = x.RefCode;
+                    ws.Cell(i, 7).Value = x.Computer;
                     i++;
                 }
-                ws.Columns(1, 3).AdjustToContents();
-                ws.Column(4).Width = 90;
-                ws.Columns(5, 6).AdjustToContents();
-                ws.SheetView.FreezeRows(1);
+                ImportTemplateService.Body(ws, i - 1, head.Length);
+                ImportTemplateService.LeftAlign(ws, i - 1, 3, 5);
+                if (i > 2) { ws.Range(2, 1, i - 1, 1).Style.Font.Bold = true; ws.Range(2, 5, i - 1, 5).Style.Alignment.WrapText = true; }
                 wb.SaveAs(path);
             }
             return rows.Count;

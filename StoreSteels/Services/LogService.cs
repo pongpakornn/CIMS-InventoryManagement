@@ -110,9 +110,9 @@ namespace CIMS.Services
 
         // ✅ งานแสกน (Scan In / Scan Out)
         // rawBarcode (ไม่บังคับ): บาร์โค้ดดิบทั้งชุด เช่นป้าย Panta - ต่อท้ายใน Description (nvarchar(max)) ให้ย้อนดูได้ครบ
-        public static void WriteScanLog(string userId, string actionType, string partCode, string partName, int qty, string rawBarcode = null)
+        public static void WriteScanLog(string userId, string actionType, string partCode, string partName, decimal qty, string rawBarcode = null)
         {
-            string description = $"[{actionType}] PD: {partName} | QTY: {qty}"
+            string description = $"[{actionType}] PD: {partName} | QTY: {CIMS.Helpers.Qty.Plain(qty)}"
                 + (string.IsNullOrWhiteSpace(rawBarcode) ? "" : $" | BARCODE: {rawBarcode.Trim()}");
             Insert(userId, actionType, description, partCode ?? "");
         }

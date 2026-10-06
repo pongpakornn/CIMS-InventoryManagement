@@ -118,17 +118,36 @@ namespace CIMS.ViewModels
 
                 return await Task.Run(() =>
                 {
-                    int maxVal = int.TryParse(product.Max, out int ma) ? ma : 0;
-                    int minVal = int.TryParse(product.Min, out int mi) ? mi : 0;
-                    double? qtyVal = double.TryParse(product.Qty, out double q) ? q : (double?)null;
+                    // คลังที่เปิด DECIMAL QTY เก็บทศนิยม (สูงสุด 3 ตำแหน่ง) / คลังอื่นปัดเป็นจำนวนเต็มเหมือนเดิม
+                    bool dec = Stock?.AllowDecimal == true;
+                    // ช่องว่าง / "-" = 0 / พิมพ์ผิด (ไม่ใช่ตัวเลข) -> แจ้งเตือน ไม่บันทึก (เดิมบันทึกเป็น 0 ทับค่าเดิมเงียบๆ)
+                    decimal Field(string text, string name)
+                    {
+                        string t = (text ?? "").Trim();
+                        if (t.Length == 0 || t == "-") return 0;
+                        if (!Qty.TryParse(t, out decimal v)) throw new FormatException($"{name} \"{t}\" ไม่ใช่ตัวเลข");
+                        return Qty.Round(Math.Max(0, v), dec);
+                    }
+                    void CheckNumber(string text, string original, string name)
+                    {
+                        string t = (text ?? "").Trim();
+                        if (t != (original ?? "").Trim() && t.Length > 0 && t != "-" && !Qty.TryParse(t, out _))
+                            throw new FormatException($"{name} \"{t}\" ไม่ใช่ตัวเลข");
+                    }
+                    decimal maxVal = Field(product.Max, "MAX");
+                    decimal minVal = Field(product.Min, "MIN");
+                    CheckNumber(product.Qty, originalProduct.Qty, "QTY");
+                    CheckNumber(product.StockPcs, originalProduct.StockPcs, "STOCK (PCS)");
+                    CheckNumber(product.StockBox, originalProduct.StockBox, "STOCK (BOX)");
+                    decimal? qtyVal = Qty.TryParse(product.Qty, out decimal q) ? q : (decimal?)null;
 
                     // STOCK (BOX) / STOCK (PCS): แก้ช่องไหน อีกช่องคำนวณตาม Pack Size ให้ (BOX x Pack Size = PCS)
                     int? boxVal = null;
-                    static double? Num(string s) => double.TryParse((s ?? "").Replace(",", ""), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : (double?)null;
-                    if (product.StockPcs != originalProduct.StockPcs && Num(product.StockPcs) is double pcs)
+                    if (product.StockPcs != originalProduct.StockPcs && Qty.TryParse(product.StockPcs, out decimal pcs))
                     { qtyVal = pcs; changes.Add($"STOCK(PCS): {originalProduct.StockPcs}->{product.StockPcs}"); }
-                    else if (product.StockBox != originalProduct.StockBox && Num(product.StockBox) is double box)
+                    else if (product.StockBox != originalProduct.StockBox && Qty.TryParse(product.StockBox, out decimal box))
                     { boxVal = (int)Math.Max(0, Math.Round(box)); changes.Add($"STOCK(BOX): {originalProduct.StockBox}->{product.StockBox}"); }
+                    if (qtyVal.HasValue) qtyVal = Qty.Round(Math.Max(0, qtyVal.Value), dec);
 
                     if (changes.Count > 0)
                         LogService.WriteLog(CurrentUser.UserId, "UPDATE_PRODUCT_MASTER", $"| {StockTag}Changes: {string.Join(", ", changes)}", product.PartCode);

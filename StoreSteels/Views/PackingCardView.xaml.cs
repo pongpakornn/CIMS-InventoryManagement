@@ -148,6 +148,10 @@ namespace CIMS.Views
 
         private void RunPrintFlow(List<PackingCardModel> items)
         {
+            // 🖨 เลือกเครื่องพิมพ์ก่อน: QL-800 = ฉลากทีละดวงแบบเดิม / เครื่องอื่น (Fuji ApeosPort ฯลฯ) = A4 หลายใบต่อแผ่น
+            var choice = PrinterChoiceWindow.Choose(items);
+            if (choice == null) return;
+
             var progressView = new PrintProgressView();
             if (Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible)
             {
@@ -158,7 +162,7 @@ namespace CIMS.Views
 
             try
             {
-                var printedItems = _printService.PrintCards(items, (current, total) =>
+                var printedItems = _printService.PrintCards(items, choice.SelectedQueue, choice.IsA4, choice.Cols, choice.Rows, (current, total) =>
                 {
                     progressView.UpdateProgress(current, total);
                     // ปั๊มข้อความ UI ให้หลอดโปรเกรสขยับจริงระหว่างพิมพ์ทีละใบ (loop นี้ทำงานบน UI thread)
@@ -171,7 +175,7 @@ namespace CIMS.Views
                     // บันทึกประวัติการพิมพ์ลง CIMS.PickListPrintLogs (ฐานของเราเอง) - รอบถัดไป ERP query
                     // จะไม่ดึงรายการนี้กลับมาอีก และตัดออกจากลิสต์ที่แสดงอยู่ทันทีด้านล่าง
                     _printLogService.LogPrinted(item, userId);
-                    LogService.WriteLog(userId, "PRINT_PACKING_CARD", $"Printed Packing Card | Ticket: {item.TicketNo} | Lot: {item.LotNo}", item.MaterialCode);
+                    LogService.WriteLog(userId, "PRINT_PACKING_CARD", $"Printed Packing Card | Ticket: {item.TicketNo} | Lot: {item.LotNo} | Printer: {choice.SelectedQueue.FullName}{(choice.IsA4 ? $" (A4 {choice.Cols}x{choice.Rows})" : "")}", item.MaterialCode);
                 }
 
                 if (printedItems.Count > 0)

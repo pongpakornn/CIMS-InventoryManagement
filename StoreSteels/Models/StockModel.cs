@@ -64,6 +64,8 @@ namespace CIMS.Models
         public bool OutSupplier { get; set; }
         public bool OutSysQr { get; set; }
         public bool OutExcel { get; set; }    // จ่ายออกด้วย Import Excel
+        // 🔢 เก็บ / แสดงยอดเป็นทศนิยม (เช่น KG 1,234.50) - ปิด = ปัดเป็นจำนวนเต็มเหมือนเดิม
+        public bool AllowDecimal { get; set; }
 
         public int SortNo { get; set; }
 

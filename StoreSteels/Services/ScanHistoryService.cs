@@ -17,7 +17,7 @@ namespace CIMS.Services
         public string TxType { get; set; }
         public string PartCode { get; set; }
         public string PartName { get; set; }
-        public int Qty { get; set; }
+        public decimal Qty { get; set; }
         public string UserId { get; set; }
         public string UserName { get; set; }
         public string RefNo { get; set; }
@@ -132,7 +132,7 @@ namespace CIMS.Services
             TxType = r["TransactionType"].ToString(),
             PartCode = r["PartCode"].ToString(),
             PartName = r["Description"].ToString(),
-            Qty = r["Quantity"] == DBNull.Value ? 0 : Convert.ToInt32(r["Quantity"]),
+            Qty = CIMS.Helpers.Qty.Read(r["Quantity"]),
             UserId = r["UserID"].ToString(),
             UserName = r["FullName"].ToString(),
             RefNo = r["ReferenceNo"].ToString(),
@@ -164,24 +164,26 @@ namespace CIMS.Services
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.Worksheets.Add("Scan History");
-                string[] head = { "DATE TIME", "STOCK", "TYPE", "PRODUCT CODE", "PRODUCT NAME", "QTY", "USER", "BARCODE" };
-                for (int c = 0; c < head.Length; c++) ws.Cell(1, c + 1).Value = head[c];
-                ws.Range(1, 1, 1, head.Length).Style.Font.Bold = true;
+                // รูปแบบเดียวกับไฟล์ Export / Template ทั้งระบบ
+                string[] head = { "NO", "DATE TIME", "STOCK", "TYPE", "PRODUCT CODE", "PRODUCT NAME", "QTY", "USER", "BARCODE" };
+                ImportTemplateService.Header(ws, head, new double[] { 7, 20, 16, 16, 20, 40, 12, 26, 60 });
                 int i = 2;
                 foreach (var x in rows)
                 {
-                    ws.Cell(i, 1).Value = x.TxDate; ws.Cell(i, 1).Style.DateFormat.Format = "yyyy-mm-dd hh:mm:ss";
-                    ws.Cell(i, 2).Value = x.StockCode;
-                    ws.Cell(i, 3).Value = x.TxType;
-                    ws.Cell(i, 4).Value = x.CodeText;
-                    ws.Cell(i, 5).Value = x.PartName;
-                    ws.Cell(i, 6).Value = x.Qty;
-                    ws.Cell(i, 7).Value = x.UserText;
-                    ws.Cell(i, 8).Value = x.RefNo;
+                    ws.Cell(i, 1).Value = i - 1;
+                    ws.Cell(i, 2).Value = x.TxDate; ws.Cell(i, 2).Style.DateFormat.Format = "yyyy-mm-dd hh:mm:ss";
+                    ws.Cell(i, 3).Value = x.StockCode;
+                    ws.Cell(i, 4).Value = x.TxType;
+                    ws.Cell(i, 5).Value = x.CodeText;
+                    ws.Cell(i, 6).Value = x.PartName;
+                    ws.Cell(i, 7).Value = x.Qty; ws.Cell(i, 7).Style.NumberFormat.Format = x.Qty % 1 == 0 ? "#,##0" : "#,##0.00#";
+                    ws.Cell(i, 8).Value = x.UserText;
+                    ws.Cell(i, 9).Value = x.RefNo;
                     i++;
                 }
-                ws.Columns(1, head.Length - 1).AdjustToContents();
-                ws.Column(head.Length).Width = 60;
+                ImportTemplateService.Body(ws, i - 1, head.Length);
+                ImportTemplateService.LeftAlign(ws, i - 1, 6, 9);
+                if (i > 2) ws.Range(2, 1, i - 1, 1).Style.Font.Bold = true;
                 wb.SaveAs(path);
             }
             return rows.Count;

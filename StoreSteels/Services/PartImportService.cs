@@ -35,10 +35,11 @@ namespace CIMS.Services
         public bool InMain { get; set; }                  // ระบุคลังหลักไว้ (หรือไม่ระบุคลังเลย)
 
         // คอลัมน์เพิ่มเติม (ไม่บังคับ) - null = ไม่ได้กรอก
-        public int? Max { get; set; }
-        public int? Min { get; set; }
+        // MAX / MIN / ยอด เป็นทศนิยมได้ (บันทึกตามการตั้งค่า DECIMAL QTY ของแต่ละคลัง) / จำนวนกล่องเป็นจำนวนเต็ม
+        public decimal? Max { get; set; }
+        public decimal? Min { get; set; }
         public int? StockBox { get; set; }
-        public int? StockPcs { get; set; }
+        public decimal? StockPcs { get; set; }
         public string Remark { get; set; }
         public List<int> OtherStockIds { get; } = new List<int>();
         public string Error { get; set; }
@@ -184,12 +185,21 @@ namespace CIMS.Services
                         item.Error = $"{label} ต้องเป็นจำนวนเต็มไม่ติดลบ ({s})";
                         return null;
                     }
-                    item.Max = Whole("MAX", "MAX");
-                    item.Min = Whole("MIN", "MIN");
+                    // ทศนิยมได้ (คลังที่ไม่ได้เปิด DECIMAL QTY ปัดเป็นจำนวนเต็มตอนบันทึก)
+                    decimal? Num(string key, string label)
+                    {
+                        string s = Get(r, key);
+                        if (s.Length == 0 || item.Error != null) return null;
+                        if (CIMS.Helpers.Qty.TryParse(s, out decimal v) && v >= 0) return CIMS.Helpers.Qty.Round(v, true);
+                        item.Error = $"{label} ต้องเป็นตัวเลขไม่ติดลบ ({s})";
+                        return null;
+                    }
+                    item.Max = Num("MAX", "MAX");
+                    item.Min = Num("MIN", "MIN");
                     item.StockBox = Whole("STOCKBOX", "STOCK (BOX)");
-                    item.StockPcs = Whole("STOCKPCS", "STOCK (PCS)");
+                    item.StockPcs = Num("STOCKPCS", "STOCK (PCS)");
                     // QTY (KG.) / QTY (SHEET) ... = ยอดคงเหลือของคลัง (คอลัมน์เดียวกับ STOCK (PCS) ของคลังที่นับเป็นชิ้น)
-                    int? qty = Whole("QTY", "QTY");
+                    decimal? qty = Num("QTY", "QTY");
                     if (item.Error == null && qty.HasValue)
                     {
                         if (item.StockPcs.HasValue && item.StockPcs.Value != qty.Value)
@@ -273,6 +283,18 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
+                // คลังไหนเปิด DECIMAL QTY (เก็บทศนิยม) / คลังอื่นปัดเป็นจำนวนเต็ม
+                var decStock = new Dictionary<int, bool>();
+                bool mainDec = false;
+                using (var cmd = new SqlCommand("SELECT StockID, IsMain, " + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal") + " FROM CIMS.Stocks", conn))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader.Read())
+                    {
+                        decStock[reader.GetInt32(0)] = reader.GetBoolean(2);
+                        if (reader.GetBoolean(1)) mainDec = reader.GetBoolean(2);
+                    }
+                decimal Rnd(decimal v, bool dec) => CIMS.Helpers.Qty.Round(v, dec);
+
                 using (var trans = conn.BeginTransaction())
                 {
                     foreach (var r in valid)
@@ -303,9 +325,9 @@ namespace CIMS.Services
                             // MAX / MIN / ยอด / REMARK ของคลังหลัก (เฉพาะเมื่อระบุคลังหลัก) - ยอด: STOCK (PCS) ก่อน ไม่มีใช้ BOX x PACKSIZE
                             bool inMain = r.InMain;
                             cmd.Parameters.AddWithValue("@inMain", inMain ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@mmax", inMain ? r.Max ?? 0 : 0);
-                            cmd.Parameters.AddWithValue("@mmin", inMain ? r.Min ?? 0 : 0);
-                            cmd.Parameters.AddWithValue("@mqty", inMain ? r.StockPcs ?? (r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0) : 0);
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@mmax", inMain ? Rnd(r.Max ?? 0, mainDec) : 0m));
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@mmin", inMain ? Rnd(r.Min ?? 0, mainDec) : 0m));
+                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@mqty", inMain ? Rnd(r.StockPcs ?? (r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0), mainDec) : 0m));
                             cmd.Parameters.AddWithValue("@rmk", (object)r.Remark ?? DBNull.Value);
                             ptId = (int)cmd.ExecuteScalar();
                         }
@@ -313,7 +335,8 @@ namespace CIMS.Services
                         foreach (int stkId in r.OtherStockIds)
                         {
                             // STOCK (PCS) + STOCK (BOX): ใส่ทั้งคู่ = ตามไฟล์ / ใส่ PCS อย่างเดียว = BOX คำนวณจาก PACKSIZE / ใส่ BOX อย่างเดียว = PCS = BOX x PACKSIZE
-                            int pcs = r.StockPcs ?? (r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0);
+                            bool dec = decStock.TryGetValue(stkId, out bool dv) && dv;
+                            decimal pcs = Rnd(r.StockPcs ?? (r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0), dec);
                             int box = r.StockBox ?? 0;
                             using (var cmd = new SqlCommand(@"INSERT INTO CIMS.PartStocks (StockID, PartID, Quantity, BoxQuantity, MaxQuantity, MinQuantity, Remark, IsShow)
                                                               VALUES (@s, @p, @qty, @box, @max, @min, @rmk, @show)", conn, trans))
@@ -321,10 +344,10 @@ namespace CIMS.Services
                                 cmd.Parameters.AddWithValue("@s", stkId);
                                 cmd.Parameters.AddWithValue("@p", ptId);
                                 cmd.Parameters.AddWithValue("@show", r.ShowInStock ? 1 : 0);
-                                cmd.Parameters.AddWithValue("@qty", pcs);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@qty", pcs));
                                 cmd.Parameters.AddWithValue("@box", box);
-                                cmd.Parameters.AddWithValue("@max", (object)r.Max ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@min", (object)r.Min ?? DBNull.Value);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@max", r.Max.HasValue ? Rnd(r.Max.Value, dec) : (decimal?)null));
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@min", r.Min.HasValue ? Rnd(r.Min.Value, dec) : (decimal?)null));
                                 cmd.Parameters.AddWithValue("@rmk", (object)r.Remark ?? DBNull.Value);
                                 cmd.ExecuteNonQuery();
                             }
