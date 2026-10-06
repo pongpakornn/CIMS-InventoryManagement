@@ -111,6 +111,12 @@
                                 <TextBlock Text="Keep decimals in QTY / MAX / MIN and scans (e.g. 1,234.50 KG). Off = whole numbers."
                                            FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+                            <!-- 🧲 STOCK (COIL): คลัง KG นับจำนวน Coil - สแกนเข้า 1 ครั้ง = +1 Coil -->
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <CheckBox x:Name="chkCountCoil" Content="STOCK (COIL)" Style="{StaticResource StkChip}" VerticalAlignment="Center"/>
+                                <TextBlock Text="Count coils: each scan IN = +1 coil, OUT = -1 coil, REMAINDER = no coil. STOCK (KG.) still follows the scanned amount."
+                                           FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

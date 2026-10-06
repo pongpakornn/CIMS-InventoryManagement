@@ -138,7 +138,7 @@ namespace CIMS.ViewModels
                     decimal minVal = Field(product.Min, "MIN");
                     CheckNumber(product.Qty, originalProduct.Qty, "QTY");
                     CheckNumber(product.StockPcs, originalProduct.StockPcs, "STOCK (PCS)");
-                    CheckNumber(product.StockBox, originalProduct.StockBox, "STOCK (BOX)");
+                    CheckNumber(product.StockBox, originalProduct.StockBox, Stock?.BoxHeader ?? "STOCK (BOX)");
                     decimal? qtyVal = Qty.TryParse(product.Qty, out decimal q) ? q : (decimal?)null;
 
                     // STOCK (BOX) / STOCK (PCS): แก้ช่องไหน อีกช่องคำนวณตาม Pack Size ให้ (BOX x Pack Size = PCS)
@@ -146,7 +146,7 @@ namespace CIMS.ViewModels
                     if (product.StockPcs != originalProduct.StockPcs && Qty.TryParse(product.StockPcs, out decimal pcs))
                     { qtyVal = pcs; changes.Add($"STOCK(PCS): {originalProduct.StockPcs}->{product.StockPcs}"); }
                     else if (product.StockBox != originalProduct.StockBox && Qty.TryParse(product.StockBox, out decimal box))
-                    { boxVal = (int)Math.Max(0, Math.Round(box)); changes.Add($"STOCK(BOX): {originalProduct.StockBox}->{product.StockBox}"); }
+                    { boxVal = (int)Math.Max(0, Math.Round(box)); changes.Add($"{(Stock?.CountCoil == true ? "QTY(COIL)" : "STOCK(BOX)")}: {originalProduct.StockBox}->{product.StockBox}"); }
                     if (qtyVal.HasValue) qtyVal = Qty.Round(Math.Max(0, qtyVal.Value), dec);
 
                     if (changes.Count > 0)

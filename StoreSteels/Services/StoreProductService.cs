@@ -87,6 +87,21 @@ namespace CIMS.Services
         {
             if (!IsOtherStock(stock))
             {
+                // คลังหลักที่นับ Coil: แก้ QTY (COIL) = แก้จำนวน Coil อย่างเดียว (ไม่แปลงเป็น KG)
+                if (box.HasValue && stock?.CountCoil == true && CIMS.Helpers.DbSchema.HasCountCoil)
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("UPDATE CIMS.Parts SET CoilQuantity = @c, Remark = @remark WHERE (@pt > 0 AND PartID = @pt) OR (@pt = 0 AND PartCode = @code)", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@c", Math.Max(0, box.Value));
+                        cmd.Parameters.AddWithValue("@remark", (object)remark ?? "");
+                        cmd.Parameters.AddWithValue("@pt", ptId);
+                        cmd.Parameters.AddWithValue("@code", partCode ?? "");
+                        conn.Open();
+                        cmd.ExecuteNonQuery();
+                    }
+                    box = null;
+                }
                 if (box.HasValue) qty = box.Value * Math.Max(1, GetPackSize(partCode, ptId));
                 if (qty.HasValue) qty = CIMS.Helpers.Qty.Round(Math.Max(0, qty.Value), stock?.AllowDecimal == true);
                 return UpdateProductMaster(partCode, remark, max, min, qty, ptId);

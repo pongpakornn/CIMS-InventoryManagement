@@ -39,6 +39,7 @@ namespace CIMS.Services
         public decimal? Max { get; set; }
         public decimal? Min { get; set; }
         public int? StockBox { get; set; }
+        public int? Coil { get; set; }   // QTY (COIL) - คลังที่นับ Coil
         public decimal? StockPcs { get; set; }
         public string Remark { get; set; }
         public List<int> OtherStockIds { get; } = new List<int>();
@@ -99,6 +100,8 @@ namespace CIMS.Services
                 if (!h.StartsWith(prefix, StringComparison.Ordinal)) continue;
                 string unit = h.Substring(prefix.Length);
                 if (unit == "BOX" || unit == "BOXES" || unit == "กล่อง") return key == "QTY" ? "STOCKBOX" : key;
+                // QTY (COIL) = จำนวน Coil ของคลัง KG ที่นับ Coil
+                if (unit == "COIL" || unit == "COILS") return key == "QTY" ? "COIL" : key;
                 if (Units.Contains(unit)) return key;
             }
             return null;
@@ -197,6 +200,7 @@ namespace CIMS.Services
                     item.Max = Num("MAX", "MAX");
                     item.Min = Num("MIN", "MIN");
                     item.StockBox = Whole("STOCKBOX", "STOCK (BOX)");
+                    item.Coil = Whole("COIL", "STOCK (COIL)");
                     item.StockPcs = Num("STOCKPCS", "STOCK (PCS)");
                     // QTY (KG.) / QTY (SHEET) ... = ยอดคงเหลือของคลัง (คอลัมน์เดียวกับ STOCK (PCS) ของคลังที่นับเป็นชิ้น)
                     decimal? qty = Num("QTY", "QTY");
@@ -285,13 +289,16 @@ namespace CIMS.Services
                 conn.Open();
                 // คลังไหนเปิด DECIMAL QTY (เก็บทศนิยม) / คลังอื่นปัดเป็นจำนวนเต็ม
                 var decStock = new Dictionary<int, bool>();
-                bool mainDec = false;
-                using (var cmd = new SqlCommand("SELECT StockID, IsMain, " + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal") + " FROM CIMS.Stocks", conn))
+                bool mainDec = false, mainCoil = false;
+                var coilStock = new Dictionary<int, bool>();
+                using (var cmd = new SqlCommand("SELECT StockID, IsMain, " + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal")
+                                                + ", " + (CIMS.Helpers.DbSchema.HasCountCoil ? "CountCoil" : "CAST(0 AS BIT) AS CountCoil") + " FROM CIMS.Stocks", conn))
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
                     {
                         decStock[reader.GetInt32(0)] = reader.GetBoolean(2);
-                        if (reader.GetBoolean(1)) mainDec = reader.GetBoolean(2);
+                        coilStock[reader.GetInt32(0)] = reader.GetBoolean(3);
+                        if (reader.GetBoolean(1)) { mainDec = reader.GetBoolean(2); mainCoil = reader.GetBoolean(3); }
                     }
                 decimal Rnd(decimal v, bool dec) => CIMS.Helpers.Qty.Round(v, dec);
 
@@ -331,13 +338,23 @@ namespace CIMS.Services
                             cmd.Parameters.AddWithValue("@rmk", (object)r.Remark ?? DBNull.Value);
                             ptId = (int)cmd.ExecuteScalar();
                         }
+                        // คลังหลักที่นับ Coil: QTY (COIL) ตามไฟล์
+                        if (r.InMain && mainCoil && r.Coil.HasValue)
+                            using (var cmd = new SqlCommand("UPDATE CIMS.Parts SET CoilQuantity = @c WHERE PartID = @p", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@c", r.Coil.Value);
+                                cmd.Parameters.AddWithValue("@p", ptId);
+                                cmd.ExecuteNonQuery();
+                            }
 
                         foreach (int stkId in r.OtherStockIds)
                         {
                             // STOCK (PCS) + STOCK (BOX): ใส่ทั้งคู่ = ตามไฟล์ / ใส่ PCS อย่างเดียว = BOX คำนวณจาก PACKSIZE / ใส่ BOX อย่างเดียว = PCS = BOX x PACKSIZE
                             bool dec = decStock.TryGetValue(stkId, out bool dv) && dv;
-                            decimal pcs = Rnd(r.StockPcs ?? (r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0), dec);
-                            int box = r.StockBox ?? 0;
+                            // คลังที่นับ Coil: ช่องกล่อง = QTY (COIL) ตามไฟล์ ยอด KG ไม่คำนวณจากกล่อง (Trigger ข้ามคลัง Coil)
+                            bool coil = coilStock.TryGetValue(stkId, out bool cv) && cv;
+                            decimal pcs = Rnd(r.StockPcs ?? (!coil && r.StockBox.HasValue ? r.StockBox.Value * Math.Max(1, r.PackSize) : 0), dec);
+                            int box = coil ? (r.Coil ?? 0) : (r.StockBox ?? 0);
                             using (var cmd = new SqlCommand(@"INSERT INTO CIMS.PartStocks (StockID, PartID, Quantity, BoxQuantity, MaxQuantity, MinQuantity, Remark, IsShow)
                                                               VALUES (@s, @p, @qty, @box, @max, @min, @rmk, @show)", conn, trans))
                             {

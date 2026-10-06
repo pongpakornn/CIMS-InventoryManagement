@@ -185,10 +185,15 @@ namespace CIMS.Services
                             }
                             if (balance + delta < 0)
                                 throw new InvalidOperationException($"ยอดคงเหลือในคลัง {stkCode} ไม่พอ (คงเหลือ {CIMS.Helpers.Qty.Plain(balance)} ต้องปรับ {CIMS.Helpers.Qty.Plain(delta)})");
-                            using (var cmd = new SqlCommand("UPDATE CIMS.Parts SET StockQuantity = ISNULL(StockQuantity, 0) + @d WHERE PartID = @p", conn, trans))
+                            // คลังหลักที่นับ Coil: ยกเลิกแล้วย้อน Coil ตาม BoxChange ที่บันทึกไว้ (แก้จำนวน = Coil ไม่เปลี่ยน)
+                            bool coilBack = !newQty.HasValue && txBox.HasValue && txBox.Value != 0 && CIMS.Helpers.DbSchema.HasCountCoil;
+                            using (var cmd = new SqlCommand(coilBack
+                                ? "UPDATE CIMS.Parts SET StockQuantity = ISNULL(StockQuantity, 0) + @d, CoilQuantity = CASE WHEN CoilQuantity - @c < 0 THEN 0 ELSE CoilQuantity - @c END WHERE PartID = @p"
+                                : "UPDATE CIMS.Parts SET StockQuantity = ISNULL(StockQuantity, 0) + @d WHERE PartID = @p", conn, trans))
                             {
                                 cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@d", delta));
                                 cmd.Parameters.AddWithValue("@p", ptId);
+                                cmd.Parameters.AddWithValue("@c", txBox ?? 0);
                                 cmd.ExecuteNonQuery();
                             }
                         }
@@ -224,11 +229,12 @@ namespace CIMS.Services
 
                         // 4) สแกนรับเข้าคลังหลักที่ตัดยอดคลังต้นทางอัตโนมัติ (รูปแบบป้ายที่ตั้ง "ตัดยอดจากคลัง") -> ยกเลิกแล้วคืนยอดคลังต้นทางด้วย
                         string sourceNote = null;
-                        if (!newQty.HasValue && type == "IN" && isMain)
+                        // รับเข้าได้ทุกคลัง / คลังต้นทางอาจเป็นสินค้าคนละรหัสที่ BIN เดียวกัน (SourcePartID)
+                        if (!newQty.HasValue && type == "IN")
                         {
-                            int trfId = 0, fromStk = 0; decimal trfQty = 0; string fromCode = null;
+                            int trfId = 0, fromStk = 0, srcPt = ptId; decimal trfQty = 0; string fromCode = null;
                             using (var cmd = new SqlCommand(@"
-                                SELECT TOP 1 TransferID, Quantity, FromStockID, FromStockCode FROM CIMS.StockTransfers
+                                SELECT TOP 1 TransferID, Quantity, FromStockID, FromStockCode, " + (CIMS.Helpers.DbSchema.HasCountCoil ? "ISNULL(SourcePartID, PartID)" : "PartID") + @" FROM CIMS.StockTransfers
                                 WHERE TransferMode = 'SCAN' AND PartID = @p AND (ToStockID = @to OR @to IS NULL)
                                   AND TransferDate BETWEEN DATEADD(SECOND, -5, @d) AND DATEADD(SECOND, 5, @d)
                                 ORDER BY ABS(DATEDIFF(MILLISECOND, TransferDate, @d))", conn, trans))
@@ -237,15 +243,25 @@ namespace CIMS.Services
                                 cmd.Parameters.Add("@to", SqlDbType.Int).Value = (object)stkId ?? DBNull.Value;
                                 cmd.Parameters.AddWithValue("@d", txDate);
                                 using (var r = cmd.ExecuteReader())
-                                    if (r.Read()) { trfId = Convert.ToInt32(r[0]); trfQty = CIMS.Helpers.Qty.Read(r[1]); fromStk = Convert.ToInt32(r[2]); fromCode = r[3].ToString(); }
+                                    if (r.Read()) { trfId = Convert.ToInt32(r[0]); trfQty = CIMS.Helpers.Qty.Read(r[1]); fromStk = Convert.ToInt32(r[2]); fromCode = r[3].ToString(); srcPt = Convert.ToInt32(r[4]); }
                             }
                             if (trfId > 0 && trfQty > 0)
                             {
-                                using (var cmd = new SqlCommand("UPDATE CIMS.PartStocks SET Quantity = Quantity + @q, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p", conn, trans))
+                                // คลังต้นทางนับ Coil: คืน 1 Coil ด้วย (ตอนตัดยอดหัก 1 Coil)
+                                bool srcCoil = false;
+                                if (CIMS.Helpers.DbSchema.HasCountCoil)
+                                    using (var cmd = new SqlCommand("SELECT CountCoil FROM CIMS.Stocks WHERE StockID = @s", conn, trans))
+                                    {
+                                        cmd.Parameters.AddWithValue("@s", fromStk);
+                                        srcCoil = Convert.ToBoolean(cmd.ExecuteScalar() ?? false);
+                                    }
+                                using (var cmd = new SqlCommand(srcCoil
+                                    ? "UPDATE CIMS.PartStocks SET Quantity = Quantity + @q, BoxQuantity = BoxQuantity + 1, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p"
+                                    : "UPDATE CIMS.PartStocks SET Quantity = Quantity + @q, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @p", conn, trans))
                                 {
                                     cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@q", trfQty));
                                     cmd.Parameters.AddWithValue("@s", fromStk);
-                                    cmd.Parameters.AddWithValue("@p", ptId);
+                                    cmd.Parameters.AddWithValue("@p", srcPt);
                                     if (cmd.ExecuteNonQuery() > 0) sourceNote = $"คืนยอดคลังต้นทาง {fromCode} +{CIMS.Helpers.Qty.Plain(trfQty)}";
                                 }
                             }

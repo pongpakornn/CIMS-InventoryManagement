@@ -986,14 +986,14 @@ namespace CIMS.ViewModels
                     }
 
                     // บันทึกจริงกรณีโหมดปกติ: รับเข้า หรือ ตัดสต็อกออก (UpdateStockOut คืน false ถ้าสต็อกไม่พอ)
-                    // 🔁 ป้าย Supplier ที่ผูก "ตัดยอดจากคลัง" ไว้ (เช่น Panta -> STOCK-PANTA) + รับเข้าคลังหลัก
-                    //    -> รับเข้าคลังหลักเต็มจำนวน และตัดคลังต้นทางอัตโนมัติใน Transaction เดียวกัน
-                    bool useDeduct = !isOut && stock.IsMain && isSupplierScan && supplierFmt.SourceStkId.HasValue
+                    // 🔁 ป้าย Supplier ที่ผูก "ตัดยอดจากคลัง" ไว้ (เช่น Panta -> STOCK-PANTA) + สแกนรับเข้า (ทุกคลัง ไม่จำกัดคลังหลัก)
+                    //    -> รับเข้าเต็มจำนวน และตัดสินค้าที่ BIN เดียวกันในคลังต้นทางอัตโนมัติใน Transaction เดียวกัน
+                    bool useDeduct = !isOut && isSupplierScan && supplierFmt.SourceStkId.HasValue
                                      && supplierFmt.SourceStkId.Value != stock.StkId;
                     bool isSaved;
                     if (useDeduct)
                     {
-                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, supplierFmt.SourceStkId.Value);
+                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, supplierFmt.SourceStkId.Value, remainder);
                         isSaved = deductResult.Saved;
                     }
                     else
@@ -1008,7 +1008,7 @@ namespace CIMS.ViewModels
                         string logRef = stock.IsMain ? rawBarcodeFull : $"{rawBarcodeFull} | STOCK: {stock.Code}";
                         if (remainder) logRef += " | REMAINDER";
                         if (deductResult != null)
-                            logRef += $" | DEDUCT {deductResult.SourceCode}: {deductResult.Deducted} (bal {deductResult.SourceBefore}->{deductResult.SourceAfter})";
+                            logRef += $" | DEDUCT {deductResult.SourceCode}{(deductResult.MatchedByBin ? $" ({deductResult.SourcePartCode} BIN)" : "")}: {deductResult.Deducted} (bal {deductResult.SourceBefore}->{deductResult.SourceAfter})";
                         LogService.WriteScanLog(uid, isOut ? "SCAN_OUT" : "SCAN_IN", part.PartCode, part.PartACode, originalQty, logRef);
                         part.Qty = originalQty;
                         return part;

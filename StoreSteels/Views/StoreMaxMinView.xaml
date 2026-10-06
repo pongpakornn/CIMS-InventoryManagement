@@ -674,7 +674,7 @@
                     </DataGridTextColumn>
 
                     <!-- น้ำหนักคงคลัง (กก.) - เดิมแยก STOCK(BOX)/STOCK(PCS) 2 คอลัมน์ ตอนนี้เหลือค่าเดียว -->
-                    <DataGridTextColumn x:Name="colQty" Header="QTY (KG.)" Binding="{Binding Qty, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" IsReadOnly="False" Width="110">
+                    <DataGridTextColumn x:Name="colQty" Header="STOCK (KG.)" Binding="{Binding Qty, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" IsReadOnly="False" Width="110">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="HorizontalAlignment" Value="Center"/>

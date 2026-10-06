@@ -28,7 +28,8 @@ namespace CIMS.Services
             s.GroupBy, s.MaxMinBasis, s.ShowColCustomer, s.ShowColPartA, s.ShowColPartNumber, s.ShowColStockBox, s.ShowColStockPcs,
             s.ShowColNo, s.ShowColModel, s.OutExcel, "
             + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "s.AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal")
-            + (CIMS.Helpers.DbSchema.HasLiveSource ? ", s.LiveSource" : ", CAST(NULL AS NVARCHAR(30)) AS LiveSource");
+            + (CIMS.Helpers.DbSchema.HasLiveSource ? ", s.LiveSource" : ", CAST(NULL AS NVARCHAR(30)) AS LiveSource")
+            + (CIMS.Helpers.DbSchema.HasCountCoil ? ", s.CountCoil" : ", CAST(0 AS BIT) AS CountCoil");
 
         // คลังทั้งหมด (คลังหลักอยู่บนสุด) พร้อมจำนวนรายการสินค้าในแต่ละคลัง
         public List<StockModel> GetStocks()
@@ -134,7 +135,8 @@ namespace CIMS.Services
                 ColModel = Convert.ToBoolean(rdr["ShowColModel"]),
                 OutExcel = Convert.ToBoolean(rdr["OutExcel"]),
                 AllowDecimal = Convert.ToBoolean(rdr["AllowDecimal"]),
-                LiveSource = rdr["LiveSource"] == DBNull.Value ? null : rdr["LiveSource"].ToString()
+                LiveSource = rdr["LiveSource"] == DBNull.Value ? null : rdr["LiveSource"].ToString(),
+                CountCoil = Convert.ToBoolean(rdr["CountCoil"])
             };
         }
 
@@ -176,15 +178,16 @@ namespace CIMS.Services
                         INSERT INTO CIMS.Stocks (StockCode, StockName, Unit, IsMain, UseMaxMin,
                             ShowColImage, ShowColCode, ShowColName, ShowColQuantity, ShowColRemark,
                             InPickList, InSupplier, InSystemQR, InExcel, OutPickList, OutSupplier, OutSystemQR,
-                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel, AllowDecimal,
+                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel, AllowDecimal, CountCoil,
                             SortNo, CreatedBy)
                         VALUES (@code, @name, @unit, 0, @maxmin,
                             @cimg, @ccode, @cname, @cqty, @crmk,
                             @ipl, @isup, @isys, @ixls, @opl, @osup, @osys,
-                            @grp, @mmb, @ccust, @cparta, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls, @dec,
+                            @grp, @mmb, @ccust, @cparta, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls, @dec, @coil,
                             (SELECT ISNULL(MAX(SortNo), 0) + 1 FROM CIMS.Stocks), @uid);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);";
                     if (!CIMS.Helpers.DbSchema.HasAllowDecimal) sql = sql.Replace(" AllowDecimal,", "").Replace(" @dec,", "");
+                    if (!CIMS.Helpers.DbSchema.HasCountCoil) sql = sql.Replace(" CountCoil,", "").Replace(" @coil,", "");
 
                     int newId;
                     using (var cmd = new SqlCommand(sql, conn, trans))
@@ -235,10 +238,11 @@ namespace CIMS.Services
                             OutPickList = @opl, OutSupplier = @osup, OutSystemQR = @osys,
                             GroupBy = @grp, MaxMinBasis = @mmb, ShowColCustomer = @ccust, ShowColPartA = @cparta,
                             ShowColPartNumber = @cpartno, ShowColStockBox = @cbox, ShowColStockPcs = @cpcs,
-                                 ShowColNo = @cno, ShowColModel = @cmodel, OutExcel = @oxls, AllowDecimal = @dec,
+                                 ShowColNo = @cno, ShowColModel = @cmodel, OutExcel = @oxls, AllowDecimal = @dec, CountCoil = @coil,
                             UpdatedBy = @uid, UpdatedDate = GETDATE()
                         WHERE StockID = @id";
                     if (!CIMS.Helpers.DbSchema.HasAllowDecimal) sql = sql.Replace(" AllowDecimal = @dec,", "");
+                    if (!CIMS.Helpers.DbSchema.HasCountCoil) sql = sql.Replace(" CountCoil = @coil,", "");
 
                     using (var cmd = new SqlCommand(sql, conn, trans))
                     {
@@ -300,6 +304,7 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@cmodel", s.ColModel);
             cmd.Parameters.AddWithValue("@oxls", s.OutExcel);
             cmd.Parameters.AddWithValue("@dec", s.AllowDecimal);
+            cmd.Parameters.AddWithValue("@coil", s.CountCoil);
         }
 
         private static void SaveFormatLinks(SqlConnection conn, SqlTransaction trans, int stkId, IEnumerable<int> fmtIds)
@@ -444,7 +449,7 @@ namespace CIMS.Services
         // หัวคอลัมน์ที่รองรับ (ไม่สนตัวพิมพ์เล็ก/ใหญ่ ช่องว่าง จุด วงเล็บ) - แบบฟอร์มจริงยังรอสรุป
         // จึงค้นหาหัวตารางเองจาก 10 แถวแรก แทนการล็อกตำแหน่งคอลัมน์ตายตัว
         private static readonly string[] CodeHeaders = { "PDCODE", "PARTCODE", "PRODUCTCODE", "CODE", "PTCODE", "ITEMCODE", "รหัสสินค้า", "รหัส" };
-        private static readonly string[] QtyHeaders = { "QTY", "QUANTITY", "QTYKG", "QTYPCS", "KG", "จำนวน", "ยอด", "น้ำหนัก" };
+        private static readonly string[] QtyHeaders = { "QTY", "QUANTITY", "QTYKG", "QTYPCS", "STOCKKG", "STOCKPCS", "STOCKUNIT", "KG", "จำนวน", "ยอด", "น้ำหนัก" };
 
         private static string NormalizeHeader(string h) =>
             new string((h ?? "").Where(c => !char.IsWhiteSpace(c) && c != '.' && c != '(' && c != ')' && c != '_' && c != '-').ToArray()).ToUpperInvariant();

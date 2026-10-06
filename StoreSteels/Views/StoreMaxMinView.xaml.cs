@@ -160,7 +160,8 @@ namespace CIMS.Views
             Set(colMin, _stock.UseMaxMin);
             Set(colStatus, _stock.UseMaxMin);
             Set(colQty, _stock.ColQty);
-            Set(colStockBox, _stock.ColStockBox);
+            Set(colStockBox, _stock.ShowBoxColumn);
+            colStockBox.Header = _stock.BoxHeader;   // คลัง KG ที่นับ Coil = STOCK (COIL)
             Set(colStockPcs, _stock.ColStockPcs);
             Set(colRemark, _stock.ColRemark);
             // หัวคอลัมน์ตามหน่วยของคลัง เช่น MAX (KG.) / MIN (KG.) / QTY (KG.) หรือ MAX (BOX)
@@ -317,14 +318,15 @@ namespace CIMS.Views
                 string qtyHeader = _stock.QtyHeader;
                 string groupLabel = _viewModel.GroupLabel;
                 bool dec = _stock.AllowDecimal;
+                bool coil = _stock.CountCoil;   // คลัง KG ที่นับ Coil -> มีคอลัมน์ QTY (COIL) ด้วย
                 await Task.Run(() =>
                 {
                     using (var wb = new ClosedXML.Excel.XLWorkbook())
                     {
                         // รูปแบบเดียวกับไฟล์ Export / Template ทั้งระบบ (หัวตาราง #002060 + เส้นตาราง + แถวกลุ่ม)
                         var ws = wb.Worksheets.Add("Store");
-                        string[] heads = { "NO", "PD CODE", "PRODUCT NAME", qtyHeader };
-                        ImportTemplateService.Header(ws, heads, new double[] { 6.4, 20, 46, 16 });
+                        string[] heads = coil ? new[] { "NO", "PD CODE", "PRODUCT NAME", qtyHeader, "STOCK (COIL)" } : new[] { "NO", "PD CODE", "PRODUCT NAME", qtyHeader };
+                        ImportTemplateService.Header(ws, heads, new double[] { 6.4, 20, 46, 16, 13 });
 
                         int r = 2;
                         var groupRows = new List<(int Row, string Text)>();
@@ -340,6 +342,7 @@ namespace CIMS.Views
                                 ws.Cell(r, 3).Value = p.PartName;
                                 // จำนวนเป็นตัวเลขใน Excel (คำนวณต่อได้)
                                 if (CIMS.Helpers.Qty.TryParse(p.Qty, out decimal q)) ws.Cell(r, 4).Value = q; else ws.Cell(r, 4).Value = p.Qty;
+                                if (coil) { if (CIMS.Helpers.Qty.TryParse(p.StockBox, out decimal cq)) ws.Cell(r, 5).Value = cq; else ws.Cell(r, 5).Value = 0; }
                                 r++;
                             }
                         }
@@ -348,6 +351,7 @@ namespace CIMS.Views
                         ImportTemplateService.LeftAlign(ws, last, 3);
                         ws.Range(2, 1, last, 1).Style.Font.Bold = true;
                         ws.Range(2, 4, last, 4).Style.NumberFormat.Format = ImportTemplateService.QtyFormat(dec);
+                        if (coil) ws.Range(2, 5, last, 5).Style.NumberFormat.Format = "#,##0";
                         foreach (var (row, text) in groupRows) ImportTemplateService.GroupRow(ws, row, heads.Length, text);
                         wb.SaveAs(path);
                     }
@@ -825,7 +829,7 @@ namespace CIMS.Views
             var list = new List<(string, string)>();
             if (_stock.UseMaxMin) { list.Add((_stock.MaxHeader, nameof(StoreProductModel.Max))); list.Add((_stock.MinHeader, nameof(StoreProductModel.Min))); }
             if (_stock.ColQty) list.Add((_stock.QtyHeader, nameof(StoreProductModel.Qty)));
-            if (_stock.ColStockBox) list.Add(("STOCK (BOX)", nameof(StoreProductModel.StockBox)));
+            if (_stock.ShowBoxColumn) list.Add((_stock.BoxHeader, nameof(StoreProductModel.StockBox)));
             if (_stock.ColStockPcs) list.Add(("STOCK (PCS)", nameof(StoreProductModel.StockPcs)));
             return list;
         }

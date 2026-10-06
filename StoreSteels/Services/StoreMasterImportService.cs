@@ -28,6 +28,7 @@ namespace CIMS.Services
         public string Remark { get; set; }
         public decimal? Qty { get; set; }
         public int? Box { get; set; }
+        public int? Coil { get; set; }   // QTY (COIL) - คลังที่นับ Coil
         public decimal? Max { get; set; }   // ทศนิยมได้ - บันทึกตาม DECIMAL QTY ของแต่ละคลัง
         public decimal? Min { get; set; }
         public bool? ShowInMain { get; set; }
@@ -36,7 +37,7 @@ namespace CIMS.Services
         public int PtId { get; set; }
         public string Error { get; set; }
         public bool IsValid => string.IsNullOrEmpty(Error);
-        public bool HasStockValues => Qty.HasValue || Box.HasValue || Max.HasValue || Min.HasValue || Remark != null;
+        public bool HasStockValues => Qty.HasValue || Box.HasValue || Coil.HasValue || Max.HasValue || Min.HasValue || Remark != null;
     }
 
     public class StoreMasterResult
@@ -69,8 +70,9 @@ namespace CIMS.Services
             ["MODEL"] = new[] { "MODEL", "MODELCODE", "โมเดล" },
             ["SHOWHIDE"] = new[] { "SHOW/HIDE", "SHOWHIDE", "SHOW", "HIDE", "แสดง/ซ่อน" },
             ["REMARK"] = new[] { "REMARK", "REMARKS", "หมายเหตุ" },
-            ["QTY"] = new[] { "QTY", "QUANTITY", "QTYKG", "QTYPCS", "QTYSHEET", "QTYBOX", "STOCKPCS", "STOCKQTY", "BALANCE", "จำนวน", "ยอด" },
+            ["QTY"] = new[] { "QTY", "QUANTITY", "QTYKG", "QTYPCS", "QTYSHEET", "QTYBOX", "STOCKPCS", "STOCKQTY", "STOCKKG", "STOCKKGS", "STOCKSHEET", "STOCKUNIT", "BALANCE", "จำนวน", "ยอด" },
             ["BOX"] = new[] { "STOCKBOX" },
+            ["COIL"] = new[] { "QTYCOIL", "COIL", "COILS", "STOCKCOIL", "COILQTY" },   // QTY (COIL) ของคลังที่นับ Coil
             ["MAX"] = new[] { "MAX", "QTYMAX", "MAXKG", "MAXPCS", "MAXBOX", "MAXSHEET", "MAXUNIT" },
             ["MIN"] = new[] { "MIN", "QTYMIN", "MINKG", "MINPCS", "MINBOX", "MINSHEET", "MINUNIT" },
             ["STOCK"] = new[] { "STOCK", "STOCKCODE", "คลัง" },
@@ -153,6 +155,7 @@ namespace CIMS.Services
                     Num("PACKSIZE", "PACKSIZE", v => x.PackSize = (int)v, true);
                     Num("QTY", "QTY", v => x.Qty = v, false);
                     Num("BOX", "STOCK (BOX)", v => x.Box = (int)v, true);
+                    Num("COIL", "STOCK (COIL)", v => x.Coil = (int)v, true);
                     Num("MAX", "MAX", v => x.Max = v, false);
                     Num("MIN", "MIN", v => x.Min = v, false);
                     if (x.Error == null && x.Max.HasValue && x.Min.HasValue && x.Min > x.Max && x.Max > 0) x.Error = $"MIN {x.Min} มากกว่า MAX {x.Max}";
@@ -264,9 +267,11 @@ namespace CIMS.Services
                         // ยอด / MAX / MIN / REMARK ของทุกคลังที่ระบุ (ไม่มีแถวในคลังนั้น = เพิ่มเข้าคลัง)
                         foreach (var s in x.Stocks)
                         {
+                            // คลังที่นับ Coil: QTY (COIL) = คลังหลักเก็บที่ Parts.CoilQuantity / คลังอื่นเก็บในช่องกล่อง (ไม่คำนวณจาก Pack Size)
+                            bool coil = s.CountCoil && CIMS.Helpers.DbSchema.HasCountCoil;
                             string sql = s.IsMain
                                 ? @"UPDATE CIMS.Parts SET StockQuantity = ISNULL(@qty, StockQuantity), MaxQuantity = ISNULL(@max, MaxQuantity), MinQuantity = ISNULL(@min, MinQuantity),
-                                           Remark = ISNULL(@rmk, Remark) WHERE PartID = @p"
+                                           Remark = ISNULL(@rmk, Remark)" + (coil ? ", CoilQuantity = ISNULL(@coil, CoilQuantity)" : "") + " WHERE PartID = @p"
                                 : @"IF NOT EXISTS (SELECT 1 FROM CIMS.PartStocks WHERE StockID = @s AND PartID = @p)
                                         INSERT INTO CIMS.PartStocks (StockID, PartID, Quantity) VALUES (@s, @p, 0);
                                     UPDATE CIMS.PartStocks SET MaxQuantity = ISNULL(@max, MaxQuantity), MinQuantity = ISNULL(@min, MinQuantity),
@@ -282,7 +287,8 @@ namespace CIMS.Services
                                 // คลังที่เปิด DECIMAL QTY เก็บทศนิยม (3 ตำแหน่ง) / คลังอื่นปัดเป็นจำนวนเต็มเหมือนเดิม
                                 decimal? Rnd(decimal? v) => v.HasValue ? CIMS.Helpers.Qty.Round(v.Value, s.AllowDecimal) : (decimal?)null;
                                 cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@qty", Rnd(x.Qty)));
-                                cmd.Parameters.AddWithValue("@box", (object)x.Box ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@box", (object)(coil ? x.Coil : x.Box) ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@coil", (object)x.Coil ?? DBNull.Value);
                                 cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@max", Rnd(x.Max)));
                                 cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@min", Rnd(x.Min)));
                                 cmd.Parameters.AddWithValue("@rmk", string.IsNullOrEmpty(x.Remark) ? DBNull.Value : (object)x.Remark);

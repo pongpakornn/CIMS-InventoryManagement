@@ -119,8 +119,7 @@ namespace CIMS.Views
             int codePos = ParsePos(txtCodePos.Text) ?? 0;
             int? alt = ParsePos(txtAltPos.Text);
             int? qty = ParsePos(txtQtyPos.Text);
-            int autoMin = Math.Max(codePos, Math.Max(alt ?? 0, qty ?? 0));
-            return new BarcodeFormatModel
+            var f = new BarcodeFormatModel
             {
                 FmtId = _current?.FmtId ?? 0,
                 Name = (txtName.Text ?? "").Trim(),
@@ -136,10 +135,20 @@ namespace CIMS.Views
                 CodePos = codePos,
                 AltCodePos = alt,
                 QtyPos = qty,
-                MinFields = Math.Max(ParsePos(txtMinFields.Text) ?? autoMin, autoMin),
                 SampleText = (txtSample.Text ?? "").Trim(),
                 IsActive = true   // พรีวิวทดสอบเสมอ (ค่า ACTIVE จริงใช้ตอนบันทึก)
             };
+            int autoMin = RequiredMinFields(f);
+            f.MinFields = Math.Max(ParsePos(txtMinFields.Text) ?? autoMin, autoMin);
+            return f;
+        }
+
+        // จำนวนช่องขั้นต่ำ = เลขช่องที่ใหญ่ที่สุดที่ใช้ (รหัส / รหัสสำรอง / จำนวน / ช่องชื่อสินค้า)
+        private static int RequiredMinFields(BarcodeFormatModel f)
+        {
+            int m = Math.Max(f.CodePos, Math.Max(f.AltCodePos ?? 0, f.QtyPos ?? 0));
+            if (f.MatchByName) foreach (int n in f.NamePositions()) m = Math.Max(m, n);
+            return m;
         }
 
         private void Field_TextChanged(object sender, TextChangedEventArgs e) => UpdatePreview();
@@ -246,6 +255,15 @@ namespace CIMS.Views
             if (f.CodePos <= 0) { DialogHelper.ShowWarning("กรุณากรอกตำแหน่งช่องรหัสสินค้า (CODE FIELD #)"); txtCodePos.Focus(); return; }
             if (f.MatchByName && !string.IsNullOrWhiteSpace(f.NameFields) && f.NamePositions().Count == 0)
             { DialogHelper.ShowWarning("กรุณากรอกช่องชื่อสินค้า (NAME FIELDS #) เป็นตัวเลข เช่น 6,7"); txtNameFields.Focus(); return; }
+            // MIN FIELDS ที่กรอกต้องไม่น้อยกว่าเลขช่องที่ใหญ่ที่สุด - เดิมระบบแอบปรับเป็นค่านั้นตอนบันทึก (ดูเหมือนบันทึกแล้วค่าไม่เปลี่ยน)
+            int? typedMin = ParsePos(txtMinFields.Text);
+            int needMin = RequiredMinFields(f);
+            if (typedMin.HasValue && typedMin.Value < needMin)
+            {
+                DialogHelper.ShowWarning($"MIN FIELDS ต้องไม่น้อยกว่า {needMin}\n(ช่องที่ใช้อยู่ไกลสุดคือช่อง #{needMin}) - เว้นว่างไว้ได้ ระบบใส่ให้เอง");
+                txtMinFields.Focus();
+                return;
+            }
 
             var list = lstFormats.ItemsSource as IEnumerable<BarcodeFormatModel> ?? Enumerable.Empty<BarcodeFormatModel>();
             if (list.Any(x => x.FmtId != f.FmtId && string.Equals(x.Name, f.Name, StringComparison.OrdinalIgnoreCase)))

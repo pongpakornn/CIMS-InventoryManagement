@@ -10,6 +10,10 @@ namespace CIMS.Helpers
     {
         private static bool? _allowDecimal;
         private static bool? _liveSource;
+        private static bool? _countCoil;
+
+        // Update_20261006c.sql: CIMS.Stocks.CountCoil + CIMS.Parts.CoilQuantity (QTY (COIL) ของคลัง KG)
+        public static bool HasCountCoil => _countCoil ?? (_countCoil = ColumnExists("CountCoil")) ?? false;
 
         // Update_20261006b.sql: CIMS.Stocks.LiveSource (คลังที่แสดงข้อมูลสดจาก StorePC ชั่วคราว)
         public static bool HasLiveSource => _liveSource ?? (_liveSource = ColumnExists("LiveSource")) ?? false;

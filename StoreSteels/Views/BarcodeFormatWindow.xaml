@@ -209,8 +209,10 @@
                         <!-- แสกนป้ายรูปแบบนี้รับเข้าคลังหลัก -> ตัดยอดคลังนี้อัตโนมัติ (เช่น Panta -> STOCK-PANTA) -->
                         <Border Style="{StaticResource StkSection}">
                             <StackPanel>
-                                <TextBlock Text="AUTO DEDUCT FROM STOCK  (when this label is scanned IN to the main stock)" Style="{StaticResource StkLabel}"/>
+                                <TextBlock Text="AUTO DEDUCT FROM STOCK  (when this label is scanned IN to any stock)" Style="{StaticResource StkLabel}"/>
                                 <ComboBox x:Name="cbSourceStock" Style="{StaticResource StkCombo}" Width="360" HorizontalAlignment="Left"/>
+                                <TextBlock Text="The product with the same BIN in that stock is deducted (product codes can differ). No BIN = the same product."
+                                           FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" Margin="0,6,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 

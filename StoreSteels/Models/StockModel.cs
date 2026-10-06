@@ -39,6 +39,12 @@ namespace CIMS.Models
         public bool ColPartA { get; set; }
         public bool ColPartNo { get; set; }
         public bool ColStockBox { get; set; }
+
+        // STOCK (COIL) - คลัง KG: สแกนเข้า 1 ครั้ง = +1 Coil / ออก = -1 / เศษ = ไม่นับ (ยอด KG ตามที่สแกน)
+        //   ใช้ช่องเดียวกับ STOCK (BOX) แต่ไม่คำนวณจาก Pack Size - คลังที่นับ Coil แสดงคอลัมน์นี้เสมอ
+        public bool CountCoil { get; set; }
+        public string BoxHeader => CountCoil ? "STOCK (COIL)" : "STOCK (BOX)";
+        public bool ShowBoxColumn => ColStockBox || CountCoil;
         public bool ColStockPcs { get; set; }
         public bool ColNo { get; set; }       // No. = ลำดับในแต่ละกลุ่ม (กลุ่ม A 1-5, กลุ่ม B 1-3 ...)
         public bool ColModel { get; set; }    // MODEL (รหัสโมเดล Model)
@@ -94,7 +100,7 @@ namespace CIMS.Models
 
         private string UnitText => string.IsNullOrWhiteSpace(Unit) ? "KG" : Unit;
         public string UnitDisplay => UnitText;
-        public string QtyHeader => $"QTY ({UnitText}.)";
+        public string QtyHeader => $"STOCK ({UnitText}.)";   // ยอดคงคลังตามหน่วย เช่น STOCK (KG.)
         public string MaxHeader => MaxMinInBox ? "MAX (BOX)" : $"MAX ({MaxMinUnit}.)";
         public string MinHeader => MaxMinInBox ? "MIN (BOX)" : $"MIN ({MaxMinUnit}.)";
 
