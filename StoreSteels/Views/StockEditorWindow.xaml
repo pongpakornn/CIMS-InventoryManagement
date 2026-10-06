@@ -73,12 +73,15 @@
                                 <CheckBox x:Name="chkColModel" Content="MODEL" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColName" Content="PRODUCT NAME" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkMaxMin" Content="MAX / MIN" Style="{StaticResource StkChip}"/>
-                                <CheckBox x:Name="chkColQty" Content="QTY" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColQty" Content="STOCK (UNIT)" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColStockBox" Content="STOCK (BOX)" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkCountCoil" Content="STOCK (COIL)" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColStockPcs" Content="STOCK (PCS)" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColRemark" Content="REMARK" Style="{StaticResource StkChip}"/>
                             </WrapPanel>
-                            <TextBlock Text="NO. = running number inside each group.  MAX / MIN also controls the STATUS column and the MAX Stock / MIN Stock filters.  STOCK (BOX) = QTY / PACKSIZE."
+                            <!-- ลำดับคอลัมน์ในตาราง = ลำดับที่ติ๊กเลือก -->
+                            <TextBlock x:Name="txtColumnOrder" FontSize="12" Foreground="{StaticResource AccentPurple}" FontWeight="Bold" Margin="2,2,0,4" TextWrapping="Wrap"/>
+                            <TextBlock Text="Columns show in the order you tick them.  NO. = running number inside each group.  MAX / MIN also controls the STATUS column and the MAX Stock / MIN Stock filters.  STOCK (BOX) = STOCK / PACKSIZE.  STOCK (COIL) = coil count: scan IN +1, OUT -1, REMAINDER no coil."
                                        FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" Margin="2,2,0,10" TextWrapping="Wrap"/>
 
                             <Grid>
@@ -102,6 +105,7 @@
                                         <ComboBoxItem Content="PCS"/>
                                         <ComboBoxItem Content="SHEET"/>
                                         <ComboBoxItem Content="BOX"/>
+                                        <ComboBoxItem Content="COIL"/>
                                     </ComboBox>
                                 </StackPanel>
                             </Grid>
@@ -109,12 +113,6 @@
                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                 <CheckBox x:Name="chkAllowDecimal" Content="DECIMAL QTY" Style="{StaticResource StkChip}" VerticalAlignment="Center"/>
                                 <TextBlock Text="Keep decimals in QTY / MAX / MIN and scans (e.g. 1,234.50 KG). Off = whole numbers."
-                                           FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <!-- 🧲 STOCK (COIL): คลัง KG นับจำนวน Coil - สแกนเข้า 1 ครั้ง = +1 Coil -->
-                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                <CheckBox x:Name="chkCountCoil" Content="STOCK (COIL)" Style="{StaticResource StkChip}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Count coils: each scan IN = +1 coil, OUT = -1 coil, REMAINDER = no coil. STOCK (KG.) still follows the scanned amount."
                                            FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>

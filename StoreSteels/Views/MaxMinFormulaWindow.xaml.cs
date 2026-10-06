@@ -29,7 +29,7 @@ namespace CIMS.Views
             InitializeComponent();
             _session = session;
             _stock = stock;
-            _inBox = stock == null || stock.MaxMinInBox;
+            _inBox = stock == null || stock.MaxMinInBox || stock.MaxMinInCoil;
             var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) Owner = owner; else WindowStartupLocation = WindowStartupLocation.CenterScreen;
             txtExPack.IsEnabled = _inBox;
@@ -89,7 +89,7 @@ namespace CIMS.Views
             decimal.TryParse(txtExQty.Text, out decimal qty);
             int.TryParse(txtExWd.Text, out int wd);
             int.TryParse(txtExPack.Text, out int pack);
-            string unit = _inBox ? "BOX" : _stock.MaxMinUnit;
+            string unit = _stock != null && _stock.MaxMinInCoil ? "COIL" : _inBox ? "BOX" : _stock.MaxMinUnit;
             lblExQty.Text = f.QtySource == "FORECAST" ? "FORECAST" : "ORDER";
             lblExMax.Text = $"MAX ({unit}) = x {f.DefDayMax} DAYS";
             lblExMin.Text = $"MIN ({unit}) = x {f.DefDayMin} DAYS";

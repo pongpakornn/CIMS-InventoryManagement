@@ -79,7 +79,7 @@ namespace CIMS.Views
             if (!((cbStock.SelectedItem as ComboBoxItem)?.Tag is StockModel s)) return;
             _stock = s;
             UiPrefs.Set("MaxMinCalc.Stock", s.StkId);
-            string unit = s.MaxMinInBox ? "BOX" : s.MaxMinUnit;
+            string unit = s.MaxMinInBox ? "BOX" : s.MaxMinInCoil ? "COIL" : s.MaxMinUnit;
             colQtyMax.Header = $"MAX ({unit})";
             colQtyMin.Header = $"MIN ({unit})";
             ClearForm();
@@ -117,7 +117,7 @@ namespace CIMS.Views
 
                 bdAuto.Background = _setting.AutoCalc ? (Brush)FindResource("AccentPurple") : new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
                 txtAuto.Text = _setting.AutoCalc ? "AUTO CALC : ON" : "AUTO CALC : OFF";
-                txtFormula.Text = $"{_formula.Name} :  " + _formula.Describe(stock.MaxMinInBox);
+                txtFormula.Text = $"{_formula.Name} :  " + _formula.Describe(stock.MaxMinInBox || stock.MaxMinInCoil);
                 txtFormula.ToolTip = txtFormula.Text + $"\nDefault: MAX {_formula.DefDayMax} days / MIN {_formula.DefDayMin} days / {_formula.DefWorkdays} workdays";
                 var inv = CultureInfo.InvariantCulture;
                 txtLast.Text = (month.HasValue ? "ORDER : " + month.Value.ToString("MMM yyyy", inv).ToUpperInvariant() : "NO ORDER IMPORTED")
@@ -159,7 +159,7 @@ namespace CIMS.Views
         {
             _loadingSetting = true;
             cbFormula.Items.Clear();
-            foreach (var f in _formulas) cbFormula.Items.Add(new ComboBoxItem { Content = f.DisplayName, Tag = f, ToolTip = f.Describe(_stock.MaxMinInBox) });
+            foreach (var f in _formulas) cbFormula.Items.Add(new ComboBoxItem { Content = f.DisplayName, Tag = f, ToolTip = f.Describe(_stock.MaxMinInBox || _stock.MaxMinInCoil) });
             cbFormula.SelectedIndex = _formulas.FindIndex(f => f.FormulaId == _formula.FormulaId);
             chkAutoCalc.IsChecked = _setting.AutoCalc;
             btnSaveSetting.IsEnabled = false;

@@ -941,6 +941,13 @@ namespace CIMS.ViewModels
                 if (stock == null) { BarcodeInput = string.Empty; return; }
             }
 
+            // 🏷️ หลายรูปแบบในคลังเดียว: ใช้รูปแบบที่ผูกกับคลังนี้ (หาสินค้า / จำนวน / ตัดยอดคลังต้นทาง ตามรูปแบบนั้น)
+            if (isSupplierScan)
+            {
+                FormatForStock(stock, ref supplierFmt, ref supplierCodes, ref supplierQty);
+                finalSearchCode = supplierCodes[0];
+            }
+
             // 🚦 ตรวจช่องทางแสกนตามการตั้งค่าคลัง (Pick List QR / ป้าย Supplier / QR ระบบ)
             string channelError = CheckChannel(stock, isOut, isPackingCardScan, supplierFmt);
             if (channelError != null)
@@ -1149,7 +1156,7 @@ namespace CIMS.ViewModels
             {
                 if (!(isOut ? stock.OutSupplier : stock.InSupplier))
                     return $"คลัง {stock.Code} ไม่ได้เปิดให้{dir}ด้วยป้าย Supplier ({supplierFmt.Name})";
-                if (!stock.FormatIds.Contains(supplierFmt.FmtId))
+                if (!StockAcceptsLabel(stock, supplierFmt))
                     return $"คลัง {stock.Code} ไม่รองรับป้าย Supplier รูปแบบ {supplierFmt.Name}";
                 return null;
             }
@@ -1172,13 +1179,19 @@ namespace CIMS.ViewModels
         // 🏷️ ป้าย Supplier: ลองทุกรูปแบบที่เข้ากับป้าย (รูปแบบที่คลังที่เลือกรับก่อน) แล้วใช้รูปแบบแรกที่เจอสินค้าในระบบ
         //    เช่น Panta (รหัส #11) กับ Panta-2 (ชื่อสินค้า #6 + #7) ป้ายหน้าตาเดียวกัน -> Panta หาไม่เจอก็ใช้ Panta-2
         //    ไม่เจอเลย = ใช้รูปแบบแรกที่เข้ากับป้าย (ไว้แจ้งว่าไม่พบสินค้า)
+        // รูปแบบทั้งหมดที่อ่านป้ายล่าสุดได้ (คลังเลือกหลายรูปแบบ = ใช้ร่วมกันได้ ดู FormatForStock)
+        private List<(BarcodeFormatModel Fmt, List<string> Codes, decimal? Qty)> _supplierHits = new List<(BarcodeFormatModel, List<string>, decimal?)>();
+
         private BarcodeFormatModel MatchSupplier(string raw, StockModel stock, out List<string> codes, out decimal? qty)
         {
             codes = null; qty = null;
-            var ordered = stock == null ? _allFormats : _allFormats.OrderBy(f => stock.FormatIds.Contains(f.FmtId) ? 0 : 1).ToList();
+            // รูปแบบที่คลังรับก่อน - สแกนร่วมหลายคลัง / AUTO = รูปแบบที่คลังไหนก็ได้ในขอบเขตรับก่อน
+            var linked = stock != null ? new HashSet<int>(stock.FormatIds) : new HashSet<int>(ScopeStocks.SelectMany(s => s.FormatIds));
+            var ordered = _allFormats.OrderBy(f => linked.Contains(f.FmtId) ? 0 : 1).ToList();
             var hits = new List<(BarcodeFormatModel Fmt, List<string> Codes, decimal? Qty)>();
             foreach (var fmt in ordered)
                 if (fmt.TryParse(raw, out List<string> c, out decimal? q)) hits.Add((fmt, c, q));
+            _supplierHits = hits;
             if (hits.Count == 0) return null;
 
             var pick = hits[0];
@@ -1188,6 +1201,22 @@ namespace CIMS.ViewModels
             codes = pick.Codes; qty = pick.Qty;
             return pick.Fmt;
         }
+
+        // 🏷️ คลังเลือกรูปแบบป้ายไว้หลายรูปแบบ = ใช้ร่วมกันได้: ถ้ารูปแบบที่เลือกมาไม่ได้ผูกกับคลังนี้
+        //    แต่มีรูปแบบอื่นของคลังนี้อ่านป้ายเดียวกันได้ -> ใช้รูปแบบนั้นแทน (รูปแบบที่เจอสินค้าก่อน)
+        private void FormatForStock(StockModel stock, ref BarcodeFormatModel fmt, ref List<string> codes, ref decimal? qty)
+        {
+            if (stock == null || fmt == null || stock.FormatIds.Contains(fmt.FmtId)) return;
+            var mine = _supplierHits.Where(h => stock.FormatIds.Contains(h.Fmt.FmtId)).ToList();
+            if (mine.Count == 0) return;
+            var pick = mine.FirstOrDefault(h => _scanService.FindPart(h.Fmt, h.Codes, out _) != null);
+            if (pick.Fmt == null) pick = mine[0];
+            fmt = pick.Fmt; codes = pick.Codes; qty = pick.Qty;
+        }
+
+        // คลังนี้รับป้ายนี้ไหม: รูปแบบที่เลือก หรือรูปแบบอื่นของคลังที่อ่านป้ายเดียวกันได้
+        private bool StockAcceptsLabel(StockModel stock, BarcodeFormatModel fmt) =>
+            stock.FormatIds.Contains(fmt.FmtId) || _supplierHits.Any(h => stock.FormatIds.Contains(h.Fmt.FmtId));
 
         // 🔄 [โหมดคืนเหล็ก] สแกน QR Export จากหน้า ProductControl -> ค้นหาสินค้า -> เด้ง Popup กรอกจำนวนรับคืน
         // -> ยืนยันแล้วอัปเดต StockQuantity ตามจำนวนที่กรอกเอง (ไม่ใช่ Packsize มาตรฐาน) พร้อม tag สถานะ "RETURN"

@@ -169,6 +169,28 @@ namespace CIMS.Views
             if (!Equals(colMax.Header, _stock.MaxHeader)) colMax.Header = _stock.MaxHeader;
             if (!Equals(colMin.Header, _stock.MinHeader)) colMin.Header = _stock.MinHeader;
 
+            // 📋 ลำดับคอลัมน์ตามที่ติ๊กเลือกในหน้า EDIT STOCK (STATUS อยู่ท้ายสุดเสมอ)
+            var byKey = new Dictionary<string, DataGridColumn[]>
+            {
+                ["NO"] = new DataGridColumn[] { colNo }, ["IMAGE"] = new DataGridColumn[] { colImage }, ["CUSTOMER"] = new DataGridColumn[] { colCustomer },
+                ["CODE"] = new DataGridColumn[] { colCode }, ["PARTA"] = new DataGridColumn[] { colPartA }, ["PARTNO"] = new DataGridColumn[] { colPartNo },
+                ["MODEL"] = new DataGridColumn[] { colModel }, ["NAME"] = new DataGridColumn[] { colName }, ["MAXMIN"] = new DataGridColumn[] { colMax, colMin },
+                ["QTY"] = new DataGridColumn[] { colQty }, ["BOX"] = new DataGridColumn[] { colStockBox }, ["COIL"] = new DataGridColumn[] { colStockBox },
+                ["PCS"] = new DataGridColumn[] { colStockPcs }, ["REMARK"] = new DataGridColumn[] { colRemark }
+            };
+            var ordered = new List<DataGridColumn>();
+            foreach (string key in _stock.ColumnOrderList())
+                if (byKey.TryGetValue(key, out var cols)) foreach (var c in cols) if (!ordered.Contains(c)) ordered.Add(c);
+            foreach (var c in dgStore.Columns) if (!ordered.Contains(c) && c != colStatus) ordered.Add(c);   // คอลัมน์อื่นที่ไม่อยู่ในรายการ
+            ordered.Add(colStatus);
+            // ย้ายตำแหน่งในคอลเลกชันคอลัมน์โดยตรง (ตั้ง DisplayIndex อย่างเดียวตอนตารางเพิ่งโหลดไม่มีผล) แล้วตั้ง DisplayIndex ให้ตรงด้วย
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                int cur = dgStore.Columns.IndexOf(ordered[i]);
+                if (cur >= 0 && cur != i) { dgStore.Columns.Move(cur, i); changed = true; }
+            }
+            for (int i = 0; i < dgStore.Columns.Count; i++)
+                if (dgStore.Columns[i].DisplayIndex != i) { dgStore.Columns[i].DisplayIndex = i; changed = true; }
             if (!changed) return;
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
             {
@@ -826,11 +848,16 @@ namespace CIMS.Views
         // ค่าบนการ์ดตามคอลัมน์ที่คลังเลือกแสดง (หัวข้อ, ชื่อ Property)
         private List<(string Label, string Path)> CardStats()
         {
+            // เรียงตามลำดับคอลัมน์ที่เลือกในหน้า EDIT STOCK เหมือนตาราง
             var list = new List<(string, string)>();
-            if (_stock.UseMaxMin) { list.Add((_stock.MaxHeader, nameof(StoreProductModel.Max))); list.Add((_stock.MinHeader, nameof(StoreProductModel.Min))); }
-            if (_stock.ColQty) list.Add((_stock.QtyHeader, nameof(StoreProductModel.Qty)));
-            if (_stock.ShowBoxColumn) list.Add((_stock.BoxHeader, nameof(StoreProductModel.StockBox)));
-            if (_stock.ColStockPcs) list.Add(("STOCK (PCS)", nameof(StoreProductModel.StockPcs)));
+            bool boxAdded = false;
+            foreach (string key in _stock.ColumnOrderList())
+            {
+                if (key == "MAXMIN" && _stock.UseMaxMin) { list.Add((_stock.MaxHeader, nameof(StoreProductModel.Max))); list.Add((_stock.MinHeader, nameof(StoreProductModel.Min))); }
+                else if (key == "QTY" && _stock.ColQty) list.Add((_stock.QtyHeader, nameof(StoreProductModel.Qty)));
+                else if ((key == "BOX" || key == "COIL") && _stock.ShowBoxColumn && !boxAdded) { list.Add((_stock.BoxHeader, nameof(StoreProductModel.StockBox))); boxAdded = true; }
+                else if (key == "PCS" && _stock.ColStockPcs) list.Add(("STOCK (PCS)", nameof(StoreProductModel.StockPcs)));
+            }
             return list;
         }
 

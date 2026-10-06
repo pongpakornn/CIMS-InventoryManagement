@@ -61,6 +61,7 @@ namespace CIMS.Views
             chkMaxMin.IsChecked = s.UseMaxMin;
             chkColQty.IsChecked = s.ColQty;
             chkColRemark.IsChecked = s.ColRemark;
+            InitColumnOrder(s);
 
             chkInPickList.IsChecked = s.InPickList;
             chkInSupplier.IsChecked = s.InSupplier;
@@ -76,7 +77,40 @@ namespace CIMS.Views
             Loaded += (o, e) => txtCode.Focus();
         }
 
-        private static readonly string[] MaxMinUnits = { "KG", "PCS", "SHEET", "BOX" };
+        private static readonly string[] MaxMinUnits = { "KG", "PCS", "SHEET", "BOX", "COIL" };
+
+        // 📋 ลำดับคอลัมน์ตามที่ติ๊กเลือก: ติ๊กก่อน = แสดงก่อน / เอาติ๊กออก = หายจากลำดับ (ติ๊กใหม่ = ต่อท้าย)
+        private readonly List<string> _colOrder = new List<string>();
+
+        private (CheckBox Box, string Key)[] ColumnChips() => new[]
+        {
+            (chkColNo, "NO"), (chkColImage, "IMAGE"), (chkColCustomer, "CUSTOMER"), (chkColCode, "CODE"), (chkColPartA, "PARTA"),
+            (chkColPartNo, "PARTNO"), (chkColModel, "MODEL"), (chkColName, "NAME"), (chkMaxMin, "MAXMIN"), (chkColQty, "QTY"),
+            (chkColStockBox, "BOX"), (chkCountCoil, "COIL"), (chkColStockPcs, "PCS"), (chkColRemark, "REMARK")
+        };
+
+        private void InitColumnOrder(StockModel s)
+        {
+            var chips = ColumnChips();
+            foreach (string key in s.ColumnOrderList())
+            {
+                var c = chips.FirstOrDefault(x => x.Key == key);
+                if (c.Box != null && c.Box.IsChecked == true) _colOrder.Add(key);
+            }
+            foreach (var (box, key) in chips)
+            {
+                box.Checked += (o, e) => { if (!_colOrder.Contains(key)) _colOrder.Add(key); ShowColumnOrder(); };
+                box.Unchecked += (o, e) => { _colOrder.Remove(key); ShowColumnOrder(); };
+            }
+            ShowColumnOrder();
+        }
+
+        private void ShowColumnOrder()
+        {
+            var chips = ColumnChips();
+            var names = _colOrder.Select((k, i) => $"{i + 1}. {chips.First(x => x.Key == k).Box.Content}");
+            txtColumnOrder.Text = _colOrder.Count == 0 ? "ORDER: -" : "ORDER:  " + string.Join("   →   ", names);
+        }
 
         private void LoadFormats(IEnumerable<int> selectedIds)
         {
@@ -142,7 +176,7 @@ namespace CIMS.Views
             if (chkColImage.IsChecked != true && chkColCode.IsChecked != true && chkColName.IsChecked != true &&
                 chkMaxMin.IsChecked != true && chkColQty.IsChecked != true && chkColRemark.IsChecked != true &&
                 chkColCustomer.IsChecked != true && chkColPartA.IsChecked != true && chkColPartNo.IsChecked != true &&
-                chkColStockBox.IsChecked != true && chkColStockPcs.IsChecked != true &&
+                chkColStockBox.IsChecked != true && chkColStockPcs.IsChecked != true && chkCountCoil.IsChecked != true &&
                 chkColNo.IsChecked != true && chkColModel.IsChecked != true)
             {
                 DialogHelper.ShowWarning("กรุณาเลือกคอลัมน์ที่ต้องการแสดงอย่างน้อย 1 คอลัมน์");
@@ -167,6 +201,7 @@ namespace CIMS.Views
             s.ColModel = chkColModel.IsChecked == true;
             s.AllowDecimal = chkAllowDecimal.IsChecked == true;
             s.CountCoil = chkCountCoil.IsChecked == true;
+            s.ColumnOrder = string.Join(",", _colOrder);
             s.ColCustomer = chkColCustomer.IsChecked == true;
             s.ColPartA = chkColPartA.IsChecked == true;
             s.ColPartNo = chkColPartNo.IsChecked == true;

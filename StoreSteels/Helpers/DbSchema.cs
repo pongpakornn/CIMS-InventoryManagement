@@ -11,6 +11,10 @@ namespace CIMS.Helpers
         private static bool? _allowDecimal;
         private static bool? _liveSource;
         private static bool? _countCoil;
+        private static bool? _columnOrder;
+
+        // Update_20261006d.sql: CIMS.Stocks.ColumnOrder (ลำดับคอลัมน์ตามที่ติ๊กเลือก)
+        public static bool HasColumnOrder => _columnOrder ?? (_columnOrder = ColumnExists("ColumnOrder")) ?? false;
 
         // Update_20261006c.sql: CIMS.Stocks.CountCoil + CIMS.Parts.CoilQuantity (QTY (COIL) ของคลัง KG)
         public static bool HasCountCoil => _countCoil ?? (_countCoil = ColumnExists("CountCoil")) ?? false;

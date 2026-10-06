@@ -747,7 +747,7 @@ namespace CIMS.Services
                     string boxSql = (stock.IsMain
                         ? "UPDATE p SET MaxQuantity = ISNULL(@mx * {0}, p.MaxQuantity), MinQuantity = ISNULL(@mn * {0}, p.MinQuantity) FROM CIMS.Parts p WHERE p.PartID = @p"
                         : "UPDATE ps SET MaxQuantity = ISNULL(@mx * {0}, ps.MaxQuantity), MinQuantity = ISNULL(@mn * {0}, ps.MinQuantity), UpdatedDate = GETDATE() FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = @s AND ps.PartID = @p");
-                    string mult = string.Equals(stock.MaxMinBasis, "BOX", StringComparison.OrdinalIgnoreCase) ? "1" : "CASE WHEN ISNULL(p.PackSize, 0) > 0 THEN p.PackSize ELSE 1 END";
+                    string mult = stock.MaxMinInBox || stock.MaxMinInCoil ? "1" : "CASE WHEN ISNULL(p.PackSize, 0) > 0 THEN p.PackSize ELSE 1 END";   // BOX / COIL เก็บตามไฟล์
                     foreach (var v in valid.Where(x => x.HasBox))
                     {
                         using (var cmd = new SqlCommand(string.Format(boxSql, mult), conn, tr))

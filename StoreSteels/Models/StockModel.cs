@@ -45,6 +45,22 @@ namespace CIMS.Models
         public bool CountCoil { get; set; }
         public string BoxHeader => CountCoil ? "STOCK (COIL)" : "STOCK (BOX)";
         public bool ShowBoxColumn => ColStockBox || CountCoil;
+
+        // ลำดับคอลัมน์ในตาราง Store ตามลำดับที่ติ๊กเลือก (คั่นด้วย ,) เช่น "CODE,NAME,MAXMIN,QTY,COIL"
+        //   คีย์: NO IMAGE CUSTOMER CODE PARTA PARTNO MODEL NAME MAXMIN QTY BOX COIL PCS REMARK - ว่าง = ลำดับเดิม
+        public string ColumnOrder { get; set; }
+        public static readonly string[] DefaultColumnOrder = { "NO", "IMAGE", "CUSTOMER", "CODE", "PARTA", "PARTNO", "MODEL", "NAME", "MAXMIN", "QTY", "BOX", "COIL", "PCS", "REMARK" };
+        public List<string> ColumnOrderList()
+        {
+            var list = new List<string>();
+            foreach (string k in (ColumnOrder ?? "").Split(','))
+            {
+                string key = k.Trim().ToUpperInvariant();
+                if (key.Length > 0 && System.Array.IndexOf(DefaultColumnOrder, key) >= 0 && !list.Contains(key)) list.Add(key);
+            }
+            foreach (string k in DefaultColumnOrder) if (!list.Contains(k)) list.Add(k);   // คอลัมน์ที่ไม่ได้ระบุ = ต่อท้ายตามลำดับเดิม
+            return list;
+        }
         public bool ColStockPcs { get; set; }
         public bool ColNo { get; set; }       // No. = ลำดับในแต่ละกลุ่ม (กลุ่ม A 1-5, กลุ่ม B 1-3 ...)
         public bool ColModel { get; set; }    // MODEL (รหัสโมเดล Model)
@@ -61,6 +77,8 @@ namespace CIMS.Models
         // ค่าเดิม UNIT = ใช้หน่วยเดียวกับคลัง
         public string MaxMinBasis { get; set; } = "UNIT";
         public bool MaxMinInBox => string.Equals(MaxMinBasis, "BOX", System.StringComparison.OrdinalIgnoreCase);
+        // MAX / MIN เป็น COIL (แบบเดียวกับ BOX ของ StorePC) - เทียบกับ STOCK (COIL)
+        public bool MaxMinInCoil => string.Equals(MaxMinBasis, "COIL", System.StringComparison.OrdinalIgnoreCase);
         public string MaxMinUnit => string.IsNullOrWhiteSpace(MaxMinBasis) || string.Equals(MaxMinBasis, "UNIT", System.StringComparison.OrdinalIgnoreCase)
                                     ? UnitText : MaxMinBasis.ToUpperInvariant();
 
@@ -101,8 +119,8 @@ namespace CIMS.Models
         private string UnitText => string.IsNullOrWhiteSpace(Unit) ? "KG" : Unit;
         public string UnitDisplay => UnitText;
         public string QtyHeader => $"STOCK ({UnitText}.)";   // ยอดคงคลังตามหน่วย เช่น STOCK (KG.)
-        public string MaxHeader => MaxMinInBox ? "MAX (BOX)" : $"MAX ({MaxMinUnit}.)";
-        public string MinHeader => MaxMinInBox ? "MIN (BOX)" : $"MIN ({MaxMinUnit}.)";
+        public string MaxHeader => MaxMinInBox ? "MAX (BOX)" : MaxMinInCoil ? "MAX (COIL)" : $"MAX ({MaxMinUnit}.)";
+        public string MinHeader => MaxMinInBox ? "MIN (BOX)" : MaxMinInCoil ? "MIN (COIL)" : $"MIN ({MaxMinUnit}.)";
 
         public string DisplayName => $"{Code} - {Name}";
 
