@@ -61,6 +61,10 @@ namespace CIMS.Services
             string sql = stock.IsMain
                 ? @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, StockQuantity, MaxQuantity, MinQuantity, Remark, IsShowInMaster, IsActive, PackSize))
                     FROM CIMS.Parts"
+                // ⏳ ชั่วคราว: คลังที่แสดงสดจาก StorePC -> ดูการเปลี่ยนแปลงในตารางของโปรแกรมเดิม
+                : stock.IsLiveView
+                ? @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PT_ID, Quantity, BOXQ, QMAX, QMIN, RMK, PackSize, ImageFileName, Description))
+                    FROM CIMS.vw_StorePcLive"
                 : @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(ps.PartID, ps.Quantity, ps.BoxQuantity, ps.MaxQuantity, ps.MinQuantity, ps.Remark, ps.IsShow, p.PackSize, p.IsActive))
                     FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = @stk";
             using (var conn = new SqlConnection(GlobalConfig.ConnStr))

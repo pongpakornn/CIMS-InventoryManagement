@@ -21,6 +21,11 @@ namespace CIMS.Models
 
         public bool IsMain { get; set; }
 
+        // ⏳ ชั่วคราว: คลังนี้แสดงข้อมูลสดจากโปรแกรมเดิม (เช่น 'StorePC') - ดูอย่างเดียว ห้ามแก้ / สแกน / Import ใน CIMS
+        public string LiveSource { get; set; }
+        public bool IsLiveView => !string.IsNullOrWhiteSpace(LiveSource);
+        public const string LiveViewMessage = "คลังนี้แสดงข้อมูลสดจากโปรแกรมเดิม (StorePC) ชั่วคราว - ดูได้อย่างเดียว\nการแก้ไข / สแกน / Import ให้ทำในโปรแกรม StorePC";
+
         private bool _useMaxMin = true;
         public bool UseMaxMin { get => _useMaxMin; set { _useMaxMin = value; OnPropertyChanged(); } }
 

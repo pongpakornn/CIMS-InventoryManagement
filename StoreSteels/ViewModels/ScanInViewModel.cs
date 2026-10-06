@@ -1138,6 +1138,9 @@ namespace CIMS.ViewModels
         private string CheckChannel(StockModel stock, bool isOut, bool isPickList, BarcodeFormatModel supplierFmt)
         {
             string dir = isOut ? "จ่ายออก" : "รับเข้า";
+            // ⏳ คลังที่แสดงสดจาก StorePC (ชั่วคราว) สแกนใน CIMS ไม่ได้ - ให้สแกนในโปรแกรม StorePC
+            if (stock.IsLiveView)
+                return $"คลัง {stock.Code} ไม่เปิดให้สแกน{dir}ใน CIMS ชั่วคราว\n{StockModel.LiveViewMessage}";
             if (isPickList)
                 return (isOut ? stock.OutPickList : stock.InPickList) ? null
                     : $"คลัง {stock.Code} ไม่ได้เปิดให้{dir}ด้วย Pick List QR";

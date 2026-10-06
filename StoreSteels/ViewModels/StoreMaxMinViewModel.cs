@@ -159,7 +159,8 @@ namespace CIMS.ViewModels
         }
 
         // แก้ MAX / MIN / QTY / STOCK(BOX) / STOCK(PCS) = สิทธิ์ EDIT ของคลังนั้น (SystemID = รหัสคลัง รวมคลังหลัก)
-        public bool CanEditMaster => Stock != null && CurrentUser != null && CurrentUser.CanEditStock(Stock);
+        // คลังที่แสดงสดจาก StorePC (ชั่วคราว) = ดูอย่างเดียว
+        public bool CanEditMaster => Stock != null && !Stock.IsLiveView && CurrentUser != null && CurrentUser.CanEditStock(Stock);
 
         // ต่อท้าย Log ให้รู้ว่าแก้ไขคลังไหน (คลังหลักไม่ต่อ เพื่อให้ Log เหมือนเดิม)
         private string StockTag => (Stock == null || Stock.IsMain) ? "" : $"Stock: {Stock.Code} | ";

@@ -27,7 +27,8 @@ namespace CIMS.Services
             s.OutPickList, s.OutSupplier, s.OutSystemQR, s.SortNo,
             s.GroupBy, s.MaxMinBasis, s.ShowColCustomer, s.ShowColPartA, s.ShowColPartNumber, s.ShowColStockBox, s.ShowColStockPcs,
             s.ShowColNo, s.ShowColModel, s.OutExcel, "
-            + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "s.AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal");
+            + (CIMS.Helpers.DbSchema.HasAllowDecimal ? "s.AllowDecimal" : "CAST(0 AS BIT) AS AllowDecimal")
+            + (CIMS.Helpers.DbSchema.HasLiveSource ? ", s.LiveSource" : ", CAST(NULL AS NVARCHAR(30)) AS LiveSource");
 
         // คลังทั้งหมด (คลังหลักอยู่บนสุด) พร้อมจำนวนรายการสินค้าในแต่ละคลัง
         public List<StockModel> GetStocks()
@@ -132,7 +133,8 @@ namespace CIMS.Services
                 ColNo = Convert.ToBoolean(rdr["ShowColNo"]),
                 ColModel = Convert.ToBoolean(rdr["ShowColModel"]),
                 OutExcel = Convert.ToBoolean(rdr["OutExcel"]),
-                AllowDecimal = Convert.ToBoolean(rdr["AllowDecimal"])
+                AllowDecimal = Convert.ToBoolean(rdr["AllowDecimal"]),
+                LiveSource = rdr["LiveSource"] == DBNull.Value ? null : rdr["LiveSource"].ToString()
             };
         }
 

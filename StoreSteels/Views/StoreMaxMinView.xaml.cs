@@ -110,7 +110,8 @@ namespace CIMS.Views
         // แสดง/ซ่อนปุ่มตามการตั้งค่าคลัง - ส่วนคอลัมน์ทำตอนตารางโหลดเสร็จ (ApplyColumnSettings)
         private void ApplyStockSettings()
         {
-            txtStockInfo.Text = $"{_stock.Code}  •  {_stock.Name}  •  UNIT : {_stock.Unit}";
+            txtStockInfo.Text = $"{_stock.Code}  •  {_stock.Name}  •  UNIT : {_stock.Unit}"
+                                + (_stock.IsLiveView ? $"  •  🔴 LIVE FROM {_stock.LiveSource.ToUpperInvariant()} (READ ONLY)" : "");
 
             btnOverMax.Visibility = Show(_stock.UseMaxMin);
             btnUnderMin.Visibility = Show(_stock.UseMaxMin);
@@ -188,6 +189,7 @@ namespace CIMS.Views
         // 📥 Import Excel: บวกจำนวนเพิ่มจากยอดเดิม (เดิม 100 + Import 100 = 200)
         private async void btnImport_Click(object sender, RoutedEventArgs e)
         {
+            if (_stock?.IsLiveView == true) { DialogHelper.ShowWarning(StockModel.LiveViewMessage, "READ ONLY"); return; }
             if (_session == null || !_session.CanImportStock(_stock))
             {
                 DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ Import ข้อมูลเข้าคลังนี้", "ACCESS DENIED");
@@ -1023,6 +1025,14 @@ namespace CIMS.Views
                     StockBox = p.StockBox,
                     StockPcs = p.StockPcs
                 };
+            }
+
+            // ⏳ คลังที่แสดงสดจาก StorePC (ชั่วคราว) = ดูอย่างเดียว ทุกคอลัมน์รวม REMARK
+            if (_stock?.IsLiveView == true)
+            {
+                DialogHelper.ShowWarning(StockModel.LiveViewMessage, "READ ONLY");
+                e.Cancel = true;
+                return;
             }
 
             string header = e.Column.Header.ToString().ToUpper();

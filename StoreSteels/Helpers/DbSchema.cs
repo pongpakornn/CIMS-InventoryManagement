@@ -9,6 +9,26 @@ namespace CIMS.Helpers
     public static class DbSchema
     {
         private static bool? _allowDecimal;
+        private static bool? _liveSource;
+
+        // Update_20261006b.sql: CIMS.Stocks.LiveSource (คลังที่แสดงข้อมูลสดจาก StorePC ชั่วคราว)
+        public static bool HasLiveSource => _liveSource ?? (_liveSource = ColumnExists("LiveSource")) ?? false;
+
+        private static bool? ColumnExists(string column)
+        {
+            try
+            {
+                using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                using (var cmd = new SqlCommand("SELECT COL_LENGTH('CIMS.Stocks', @c)", conn))
+                {
+                    cmd.Parameters.AddWithValue("@c", column);
+                    conn.Open();
+                    object v = cmd.ExecuteScalar();
+                    return v != null && v != DBNull.Value;
+                }
+            }
+            catch { return null; }   // ต่อฐานไม่ได้ตอนนี้ -> ลองใหม่ครั้งหน้า
+        }
 
         // Update_20261006.sql: CIMS.Stocks.AllowDecimal (DECIMAL QTY) - ไม่มี = ทุกคลังเป็นจำนวนเต็มเหมือนเดิม
         public static bool HasAllowDecimal

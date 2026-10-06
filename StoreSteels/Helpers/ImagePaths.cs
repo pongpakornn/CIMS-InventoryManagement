@@ -13,12 +13,16 @@ namespace CIMS.Helpers
     {
         public const string StockRoot = @"\\192.168.10.56\ProgramCHR\2. Store Only\1. CIMS - Inventory Management\1. Image Stock";
         public const string LegacyRoot = @"\\192.168.10.56\ProgramCHR\2. Store Only\StoreSteels\Image";
+        // ⏳ ชั่วคราว: รูปของโปรแกรมเดิม StorePC (คลังที่แสดงข้อมูลสดจาก StorePC - CIMS.vw_StorePcLive ส่งมาเป็น "STOREPC:<ไฟล์>")
+        public const string StorePcRoot = @"\\192.168.10.56\ProgramCHR\2. Store Only\StorePC\ImageStore";
+        private const string StorePcPrefix = "STOREPC:";
 
         // ImageFileName -> path เต็ม (ไม่เช็กว่ามีไฟล์จริง)
         public static string Resolve(string imageFileName)
         {
             if (string.IsNullOrWhiteSpace(imageFileName)) return null;
             string f = imageFileName.Trim();
+            if (f.StartsWith(StorePcPrefix, StringComparison.OrdinalIgnoreCase)) return Path.Combine(StorePcRoot, f.Substring(StorePcPrefix.Length).Trim());
             if (Path.IsPathRooted(f)) return f;
             return f.Contains('\\') || f.Contains('/') ? Path.Combine(StockRoot, f.Replace('/', '\\')) : Path.Combine(LegacyRoot, f);
         }
