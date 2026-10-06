@@ -3,11 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:vm="clr-namespace:CIMS.ViewModels"
       Title="Packing Card" Background="Transparent"
-      RenderTransformOrigin="0.5,0.5">
-
-    <Page.DataContext>
-        <vm:PackingCardViewModel />
-    </Page.DataContext>
+      RenderTransformOrigin="0.5,0.5" MinWidth="1000">
+    <!-- MinWidth: จอแคบ หน้านี้จัดตัวเองให้พอดีจอได้ถึง 1000 (MainView) ไม่ต้องเลื่อนซ้ายขวาจน REMARK หลุดขอบ -->
+    <!-- DataContext ตั้งใน code-behind (ตัวเดียว) - เดิมสร้าง ViewModel ซ้ำใน XAML ด้วย ทำให้ดึง ERP 2 รอบทุกครั้งที่เปิดหน้า -->
 
     <Page.Resources>
         <!-- Style ชุดเดียวกับ ProductControlView.xaml (CyberButton / ModernInput / CenterCellStyle)
@@ -354,13 +352,13 @@
                              เพื่อให้กระจายพื้นที่ที่เหลือแล้วเต็มตารางพอดี แทน Fixed px เดิมที่ทำให้เกิด Scrollbar
                              แนวนอนเวลาหน้าต่างกว้างกว่าผลรวมความกว้างคอลัมน์ ส่วนคอลัมน์รหัส/ตัวเลขสั้นๆ
                              (GROUP/QTY/LOT) ยังคงเป็น Fixed px เหมือน MAX/MIN ในหน้า Store Max-Min -->
-                        <DataGridTextColumn Header="BILL NO." Binding="{Binding TicketNo}" Width="1.3*" MinWidth="150" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
-                        <DataGridTextColumn Header="GROUP" Binding="{Binding GroupCode}" Width="90" MinWidth="80" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
-                        <DataGridTextColumn Header="PD CODE" Binding="{Binding MaterialCode}" Width="1.1*" MinWidth="130" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="BILL NO." Binding="{Binding TicketNo}" Width="1.3*" MinWidth="125" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="GROUP" Binding="{Binding GroupCode}" Width="80" MinWidth="70" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="PD CODE" Binding="{Binding MaterialCode}" Width="1.1*" MinWidth="120" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
                         <DataGridTextColumn Header="QTY" Binding="{Binding Qty, StringFormat='{}{0:0.##}'}" Width="80" MinWidth="70" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
-                        <DataGridTextColumn Header="WORKORDER" Binding="{Binding WorkOrder}" Width="1.3*" MinWidth="150" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
-                        <DataGridTextColumn Header="LOT" Binding="{Binding LotNo}" Width="90" MinWidth="80" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
-                        <DataGridTextColumn Header="REMARK" Binding="{Binding JobName}" Width="1.8*" MinWidth="200" ElementStyle="{StaticResource WrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="WORKORDER" Binding="{Binding WorkOrder}" Width="1.3*" MinWidth="125" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="LOT" Binding="{Binding LotNo}" Width="85" MinWidth="75" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
+                        <DataGridTextColumn Header="REMARK" Binding="{Binding JobName}" Width="2*" MinWidth="180" ElementStyle="{StaticResource WrapCellTextStyle}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Border>

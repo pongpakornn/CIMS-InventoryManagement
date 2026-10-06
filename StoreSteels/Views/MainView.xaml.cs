@@ -28,7 +28,7 @@ namespace CIMS.Views
         {
             InitializeComponent();
             // หน้าใหม่ (ทั้งจากเมนูและจากในหน้า เช่น การ์ดคลัง -> ตาราง) เริ่มที่มุมซ้ายบนเสมอ (จอเล็กที่เลื่อนหน้าได้)
-            MainFrame.Navigated += (s, e) => PageScroll.ScrollToHome();
+            MainFrame.Navigated += (s, e) => { PageScroll.ScrollToHome(); ApplyPageScale(); };   // แต่ละหน้าแคบได้ไม่เท่ากัน (MinWidth)
             this.CurrentUser = session;             // เก็บข้อมูลคน Login
             this.DataContext = this;                // ทำให้ Binding {Binding CurrentUser.UserLevel} ทำงานได้
             this.Closing += MainView_Closing;       // [เพิ่ม] ดักจับการปิด Window ทุกกรณีรวมถึงกด X เพื่อให้ UserID อัพเดทสถานะเป็น Offline เสมอ
@@ -199,7 +199,11 @@ namespace CIMS.Views
             // ต้องเลื่อนแนวตั้ง / แนวนอน -> เผื่อที่ของ Scrollbar ไม่ให้เกิดแถบเลื่อนซ้อนเพราะขาดไม่กี่ px
             bool needV = h / s < DesignHeight - 0.5;
             if (needV) { w -= SystemParameters.VerticalScrollBarWidth; s = Math.Min(1, Math.Max(MinScale, w / DesignWidth)); }
-            bool needH = s < 1 && DesignWidth * s > w + 0.5;
+            // หน้าที่ตั้ง MinWidth ไว้ (เช่น Pick List) จัดตัวเองให้แคบลงได้ถึงค่านั้น -> จอเล็กไม่ต้องเลื่อนซ้ายขวา
+            // (หน้าอื่นที่ไม่ได้ตั้ง ใช้ความกว้างออกแบบ 1600 เหมือนเดิม)
+            double pageMin = (MainFrame.Content as FrameworkElement)?.MinWidth ?? 0;
+            double hostWidth = pageMin > 0 ? Math.Min(DesignWidth, pageMin + MainFrame.Margin.Left + MainFrame.Margin.Right) : DesignWidth;
+            bool needH = s < 1 && hostWidth * s > w + 0.5;
             if (needH) { h -= SystemParameters.HorizontalScrollBarHeight; needV = h / s < DesignHeight - 0.5; }
 
             PageScale.ScaleX = PageScale.ScaleY = s;
@@ -207,7 +211,7 @@ namespace CIMS.Views
             // แกนที่ไม่พอ: เลื่อนได้ และกำหนดขนาดหน้าตายตัว - ตารางในหน้าจึงยังสร้างแถวเฉพาะที่เห็น (Virtualization) ไม่ช้าลง
             PageScroll.HorizontalScrollBarVisibility = needH ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
             PageScroll.VerticalScrollBarVisibility = needV ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
-            PageHost.Width = needH ? DesignWidth : double.NaN;
+            PageHost.Width = needH ? hostWidth : double.NaN;
             PageHost.Height = needV ? DesignHeight : double.NaN;
         }
 

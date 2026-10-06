@@ -201,7 +201,8 @@ namespace CIMS.Services
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 0 header
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 1 divider
-            for (int i = 0; i < 4; i++) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });   // 2-5
+            // 2 Bill-Group / 3 Work Order-LOT / 4 Part Name (สูงกว่า ให้ชื่อยาวขึ้น 2 บรรทัดได้ครบ) / 5 Quantity-TicketDate
+            foreach (double weight in new[] { 1.0, 1.0, 1.7, 1.0 }) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(weight, GridUnitType.Star) });
 
             // หัวการ์ด: โลโก้บริษัท (รูป CH. RADIATORS CO.,LTD. + ชื่อไทย) อย่างเดียว
             var logo = new Image
@@ -246,18 +247,18 @@ namespace CIMS.Services
             {
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var label = new TextBlock { Text = fields[i].Label, FontSize = 12 * s, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6 * s, 2 * s) };
+                var label = new TextBlock { Text = fields[i].Label, FontSize = 13.5 * s, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6 * s, 2 * s) };
                 Grid.SetColumn(label, i * 2);
                 bool wide = fields.Length == 1;
                 var value = new TextBlock
                 {
                     Text = fields[i].Value ?? "",
-                    FontSize = 13 * s,
+                    FontSize = 15 * s,
                     FontWeight = FontWeights.Bold,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     TextAlignment = TextAlignment.Center,
                     TextWrapping = TextWrapping.Wrap,
-                    MaxHeight = (wide ? 2 : 1) * 13.5 * s * 1.6,   // Part Name ยาวได้ 2 บรรทัด / ค่าอื่น 1 บรรทัด
+                    MaxHeight = (wide ? 2 : 1) * 15 * s * 1.6,   // Part Name ยาวได้ 2 บรรทัด / ค่าอื่น 1 บรรทัด
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     Padding = new Thickness(0, 0, 0, 1.5 * s)
                 };
