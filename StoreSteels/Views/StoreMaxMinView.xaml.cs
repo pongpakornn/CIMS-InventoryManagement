@@ -360,17 +360,19 @@ namespace CIMS.Views
 
             var stockCodes = string.Join(", ", valid.SelectMany(r => r.Stocks).Select(s => s.Code).Distinct());
             string summary = $"ไฟล์: {System.IO.Path.GetFileName(file)}\nคลัง: {stockCodes}\n\n" +
-                             $"อัพเดทสินค้าเดิม {valid.Count(r => !r.IsNew):N0} รายการ  •  เพิ่มสินค้าใหม่ {valid.Count(r => r.IsNew):N0} รายการ\n" +
+                             $"อัพเดทสินค้าเดิม {valid.Count(r => !r.IsNew && !r.IsCoilExtra):N0} รายการ  •  เพิ่มสินค้าใหม่ {valid.Count(r => r.IsNew && !r.IsCoilExtra):N0} รายการ\n" +
+                             (valid.Any(r => r.CoilNo != null) ? $"COIL {valid.Count(r => r.CoilNo != null):N0} ลูก  •  น้ำหนักรวม {valid.Where(r => r.CoilNo != null).Sum(r => r.CoilWeight):#,##0.###} KG (STOCK (UNIT) ของสินค้า = น้ำหนักรวม Coil ในทะเบียน)\n" : "") +
                              "ยอดคงคลัง / MAX / MIN จะถูกตั้งตามตัวเลขในไฟล์ (ช่องว่าง = ไม่เปลี่ยน)" +
                              (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{errs}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?";
             if (!DialogHelper.ShowConfirm(summary, "CONFIRM IMPORT")) return;
 
             try
             {
-                var r = await Task.Run(() => svc.Apply(rows));
+                string importUser = _session.UserId;
+                var r = await Task.Run(() => svc.Apply(rows, importUser));
                 LogService.WriteLog(_session.UserId, "STOCK_MASTER_IMPORT",
-                    $"Import Excel (update) -> {stockCodes} | File: {System.IO.Path.GetFileName(file)} | Updated: {r.Updated} | Added: {r.Added} | Stock rows: {r.StockRows} | Skipped rows: {bad.Count}", _stock.Code);
-                DialogHelper.ShowSuccess($"นำเข้าข้อมูลสำเร็จ\nอัพเดท {r.Updated:N0} รายการ  •  เพิ่มใหม่ {r.Added:N0} รายการ");
+                    $"Import Excel (update) -> {stockCodes} | File: {System.IO.Path.GetFileName(file)} | Updated: {r.Updated} | Added: {r.Added} | Stock rows: {r.StockRows} | Coils: {r.Coils} | Skipped rows: {bad.Count}", _stock.Code);
+                DialogHelper.ShowSuccess($"นำเข้าข้อมูลสำเร็จ\nอัพเดท {r.Updated:N0} รายการ  •  เพิ่มใหม่ {r.Added:N0} รายการ" + (r.Coils > 0 ? $"\nCOIL {r.Coils:N0} ลูก" : ""));
                 _viewModel.LoadData(txtSearch.Text);
             }
             catch (Exception ex) { DialogHelper.ShowError("นำเข้าข้อมูลไม่สำเร็จ (ยกเลิกทั้งไฟล์ ไม่มีรายการใดถูกบันทึก)\n" + ex.Message); }

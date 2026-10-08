@@ -152,6 +152,60 @@ namespace CIMS.Services
             }
         }
 
+        // Coil ทั้งหมดในทะเบียน (ใช้ตรวจไฟล์ Import: Coil ที่อยู่คลังอื่นห้ามทับ)
+        internal static Dictionary<string, (int Stock, string StockCode, string Status, int Part)> LoadCoils(SqlConnection conn)
+        {
+            var map = new Dictionary<string, (int, string, string, int)>(StringComparer.OrdinalIgnoreCase);
+            if (!DbSchema.HasCoilRegister) return map;
+            using (var cmd = new SqlCommand("SELECT c.CoilNo, c.StockID, s.StockCode, c.Status, c.PartID FROM CIMS.Coils c JOIN CIMS.Stocks s ON s.StockID = c.StockID", conn))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read()) map[r.GetString(0)] = (r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetInt32(4));
+            return map;
+        }
+
+        // ลงทะเบียน Coil ของสินค้า 1 ตัวในคลัง 1 คลัง (เก็บ Coil แม่ตามไฟล์) แล้วนับ STOCK (COIL) ใหม่จากทะเบียน
+        internal static void RegisterCoils(SqlConnection conn, SqlTransaction trans, IEnumerable<(string CoilNo, string Mother, decimal Weight)> coils,
+                                           int ptId, int stkId, bool isMain, string userId, bool setKg = false)
+        {
+            foreach (var c in coils)
+            {
+                ScanService.CoilReceive(conn, trans, new ScanService.CoilLabel { CoilNo = c.CoilNo, MotherCoil = c.Mother }, ptId, stkId, c.Weight, null, userId, "IMPORT");
+                using (var cmd = new SqlCommand("UPDATE CIMS.Coils SET MotherCoil = @m WHERE CoilNo = @c", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@c", c.CoilNo);
+                    cmd.Parameters.AddWithValue("@m", (object)c.Mother ?? DBNull.Value);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            RecountCoils(conn, trans, ptId, stkId, isMain);
+            // Import หน้า Product Control / Store แบบแถว Coil: STOCK (UNIT) = น้ำหนักรวมของ Coil ในทะเบียน (ตรงกับ Coil ที่เห็นเมื่อกด PD CODE)
+            if (setKg)
+            {
+                string sql = isMain
+                    ? "UPDATE CIMS.Parts SET StockQuantity = (SELECT ISNULL(SUM(WeightKG), 0) FROM CIMS.Coils WHERE StockID = @stk AND PartID = @pt AND Status = 'IN') WHERE PartID = @pt"
+                    : "UPDATE CIMS.PartStocks SET Quantity = (SELECT ISNULL(SUM(WeightKG), 0) FROM CIMS.Coils WHERE StockID = @stk AND PartID = @pt AND Status = 'IN') WHERE StockID = @stk AND PartID = @pt";
+                using (var cmd = new SqlCommand(sql, conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@stk", stkId);
+                    cmd.Parameters.AddWithValue("@pt", ptId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        internal static void RecountCoils(SqlConnection conn, SqlTransaction trans, int ptId, int stkId, bool isMain)
+        {
+            string sql = isMain
+                ? "UPDATE CIMS.Parts SET CoilQuantity = (SELECT COUNT(*) FROM CIMS.Coils WHERE StockID = @stk AND PartID = @pt AND Status = 'IN') WHERE PartID = @pt"
+                : "UPDATE CIMS.PartStocks SET BoxQuantity = (SELECT COUNT(*) FROM CIMS.Coils WHERE StockID = @stk AND PartID = @pt AND Status = 'IN') WHERE StockID = @stk AND PartID = @pt";
+            using (var cmd = new SqlCommand(sql, conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@stk", stkId);
+                cmd.Parameters.AddWithValue("@pt", ptId);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         public class ApplyResult { public int Added; public int Updated; public int Parts; }
 
         public ApplyResult Apply(StockModel stock, List<CoilImportRow> rows, string userId)
@@ -181,15 +235,7 @@ namespace CIMS.Services
                     // STOCK (COIL) = จำนวน Coil ในทะเบียนของสินค้านั้น
                     foreach (int pt in valid.Select(r => r.PartId).Distinct())
                     {
-                        string sql = stock.IsMain
-                            ? "UPDATE CIMS.Parts SET CoilQuantity = (SELECT COUNT(*) FROM CIMS.Coils WHERE StockID = @stk AND PartID = @pt AND Status = 'IN') WHERE PartID = @pt"
-                            : "UPDATE CIMS.PartStocks SET BoxQuantity = (SELECT COUNT(*) FROM CIMS.Coils WHERE StockID = @stk AND PartID = @pt AND Status = 'IN') WHERE StockID = @stk AND PartID = @pt";
-                        using (var cmd = new SqlCommand(sql, conn, trans))
-                        {
-                            cmd.Parameters.AddWithValue("@stk", stock.StkId);
-                            cmd.Parameters.AddWithValue("@pt", pt);
-                            cmd.ExecuteNonQuery();
-                        }
+                        RecountCoils(conn, trans, pt, stock.StkId, stock.IsMain);
                         result.Parts++;
                     }
                     trans.Commit();

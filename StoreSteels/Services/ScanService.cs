@@ -537,7 +537,8 @@ namespace CIMS.Services
                                     if (v != null && v != DBNull.Value) { coilPart = Convert.ToInt32(v); how = "COIL"; }
                                 }
                             if (coilPart == 0 && !string.IsNullOrWhiteSpace(coil.MotherCoil))
-                                using (var cmd = new SqlCommand(@"SELECT TOP 1 PartID FROM CIMS.Coils WHERE MotherCoil = @m AND StockID = @s AND Status = 'IN'
+                                // Coil แม่ = Coil ลูกที่มี MOTHER COIL นี้ หรือ Coil แม่ที่ลงทะเบียนไว้เอง (COIL NO = เลข Coil แม่)
+                                using (var cmd = new SqlCommand(@"SELECT TOP 1 PartID FROM CIMS.Coils WHERE (MotherCoil = @m OR CoilNo = @m) AND StockID = @s AND Status = 'IN'
                                                                   GROUP BY PartID ORDER BY COUNT(*) DESC, PartID", conn, trans))
                                 {
                                     cmd.Parameters.AddWithValue("@m", coil.MotherCoil.Trim());

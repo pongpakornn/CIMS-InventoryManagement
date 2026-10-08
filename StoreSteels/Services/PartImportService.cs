@@ -43,6 +43,16 @@ namespace CIMS.Services
         public decimal? StockPcs { get; set; }
         public string Remark { get; set; }
         public string Image { get; set; }   // IMAGE = ชื่อไฟล์รูป (เก็บตามไฟล์ / ว่าง = ไม่มีรูป)
+
+        // 🧲 แถว Coil: 1 แถว = 1 Coil (COIL NO + MOTHER COIL + น้ำหนัก = STOCK (UNIT) ของแถวนั้น)
+        //    สินค้าเดียวกันหลาย Coil = ใส่ PRODUCT CODE ซ้ำได้หลายแถว (แถวแรก = ข้อมูลสินค้า / แถวถัดไป = เพิ่ม Coil)
+        public string CoilNo { get; set; }
+        public string MotherCoil { get; set; }
+        public decimal CoilWeight { get; set; }
+        public bool IsCoilExtra { get; set; }          // แถว Coil เพิ่มของสินค้าที่อยู่แถวก่อนหน้า (ไม่สร้างสินค้าใหม่)
+        public PartImportRow CoilOwner { get; set; }   // แถวแรกของสินค้านั้น
+        public int CoilStockId { get; set; }           // คลังที่นับ Coil ที่ Coil นี้เข้า
+        public bool CoilStockIsMain { get; set; }
         public List<int> OtherStockIds { get; } = new List<int>();
         public string Error { get; set; }
         public bool IsValid => string.IsNullOrEmpty(Error);
@@ -64,6 +74,8 @@ namespace CIMS.Services
             ["BIN"] = new[] { "BIN", "LOCATION", "LOC" },
             ["QRCODE"] = new[] { "QRCODE", "QR" },
             ["IMAGE"] = new[] { "IMAGE", "IMAGEFILE", "IMAGEFILENAME", "PICTURE", "รูป", "รูปภาพ" },
+            ["COILNO"] = new[] { "COILNO", "COILNUMBER", "เลขCOIL" },
+            ["MOTHERCOIL"] = new[] { "MOTHERCOIL", "MOTHER", "COILMOTHER", "COILแม่" },
             ["STOCK"] = new[] { "STOCK", "STOCKCODE", "คลัง" },
             ["CUSTOMER"] = new[] { "CUSTOMER", "CUST", "CUSTOMERCODE", "ลูกค้า" },
             ["PARTA"] = new[] { "PARTA", "PARTACODE" },
@@ -157,6 +169,8 @@ namespace CIMS.Services
                         Bin = Get(r, "BIN"),
                         QrCode = Get(r, "QRCODE"),
                         Image = Get(r, "IMAGE"),
+                        CoilNo = Get(r, "COILNO") is string cn && cn.Length > 0 && cn != "-" ? cn.ToUpperInvariant() : null,
+                        MotherCoil = Get(r, "MOTHERCOIL") is string mc && mc.Length > 0 && mc != "-" ? mc.ToUpperInvariant() : null,
                         StockText = Get(r, "STOCK"),
                         Customer = Get(r, "CUSTOMER"),
                         PartA = Get(r, "PARTA"),
@@ -213,6 +227,14 @@ namespace CIMS.Services
                             item.Error = $"STOCK (UNIT) ({qty}) ไม่ตรงกับ STOCK (PCS) ({item.StockPcs}) - ใส่อย่างใดอย่างหนึ่ง";
                         else item.StockPcs = qty;
                     }
+                    // แถว Coil: น้ำหนักของ Coil นี้ = STOCK (UNIT) / STOCK (PCS) ของแถว / 1 แถว = 1 Coil
+                    if (item.Error == null && item.CoilNo != null)
+                    {
+                        if (!item.StockPcs.HasValue || item.StockPcs.Value <= 0) item.Error = $"COIL NO {item.CoilNo}: ใส่น้ำหนักของ Coil นี้ที่ STOCK (UNIT)";
+                        else if (item.Coil.HasValue && item.Coil.Value != 1) item.Error = $"COIL NO {item.CoilNo}: 1 แถว = 1 Coil (STOCK (COIL) ว่าง หรือ 1)";
+                        else item.CoilWeight = item.StockPcs.Value;
+                    }
+                    else if (item.Error == null && item.MotherCoil != null) item.Error = "ใส่ MOTHER COIL แล้วต้องใส่ COIL NO ด้วย";
                     string rmk = Get(r, "REMARK");
                     item.Remark = rmk.Length == 0 ? null : rmk;
                     if (item.Error == null && item.Max.HasValue && item.Min.HasValue && item.Max > 0 && item.Min > item.Max)
@@ -223,7 +245,7 @@ namespace CIMS.Services
                 }
             }
 
-            ValidateAgainstDb(rows);
+            ValidateAgainstDb(rows, stocks);
             return rows;
         }
 
@@ -261,30 +283,59 @@ namespace CIMS.Services
         private static string Key(string code, string partA) => (code ?? "").Trim().ToUpperInvariant() + "|" + (partA ?? "").Trim().ToUpperInvariant();
 
         // ข้ามสินค้าที่มีในระบบแล้ว และแถวที่ซ้ำกันเองในไฟล์ (PRODUCT CODE + PART A เดียวกัน - เก็บแถวแรกไว้)
-        private void ValidateAgainstDb(List<PartImportRow> rows)
+        private void ValidateAgainstDb(List<PartImportRow> rows, List<StockModel> stocks)
         {
             var existing = new HashSet<string>();
+            Dictionary<string, (int Stock, string StockCode, string Status, int Part)> coils;
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("SELECT PartCode, ISNULL(PartA, '') FROM CIMS.Parts", conn))
             {
                 conn.Open();
+                using (var cmd = new SqlCommand("SELECT PartCode, ISNULL(PartA, '') FROM CIMS.Parts", conn))
                 using (var rdr = cmd.ExecuteReader())
                     while (rdr.Read()) existing.Add(Key(rdr.GetString(0), rdr.GetString(1)));
+                coils = CoilImportService.LoadCoils(conn);
             }
 
-            var seen = new HashSet<string>();
+            // สินค้าซ้ำในไฟล์: ทั้งสองแถวเป็นแถว Coil = เพิ่ม Coil ให้สินค้าแถวแรก / ไม่ใช่ = ซ้ำ (ข้าม)
+            var first = new Dictionary<string, PartImportRow>();
             foreach (var r in rows.Where(x => x.IsValid))
             {
                 string k = Key(r.Code, r.PartA);
-                if (existing.Contains(k)) r.Error = "สินค้านี้ลงทะเบียนไว้แล้ว (PRODUCT CODE + PART A)";
-                else if (!seen.Add(k)) r.Error = "ซ้ำกับแถวก่อนหน้าในไฟล์ (PRODUCT CODE + PART A เดียวกัน)";
+                if (existing.Contains(k)) r.Error = "สินค้านี้ลงทะเบียนไว้แล้ว (PRODUCT CODE + PART A) - เพิ่ม / อัพเดทผ่าน IMPORT EXCEL หน้า Store (Max-Min)";
+                else if (first.TryGetValue(k, out var owner))
+                {
+                    if (r.CoilNo != null && owner.CoilNo != null) { r.IsCoilExtra = true; r.CoilOwner = owner; }
+                    else r.Error = "ซ้ำกับแถวก่อนหน้าในไฟล์ (PRODUCT CODE + PART A เดียวกัน) - หลาย Coil ให้ใส่ COIL NO ทุกแถว";
+                }
+                else first[k] = r;
             }
+
+            // คลังที่ Coil เข้า = คลังแรกของสินค้า (แถวแรก) ที่เปิด STOCK (COIL) / Coil ซ้ำในไฟล์หรือมีในทะเบียนแล้ว = ข้าม
+            var seenCoil = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var r in rows.Where(x => x.IsValid && x.CoilNo != null))
+            {
+                var owner = r.CoilOwner ?? r;
+                var target = (owner.InMain ? stocks.Where(s => s.IsMain) : Enumerable.Empty<StockModel>())
+                             .Concat(owner.OtherStockIds.Select(id => stocks.FirstOrDefault(s => s.StkId == id)))
+                             .FirstOrDefault(s => s != null && s.CountCoil);
+                if (!CIMS.Helpers.DbSchema.HasCoilRegister) r.Error = "ฐานข้อมูลยังไม่มีทะเบียน Coil (Update_20261008.sql)";
+                else if (target == null) r.Error = $"COIL NO {r.CoilNo}: คลังของสินค้านี้ไม่ได้นับ Coil (เปิด STOCK (COIL) ที่ EDIT STOCK)";
+                else if (seenCoil.TryGetValue(r.CoilNo, out int at)) r.Error = $"COIL NO {r.CoilNo} ซ้ำกับแถว {at}";
+                else if (coils.TryGetValue(r.CoilNo, out var c) && c.Status == "IN") r.Error = $"COIL NO {r.CoilNo} อยู่ในคลัง {c.StockCode} แล้ว";
+                else { seenCoil[r.CoilNo] = r.RowNumber; r.CoilStockId = target.StkId; r.CoilStockIsMain = target.IsMain; }
+            }
+            // แถวแรกของสินค้าไม่ผ่าน -> แถว Coil เพิ่มของสินค้านั้นก็ไม่นำเข้า
+            foreach (var r in rows.Where(x => x.IsValid && x.IsCoilExtra && !x.CoilOwner.IsValid))
+                r.Error = $"สินค้าแถว {r.CoilOwner.RowNumber} ไม่ผ่าน ({r.CoilOwner.Error})";
         }
 
         // ลงทะเบียนทุกแถวที่ผ่านการตรวจใน Transaction เดียว - พังแถวเดียวยกเลิกทั้งไฟล์
-        public int ApplyImport(List<PartImportRow> rows)
+        public int ApplyImport(List<PartImportRow> rows, string userId = null)
         {
-            var valid = rows.Where(r => r.IsValid).ToList();
+            // แถว Coil ของสินค้าเดียวกัน: ยอด KG ของสินค้า = น้ำหนักรวมทุก Coil ในไฟล์ / STOCK (COIL) = นับจากทะเบียน
+            var coilRows = rows.Where(r => r.IsValid && r.CoilNo != null).GroupBy(r => r.CoilOwner ?? r).ToDictionary(g => g.Key, g => g.ToList());
+            foreach (var kv in coilRows) kv.Key.StockPcs = kv.Value.Sum(r => r.CoilWeight);
+            var valid = rows.Where(r => r.IsValid && !r.IsCoilExtra).ToList();
             if (valid.Count == 0) return 0;
 
             using (var conn = new SqlConnection(_connectionString))
@@ -373,6 +424,10 @@ namespace CIMS.Services
                                 cmd.ExecuteNonQuery();
                             }
                         }
+
+                        // 🧲 Coil ของสินค้านี้ (ทุกแถวที่ใส่ COIL NO) -> ทะเบียน Coil ของคลังที่นับ Coil + นับ STOCK (COIL) ใหม่
+                        if (coilRows.TryGetValue(r, out var cl))
+                            CoilImportService.RegisterCoils(conn, trans, cl.Select(c => (c.CoilNo, c.MotherCoil, c.CoilWeight)), ptId, r.CoilStockId, r.CoilStockIsMain, userId, true);
                     }
                     trans.Commit();
                 }

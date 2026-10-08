@@ -97,7 +97,7 @@ namespace CIMS.Services
         public static readonly string[] PartHeads =
         {
             "NO", "PRODUCT CODE", "PRODUCT NAME", "SUPPLIER", "CUSTOMER", "CATEGORY", "PART A", "PART NO", "MODEL",
-            "PACK SIZE", "BIN", "QR CODE", "IMAGE", "STOCK1", "STOCK2", "STOCK3", "SHOW/HIDE", "MAX", "MIN",
+            "PACK SIZE", "BIN", "COIL NO", "MOTHER COIL", "QR CODE", "IMAGE", "STOCK1", "STOCK2", "STOCK3", "SHOW/HIDE", "MAX", "MIN",
             "STOCK (UNIT)", "STOCK (BOX)", "STOCK (COIL)", "STOCK (PCS)", "REMARK"
         };
 
@@ -106,7 +106,7 @@ namespace CIMS.Services
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.AddWorksheet("PRODUCTS");
-                Header(ws, PartHeads, new double[] { 6.4, 18, 34, 14, 14, 14, 16, 18, 14, 10, 10, 16, 28, 14, 14, 14, 11, 9, 9, 10, 11, 11, 11, 24 });
+                Header(ws, PartHeads, new double[] { 6.4, 18, 34, 14, 14, 14, 16, 18, 14, 10, 14, 16, 16, 16, 28, 14, 14, 14, 11, 9, 9, 10, 11, 11, 11, 24 });
                 Body(ws, 31, PartHeads.Length);   // 30 แถวว่างพร้อมเส้นตาราง
                 for (int r = 2; r <= 31; r++) ws.Cell(r, 1).Value = r - 1;
 
@@ -119,6 +119,9 @@ namespace CIMS.Services
                     ("PART A / PART NO / MODEL", "รหัสเพิ่มเติม (ไม่บังคับ) - ใช้ค้นหาและสแกนได้"),
                     ("PACK SIZE", "จำนวนต่อ 1 กล่อง / 1 ป้าย (ตัวเลข)"),
                     ("BIN / QR CODE", "ตำแหน่งเก็บ / รหัส QR ของสินค้า (ไม่บังคับ) - BIN ว่าง = N/A"),
+                    ("COIL NO", "เลข Coil ตามป้าย (คลังที่นับ Coil เช่น STOCK-MAT / PANTA) - 1 แถว = 1 Coil / ห้ามซ้ำ / น้ำหนักของ Coil นี้ใส่ที่ STOCK (UNIT) ของแถว"),
+                    ("สินค้า 1 ตัว หลาย Coil", "ใส่ PRODUCT CODE ซ้ำหลายแถว แถวละ 1 Coil (ใส่ COIL NO ทุกแถว) - ข้อมูลสินค้าใช้แถวแรก / STOCK (UNIT) ของสินค้า = น้ำหนักรวมของ Coil ในคลังนั้น (สินค้าใหม่ = รวมทุกแถว) / STOCK (COIL) = จำนวน Coil"),
+                    ("MOTHER COIL", "Coil แม่ที่ Coil นี้ตัดมา (ไม่บังคับ) - Coil ที่เป็น Coil แม่เองให้เว้นว่าง เช่น COIL NO = CWD1477A, MOTHER COIL = ว่าง"),
                     ("IMAGE", "ชื่อไฟล์รูปในโฟลเดอร์ 1. Image Stock เช่น STOCK-4C\\STOCK-4C-01.png (ไม่บังคับ / ว่าง = ไม่มีรูป หรือไม่เปลี่ยนรูปเดิม) - ใส่รูปทีละรายการได้ที่ปุ่มรูปในหน้า Inventory Registration"),
                     ("STOCK1 - STOCK3", "รหัสคลังที่สินค้าอยู่ ช่องละ 1 คลัง (ดูชีท STOCK CODES) - ไม่ใส่เลย = คลังหลัก"),
                     ("SHOW/HIDE", "1 = แสดง / 0 = ซ่อน ในตาราง Store (Max-Min) - ว่าง = แสดง"),
@@ -130,6 +133,27 @@ namespace CIMS.Services
                     ("NO", "ลำดับ - ระบบไม่ได้ใช้ ลบหรือเว้นว่างได้"),
                     ("", "กรอกข้อมูลในชีท PRODUCTS (ชีทแรก) ได้ไม่จำกัดแถว แล้วกด IMPORT EXCEL ในหน้า Inventory Registration"),
                 });
+
+                // ตัวอย่างสินค้า 1 ตัว หลาย Coil (อยู่ในชีท HOW TO เท่านั้น - ไม่ถูก Import)
+                var g = wb.Worksheet("HOW TO");
+                int ex = (g.LastRowUsed()?.RowNumber() ?? 20) + 2;
+                g.Cell(ex, 1).Value = "ตัวอย่าง: สินค้า 1 ตัว มี 3 Coil ในคลัง STOCK-MAT (กรอกในชีท PRODUCTS)";
+                g.Cell(ex, 1).Style.Font.Bold = true;
+                string[] exHeads = { "PRODUCT CODE", "PRODUCT NAME", "SUPPLIER", "BIN", "COIL NO", "MOTHER COIL", "STOCK1", "STOCK (UNIT)" };
+                object[][] exRows =
+                {
+                    new object[] { "CC03-1600-0050", "SPHC-P(SPH270C) 1.6x1295xC", "PANTA", "CWD1477A", "CWD1477A", "", "STOCK-MAT", 3936 },
+                    new object[] { "CC03-1600-0050", "SPHC-P(SPH270C) 1.6x1295xC", "PANTA", "CWD1477B", "CWD1477B", "", "STOCK-MAT", 11470 },
+                    new object[] { "CC03-1600-0050", "SPHC-P(SPH270C) 1.6x1295xC", "PANTA", "CTF0256A", "CTF0256A", "", "STOCK-MAT", 10260 },
+                };
+                for (int i = 0; i < exHeads.Length; i++) g.Cell(ex + 1, i + 1).Value = exHeads[i];
+                var eh = g.Range(ex + 1, 1, ex + 1, exHeads.Length);
+                eh.Style.Fill.BackgroundColor = XLColor.FromHtml("#002060"); eh.Style.Font.FontColor = XLColor.White; eh.Style.Font.Bold = true;
+                for (int rr = 0; rr < exRows.Length; rr++)
+                    for (int cc = 0; cc < exRows[rr].Length; cc++) g.Cell(ex + 2 + rr, cc + 1).Value = XLCellValue.FromObject(exRows[rr][cc]);
+                var eb = g.Range(ex + 1, 1, ex + 1 + exRows.Length, exHeads.Length);
+                eb.Style.Border.OutsideBorder = XLBorderStyleValues.Thin; eb.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+                g.Cell(ex + 2 + exRows.Length, 1).Value = "ผล: สินค้า CC03-1600-0050 1 รายการ  •  STOCK (UNIT) = 25,666 KG  •  STOCK (COIL) = 3  •  กด PD CODE ในหน้า Store (Max-Min) เห็นทั้ง 3 Coil";
 
                 var s = wb.AddWorksheet("STOCK CODES");
                 Header(s, new[] { "STOCK CODE", "STOCK NAME", "UNIT", "MAIN" }, new double[] { 18, 32, 10, 8 });

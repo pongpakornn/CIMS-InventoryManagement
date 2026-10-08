@@ -233,17 +233,20 @@
                     return;
                 }
 
-                string summary = $"ไฟล์: {Path.GetFileName(dlg.FileName)}\n\nลงทะเบียนสินค้าใหม่ได้ {valid.Count:N0} รายการ" +
+                int products = valid.Count(r => !r.IsCoilExtra), coilCount = valid.Count(r => r.CoilNo != null);
+                string summary = $"ไฟล์: {Path.GetFileName(dlg.FileName)}\n\nลงทะเบียนสินค้าใหม่ได้ {products:N0} รายการ" +
+                                 (coilCount > 0 ? $"\nCOIL {coilCount:N0} ลูก  •  น้ำหนักรวม {valid.Where(r => r.CoilNo != null).Sum(r => r.CoilWeight):#,##0.###} KG (STOCK (UNIT) ของสินค้า = น้ำหนักรวม Coil ในทะเบียน)" : "") +
                                  (invalid.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {invalid.Count:N0} แถว:\n{errors}" : "") +
                                  "\n\nยืนยันการลงทะเบียนหรือไม่?";
                 if (!DialogHelper.ShowConfirm(summary, "CONFIRM IMPORT")) return;
 
                 try
                 {
-                    int count = await Task.Run(() => service.ApplyImport(rows));
+                    string importUser = _viewModel.CurrentUser?.UserId;
+                    int count = await Task.Run(() => service.ApplyImport(rows, importUser));
                     string uid = _viewModel.CurrentUser?.UserId ?? "Unknown";
                     LogService.WriteLog(uid, "REGISTER_PART_IMPORT",
-                        $"Import Excel: {Path.GetFileName(dlg.FileName)} | Registered: {count} | Skipped rows: {invalid.Count} | Codes: {string.Join(", ", valid.Select(v => v.Code).Take(50))}", "");
+                        $"Import Excel: {Path.GetFileName(dlg.FileName)} | Registered: {count} | Skipped rows: {invalid.Count} | Coils: {coilCount} | Codes: {string.Join(", ", valid.Where(v => !v.IsCoilExtra).Select(v => v.Code).Take(50))}", "");
                     DialogHelper.ShowSuccess($"ลงทะเบียนสินค้าใหม่สำเร็จ {count:N0} รายการ");
                     _viewModel.LoadData(txtSearch.Text);
                 }
