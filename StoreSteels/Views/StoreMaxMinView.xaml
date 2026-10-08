@@ -553,71 +553,8 @@
                 <!-- คลังที่นับ Coil: กด PD CODE -> Coil แม่ / Coil ลูก ของสินค้านั้น (น้ำหนัก KG + TON) -->
                 <DataGrid.RowDetailsTemplate>
                     <DataTemplate>
-                        <Border Margin="85,0,12,10" Background="#FBFAFF" BorderBrush="#E4DDF5" BorderThickness="1" CornerRadius="6" Padding="0,0,0,4">
-                            <StackPanel>
-                                <Grid Background="#EFEAFB" Height="30">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60"/>
-                                        <ColumnDefinition Width="2*"/>
-                                        <ColumnDefinition Width="2*"/>
-                                        <ColumnDefinition Width="1.2*"/>
-                                        <ColumnDefinition Width="1.2*"/>
-                                        <ColumnDefinition Width="1.6*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="NO." FontWeight="Bold" FontSize="12" Foreground="{StaticResource MainPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="MOTHER COIL" FontWeight="Bold" FontSize="12" Foreground="{StaticResource MainPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="COIL NO." FontWeight="Bold" FontSize="12" Foreground="{StaticResource MainPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="3" Text="WEIGHT (KG.)" FontWeight="Bold" FontSize="12" Foreground="{StaticResource MainPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="4" Text="WEIGHT (TON)" FontWeight="Bold" FontSize="12" Foreground="{StaticResource MainPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="5" Text="RECEIVED" FontWeight="Bold" FontSize="12" Foreground="{StaticResource MainPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Grid>
-                                <TextBlock Text="ยังไม่มี Coil ที่ลงทะเบียนของสินค้านี้ (สแกนรับเข้า หรือ Import COIL LIST)" Margin="0,8" FontSize="12" Foreground="#888" HorizontalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasCoilRows}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <ItemsControl ItemsSource="{Binding CoilRows}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Height="28">
-                                                <Grid.Style>
-                                                    <Style TargetType="Grid">
-                                                        <Setter Property="TextElement.FontWeight" Value="Normal"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsMother}" Value="True">
-                                                                <Setter Property="Background" Value="#F4F0FC"/>
-                                                                <Setter Property="TextElement.FontWeight" Value="Bold"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Grid.Style>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="60"/>
-                                                    <ColumnDefinition Width="2*"/>
-                                                    <ColumnDefinition Width="2*"/>
-                                                    <ColumnDefinition Width="1.2*"/>
-                                                    <ColumnDefinition Width="1.2*"/>
-                                                    <ColumnDefinition Width="1.6*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding NoText}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding MotherCoil}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding CoilNo}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="3" Text="{Binding WeightKGText}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="4" Text="{Binding WeightTonText}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="5" Text="{Binding DateText}" FontSize="12" Foreground="#666" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
+                        <!-- แถว Coil ของสินค้า: สร้างในโค้ด (BuildCoilRows) ให้ตรงคอลัมน์ / ลำดับ / ความกว้างของตารางหลัก สีเหมือนแถวปกติ -->
+                        <StackPanel Loaded="CoilDetails_Loaded" Unloaded="CoilDetails_Unloaded" Background="White"/>
                     </DataTemplate>
                 </DataGrid.RowDetailsTemplate>
 

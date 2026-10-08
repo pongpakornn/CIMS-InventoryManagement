@@ -768,6 +768,84 @@ namespace CIMS.Views
         {
             if (dgStore.ItemContainerGenerator.ContainerFromItem(p) is DataGridRow row)
                 row.DetailsVisibility = p.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
+            Dispatcher.BeginInvoke(new Action(RebuildCoilPanels), DispatcherPriority.Loaded);
+        }
+
+        // 🧲 แถว Coil ใต้สินค้า = หน้าตาเหมือนแถวปกติของตาราง (คอลัมน์ / ลำดับ / ความกว้าง / สี / ตัวอักษรเดียวกัน)
+        //    PD CODE = เลข Coil · PRODUCT NAME = Coil แม่ · STOCK (KG.) = น้ำหนัก · STOCK (COIL) = 1 · REMARK = TON + วันที่รับ
+        private readonly List<StackPanel> _coilPanels = new List<StackPanel>();
+        private static readonly Brush CoilLine = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5));
+        private bool _coilResizeHooked;
+
+        private void CoilDetails_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is StackPanel sp)) return;
+            if (!_coilPanels.Contains(sp)) _coilPanels.Add(sp);
+            if (sp.Tag == null) { sp.Tag = "hooked"; sp.DataContextChanged += (s, a) => BuildCoilRows(sp); }
+            if (!_coilResizeHooked)
+            {
+                _coilResizeHooked = true;
+                // ความกว้างคอลัมน์เปลี่ยนตามขนาดหน้าจอ -> จัดแถว Coil ให้ตรงคอลัมน์ใหม่
+                dgStore.SizeChanged += (s, a) => Dispatcher.BeginInvoke(new Action(RebuildCoilPanels), DispatcherPriority.Loaded);
+            }
+            BuildCoilRows(sp);
+        }
+
+        private void CoilDetails_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is StackPanel sp) _coilPanels.Remove(sp);
+        }
+
+        private void RebuildCoilPanels()
+        {
+            foreach (var sp in _coilPanels.ToList()) BuildCoilRows(sp);
+        }
+
+        private void BuildCoilRows(StackPanel sp)
+        {
+            sp.Children.Clear();
+            if (!(sp.DataContext is StoreProductModel p) || !p.IsCoilOpen) return;
+            var cols = dgStore.Columns.Where(c => c.Visibility == Visibility.Visible).OrderBy(c => c.DisplayIndex).ToList();
+            var coils = (p.CoilRows ?? new List<CoilRowModel>()).Where(r => !r.IsMother).ToList();
+
+            if (coils.Count == 0)
+            {
+                sp.Children.Add(new Border
+                {
+                    Height = 50, BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Background = Brushes.White,
+                    Child = new TextBlock { Text = "ยังไม่มี Coil ที่ลงทะเบียนของสินค้านี้ (สแกนรับเข้า หรือ Import COIL LIST)", FontSize = 13, FontWeight = FontWeights.Bold,
+                                            Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+                });
+                return;
+            }
+
+            int n = 0;
+            foreach (var c in coils)
+            {
+                n++;
+                var line = new StackPanel { Orientation = Orientation.Horizontal };
+                foreach (var col in cols)
+                    line.Children.Add(new TextBlock
+                    {
+                        Text = CoilCellText(col, c, n),
+                        Width = Math.Max(0, col.ActualWidth),
+                        FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.Black,
+                        TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
+                        VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0)
+                    });
+                sp.Children.Add(new Border { Height = 60, Background = Brushes.White, BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Child = line });
+            }
+        }
+
+        private string CoilCellText(DataGridColumn col, CoilRowModel c, int n)
+        {
+            if (col == colNo) return n.ToString();
+            if (col == colCode) return c.CoilNo;
+            if (col == colName) return "MOTHER COIL : " + (string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil);
+            if (col == colQty) return CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true);
+            if (col == colStockBox) return "1";
+            if (col == colRemark) return $"{c.WeightTonText} TON  •  {c.DateText}";
+            return "";
         }
 
         private void dgStore_LoadingRow(object sender, DataGridRowEventArgs e)
