@@ -34,6 +34,10 @@ namespace CIMS.Helpers
             }
         }
 
+        // Update_20261008b.sql: CIMS.Stocks.ShowCoilRows (กด PD CODE แล้วแสดงแถว Coil ย่อย - ตั้งได้ตอนสร้าง / แก้คลัง)
+        private static bool? _coilRows;
+        public static bool HasCoilRows => _coilRows ?? (_coilRows = ColumnExists("ShowCoilRows")) ?? false;
+
         // Update_20261006d.sql: CIMS.Stocks.ColumnOrder (ลำดับคอลัมน์ตามที่ติ๊กเลือก)
         public static bool HasColumnOrder => _columnOrder ?? (_columnOrder = ColumnExists("ColumnOrder")) ?? false;
 

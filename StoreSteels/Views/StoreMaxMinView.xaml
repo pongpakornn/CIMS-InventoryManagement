@@ -473,6 +473,12 @@
                         <CheckBox x:Name="chkShowCards" Template="{Binding Template, ElementName=chkAutoScroll}" Checked="chkShowCards_Changed" Unchecked="chkShowCards_Changed"/>
                     </StackPanel>
 
+                    <!-- 🧲 เปิดแถว Coil ย่อยของทุกสินค้าค้างไว้ (คลังที่ตั้ง COIL SUB ROWS) -->
+                    <StackPanel x:Name="pnlCoilToggle" Orientation="Horizontal" Visibility="Collapsed">
+                        <TextBlock Text="SHOW COILS :" FontWeight="Bold" Foreground="#373737" VerticalAlignment="Center" Margin="18,0,10,0" FontSize="14"/>
+                        <CheckBox x:Name="chkShowCoils" Template="{Binding Template, ElementName=chkAutoScroll}" Checked="chkShowCoils_Changed" Unchecked="chkShowCoils_Changed"/>
+                    </StackPanel>
+
                     <!-- ⏩ ความเร็วการเลื่อน (ตาราง + การ์ด) ผู้ใช้กรอกตัวเลขเอง 1-200 จำค่าไว้ในเครื่อง -->
                     <TextBlock Text="SPEED :" FontWeight="Bold" Foreground="#373737" VerticalAlignment="Center" Margin="18,0,8,0" FontSize="14"/>
                     <TextBox x:Name="txtScrollSpeed" Width="70" Height="38" Style="{StaticResource CyberInput}" Tag="1-200"

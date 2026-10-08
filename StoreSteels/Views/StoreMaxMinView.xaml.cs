@@ -98,21 +98,56 @@ namespace CIMS.Views
                 },
                 () => !_uiReady);
 
-            if (stock.CountCoil && DbSchema.HasCoilRegister)
+            if (stock.ShowCoilRows && DbSchema.HasCoilRegister)
                 LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
                     () => LiveRefresh.DbToken($"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(CoilID, PartID, Status, WeightKG, MotherCoil)) FROM CIMS.Coils WHERE StockID = {stock.StkId}"),
                     RefreshOpenCoilsAsync,
-                    () => !_uiReady || !_viewModel.Products.Any(p => p.IsCoilOpen));
+                    () => !_uiReady || (!_showAllCoils && !_viewModel.Products.Any(p => p.IsCoilOpen)));
         }
 
-        // แถว Coil ที่เปิดดูอยู่: ดึงรายการ Coil ใหม่ แล้วแสดงต่อ
+        // แถว Coil ที่เปิดดูอยู่: ดึง Coil ทั้งคลังครั้งเดียว แล้วแสดงต่อ (SHOW COILS = เปิดให้สินค้าที่เพิ่งมี Coil ด้วย)
         private async Task RefreshOpenCoilsAsync()
         {
-            var open = _viewModel.Products.Where(p => p.IsCoilOpen).ToList();
-            if (open.Count == 0) return;
+            if (!_showAllCoils && !_viewModel.Products.Any(p => p.IsCoilOpen)) return;
+            await LoadCoilCacheAsync();
+            foreach (var p in _viewModel.Products.ToList())
+            {
+                bool has = _coilsByPart.TryGetValue(p.PartId, out var rows);
+                if (p.IsCoilOpen) p.CoilRows = has ? rows : new List<CoilRowModel>();
+                else if (_showAllCoils && has) { p.CoilRows = rows; p.IsCoilOpen = true; }
+                else continue;
+                if (dgStore.ItemContainerGenerator.ContainerFromItem(p) is DataGridRow r)
+                    r.DetailsVisibility = p.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
+            }
+            RebuildCoilPanels();
+        }
+
+        // 🧲 Coil ทั้งคลัง (ทะเบียน Coil) แยกตามสินค้า - ใช้กับ SHOW COILS และรอบเรียลไทม์
+        private bool _showAllCoils;
+        private Dictionary<int, List<CoilRowModel>> _coilsByPart = new Dictionary<int, List<CoilRowModel>>();
+
+        private async Task LoadCoilCacheAsync()
+        {
             int stkId = _stock.StkId;
-            var fresh = await Task.Run(() => open.Select(p => (p, new CoilService().GetCoilRows(stkId, p.PartId))).ToList());
-            foreach (var (p, rows) in fresh) { p.CoilRows = rows; ShowCoilRows(p); }
+            var all = await Task.Run(() => new CoilService().GetCoils(stkId, 0));
+            _coilsByPart = all.GroupBy(c => c.PartId).ToDictionary(g => g.Key, g => g.ToList());
+        }
+
+        // สวิตช์ SHOW COILS: เปิดแถว Coil ย่อยของทุกสินค้าที่มี Coil ค้างไว้ (จำค่าไว้ในเครื่องนี้)
+        private async void chkShowCoils_Changed(object sender, RoutedEventArgs e)
+        {
+            _showAllCoils = chkShowCoils.IsChecked == true;
+            if (_stock != null) UiPrefs.Set("ShowCoils." + _stock.Code, _showAllCoils);
+            try
+            {
+                if (_showAllCoils) { await RefreshOpenCoilsAsync(); return; }
+                foreach (var p in _viewModel.Products.Where(p => p.IsCoilOpen).ToList())
+                {
+                    p.IsCoilOpen = false;
+                    if (dgStore.ItemContainerGenerator.ContainerFromItem(p) is DataGridRow r) r.DetailsVisibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex) { NotificationManager.Show("COIL", "โหลดรายการ Coil ไม่สำเร็จ\n" + ex.Message, false); }
         }
 
         public StoreMaxMinView(UserSession session, string categoryCode, string filterType) : this(session)
@@ -169,6 +204,8 @@ namespace CIMS.Views
             pnlCardToggle.Visibility = Show(_stock.ColImage);
             chkShowCards.IsChecked = _stock.ColImage && UiPrefs.GetBool("ShowCards." + _stock.Code, true);
             pnlCards.Visibility = Show(chkShowCards.IsChecked == true);
+            pnlCoilToggle.Visibility = Show(_stock.ShowCoilRows && DbSchema.HasCoilRegister && !_stock.IsLiveView);
+            if (pnlCoilToggle.Visibility == Visibility.Visible) chkShowCoils.IsChecked = UiPrefs.GetBool("ShowCoils." + _stock.Code, false);
             UpdateLoadMode();
 
             dgStore.Loaded += (s, e) => ApplyColumnSettings();
@@ -819,6 +856,18 @@ namespace CIMS.Views
                 return;
             }
 
+            // หัวคอลัมน์ของแถว Coil = รูปแบบเดียวกับหัวตาราง (พื้น MainPurple ตัวขาวหนา กึ่งกลาง)
+            var head = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var col in cols)
+                head.Children.Add(new TextBlock
+                {
+                    Text = CoilHeadText(col), Width = Math.Max(0, col.ActualWidth),
+                    FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White,
+                    TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
+                    VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0)
+                });
+            sp.Children.Add(new Border { Height = 44, Background = (Brush)FindResource("MainPurple"), BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Child = head });
+
             int n = 0;
             foreach (var c in coils)
             {
@@ -837,20 +886,38 @@ namespace CIMS.Views
             }
         }
 
+        // คอลัมน์ของแถว Coil ตามที่คลังตั้งไว้ (EDIT STOCK -> COIL SUB ROW COLUMNS)
+        private bool Sub(string key) => _stock?.CoilRowShows(key) ?? true;
+
+        private string CoilHeadText(DataGridColumn col)
+        {
+            if (col == colNo) return "NO.";
+            if (col == colCode) return Sub("COILNO") ? "COIL NO." : "";
+            if (col == colName) return Sub("MOTHER") ? "MOTHER COIL" : "";
+            if (col == colQty) return Sub("WEIGHT") ? "WEIGHT (KG.)" : "";
+            if (col == colStockBox) return Sub("COIL") ? "STOCK (COIL)" : "";
+            if (col == colRemark) return string.Join("  •  ", new[] { Sub("TON") ? "WEIGHT (TON)" : null, Sub("RECEIVED") ? "RECEIVED" : null }.Where(x => x != null));
+            return "";
+        }
+
         private string CoilCellText(DataGridColumn col, CoilRowModel c, int n)
         {
             if (col == colNo) return n.ToString();
-            if (col == colCode) return c.CoilNo;
-            if (col == colName) return "MOTHER COIL : " + (string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil);
-            if (col == colQty) return CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true);
-            if (col == colStockBox) return "1";
-            if (col == colRemark) return $"{c.WeightTonText} TON  •  {c.DateText}";
+            if (col == colCode) return Sub("COILNO") ? c.CoilNo : "";
+            if (col == colName) return Sub("MOTHER") ? (string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil) : "";
+            if (col == colQty) return Sub("WEIGHT") ? CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true) : "";
+            if (col == colStockBox) return Sub("COIL") ? "1" : "";
+            if (col == colRemark)
+                return string.Join("  •  ", new[] { Sub("TON") ? c.WeightTonText + " TON" : null, Sub("RECEIVED") ? (c.ReceivedDate?.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "-") : null }.Where(x => x != null));
             return "";
         }
 
         private void dgStore_LoadingRow(object sender, DataGridRowEventArgs e)
         {
             if (e.Row.Item != null) _rowMap[e.Row.Item] = e.Row;
+            // SHOW COILS: แถวที่เพิ่งโหลด / เลื่อนมาเห็น -> เปิดแถว Coil ให้เอง (เฉพาะสินค้าที่มี Coil)
+            if (_showAllCoils && e.Row.Item is StoreProductModel np && !np.IsCoilOpen && _coilsByPart != null && _coilsByPart.TryGetValue(np.PartId, out var npc))
+            { np.CoilRows = npc; np.IsCoilOpen = true; }
             // แถวถูกใช้ซ้ำ (Recycling) -> เปิด / ปิด Coil ตามสินค้าของแถวนั้น
             e.Row.DetailsVisibility = e.Row.Item is StoreProductModel sp && sp.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -858,7 +925,7 @@ namespace CIMS.Views
         // คลังที่นับ Coil: กด PD CODE -> เปิด / ปิด Coil แม่ / Coil ลูก ใต้แถวสินค้านั้น
         private async void dgStore_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_stock == null || !_stock.CountCoil || !DbSchema.HasCoilRegister) return;
+            if (_stock == null || !_stock.ShowCoilRows || !DbSchema.HasCoilRegister) return;
 
             // DataGrid จับเมาส์ไว้ตอนเลือกเซลล์ -> OriginalSource เป็นตัวตาราง: หาเซลล์จากจุดที่กดแทน
             var dep = VisualTreeHelper.HitTest(dgStore, e.GetPosition(dgStore))?.VisualHit;

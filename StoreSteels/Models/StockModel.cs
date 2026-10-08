@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Linq;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -43,6 +45,14 @@ namespace CIMS.Models
         // STOCK (COIL) - คลัง KG: สแกนเข้า 1 ครั้ง = +1 Coil / ออก = -1 / เศษ = ไม่นับ (ยอด KG ตามที่สแกน)
         //   ใช้ช่องเดียวกับ STOCK (BOX) แต่ไม่คำนวณจาก Pack Size - คลังที่นับ Coil แสดงคอลัมน์นี้เสมอ
         public bool CountCoil { get; set; }
+        // กด PD CODE แล้วแสดงแถว Coil ย่อย: null = ตาม STOCK (COIL) / ตั้งเองได้ที่หน้าสร้าง / แก้คลัง
+        public bool? ShowCoilRowsSetting { get; set; }
+        public bool ShowCoilRows => CountCoil && (ShowCoilRowsSetting ?? true);
+        // คอลัมน์ของแถว Coil ย่อย: COILNO, MOTHER, WEIGHT, COIL, TON, RECEIVED (null = แสดงทั้งหมด)
+        public static readonly string[] CoilRowKeys = { "COILNO", "MOTHER", "WEIGHT", "COIL", "TON", "RECEIVED" };
+        public string CoilRowColumns { get; set; }
+        public bool CoilRowShows(string key) =>
+            string.IsNullOrWhiteSpace(CoilRowColumns) || CoilRowColumns.Split(',').Any(k => string.Equals(k.Trim(), key, StringComparison.OrdinalIgnoreCase));
         public string BoxHeader => CountCoil ? "STOCK (COIL)" : "STOCK (BOX)";
         public bool ShowBoxColumn => ColStockBox || CountCoil;
 
