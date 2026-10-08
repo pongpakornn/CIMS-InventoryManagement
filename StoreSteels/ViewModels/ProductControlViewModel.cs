@@ -208,6 +208,20 @@ namespace CIMS.ViewModels
             }
         }
 
+        // ⚡ เรียลไทม์: โหลดใหม่เท่าจำนวนแถวที่แสดงอยู่ (ไม่ย่อกลับเหลือ 100) + คงรายการที่ติ๊กไว้ - ไม่ขึ้นหน้าต่าง Error
+        public async Task LiveReloadAsync(string keyword)
+        {
+            int count = Math.Max(PageSize, Products.Count);
+            var ticked = new HashSet<int>(Products.Where(p => p.IsSelected && p.PtId > 0).Select(p => p.PtId));
+            var data = await Task.Run(() => _qrService.GetInventoryForQR(keyword?.Trim(), FilterStkId));
+            var paged = data.Take(count).ToList();
+            foreach (var p in paged) if (ticked.Contains(p.PtId)) p.IsSelected = true;
+            Products.Clear();
+            foreach (var item in paged) Products.Add(item);
+            if (GroupedProducts == null) InitializeGrouping(); else GroupedProducts.Refresh();
+            _currentOffset = paged.Count;
+        }
+
         // 🎯 ✅ แก้ไขระบบ UPDATE ใน ViewModel เพื่อดึงและแนบข้อมูล CustomerCode, ModelCode, PartNo ส่งเข้าหลังบ้านครบทุกตัว
         public async Task<bool> UpdateProductAsync(ProductControlModel model, string oldACode)
         {

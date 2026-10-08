@@ -29,6 +29,11 @@ namespace CIMS.Views
 
             Loaded += async (s, e) => await LoadStocksAsync();
             RunEntryAnimation();
+
+            // ⚡ เรียลไทม์: เครื่องอื่นเพิ่ม / แก้ / ลบคลัง -> การ์ดอัพเดทเอง
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                () => LiveRefresh.DbToken("SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Stocks"),
+                () => LoadStocksAsync(true));
         }
 
         // ข้อมูลที่การ์ด 1 ใบใช้ (คลัง + ปุ่มที่ผู้ใช้คนนี้มีสิทธิ์)
@@ -41,7 +46,7 @@ namespace CIMS.Views
             public Brush AccentBrush => (Brush)Application.Current.FindResource(Stock.IsMain ? "MainPurple" : "AccentPurple");
         }
 
-        private async Task LoadStocksAsync()
+        private async Task LoadStocksAsync(bool live = false)
         {
             try
             {
@@ -60,6 +65,7 @@ namespace CIMS.Views
             }
             catch (Exception ex)
             {
+                if (live) throw;   // รอบเรียลไทม์: ไม่ขึ้นหน้าต่าง Error (ลองใหม่รอบหน้า)
                 DialogHelper.ShowError("ไม่สามารถโหลดรายชื่อคลังได้\n" + ex.Message);
             }
         }

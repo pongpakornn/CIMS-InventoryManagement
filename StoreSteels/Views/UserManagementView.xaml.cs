@@ -28,6 +28,12 @@ namespace CIMS.Views
             btnImport.Visibility = session?.CanAddUser == true && session.CanEditUser ? Visibility.Visible : Visibility.Collapsed;
             btnTemplate.Visibility = btnImport.Visibility;
             Loaded += async (s, e) => await ReloadAsync();
+
+            // ⚡ เรียลไทม์: เครื่องอื่นเพิ่ม / แก้ / ล็อกผู้ใช้ / สิทธิ์ / ออนไลน์ -> อัพเดทเอง (คงคำค้นไว้)
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                () => LiveRefresh.DbToken("SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Users",
+                                          "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Permissions"),
+                async () => { _all = await Task.Run(() => _service.GetUsers()); ApplyFilter(); });
         }
 
         private async Task ReloadAsync()

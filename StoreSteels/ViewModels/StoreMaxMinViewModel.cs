@@ -238,6 +238,34 @@ namespace CIMS.ViewModels
 
         #endregion
 
+        // ⚡ เรียลไทม์ (โครงตาราง): เครื่องอื่นเพิ่ม / ลบสินค้า / แก้ชื่อ รหัส กลุ่ม รูป BIN -> โหลดใหม่เท่าจำนวนแถวที่แสดงอยู่
+        //    คงคำค้น / CATEGORY / ตัวกรอง MAX-MIN / แถว Coil ที่เปิดไว้ - กำลังแก้ REMARK หรือกำลังโหลดอยู่ = ข้ามรอบนี้
+        //    คืน true = โหลดใหม่แล้ว
+        public async Task<bool> LiveReloadAsync(string searchKeyword)
+        {
+            if (_isLoading || Products.Any(p => p.IsRemarkEditing)) return false;
+            int ver = ++_loadVersion;
+            int take = LoadAllMode ? 1000000 : Math.Max(50, Products.Count);
+            string catFilter = IsAll(SelectedCategory) ? "" : SelectedCategory;
+            string filterType = SelectedFilterType;
+            var stock = Stock;
+            var open = new HashSet<int>(Products.Where(p => p.IsCoilOpen).Select(p => p.PartId));
+            _isLoading = true;
+            try
+            {
+                var data = await Task.Run(() => _service.GetProducts(stock, searchKeyword, catFilter, filterType, 0, take)) ?? new List<StoreProductModel>();
+                if (ver != _loadVersion || Products.Any(p => p.IsRemarkEditing)) return false;
+                foreach (var d in data) if (open.Contains(d.PartId)) d.IsCoilOpen = true;
+                Products.ReplaceAll(data);
+                _currentOffset = data.Count;
+                _hasMoreData = !LoadAllMode && data.Count >= take;
+                _changeToken = null;
+                RenumberGroups();
+                return true;
+            }
+            finally { if (ver == _loadVersion) _isLoading = false; }
+        }
+
         // No. ในแต่ละกลุ่ม: นับ 1.. ใหม่ทุกกลุ่ม ตามลำดับในตาราง (ข้อมูลเรียงตาม GroupKey, PartCode มาจาก SQL)
         private void RenumberGroups()
         {

@@ -39,6 +39,33 @@
 
                 LoadStocks();
                 RunEntryAnimation();
+
+                // ⚡ เรียลไทม์: เครื่องอื่นลงทะเบียน / แก้ / ลบสินค้า -> ตารางอัพเดทเอง (คงคำค้น / คลังที่กรอง / ที่ติ๊ก / ตำแหน่งเลื่อน)
+                //    ดูเฉพาะข้อมูลที่หน้านี้แสดง (ยอดคงคลังเปลี่ยนจากการสแกนไม่ทำให้โหลดใหม่)
+                LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                    () => LiveRefresh.DbToken(
+                        @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, PackSize, Bin, QRCode, Category, Supplier, Customer,
+                                                                 PartA, PartNumber, Model, ImageFileName, IsActive, IsShowInMaster)) FROM CIMS.Parts",
+                        "SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, StockID, IsShow)) FROM CIMS.PartStocks"),
+                    async () =>
+                    {
+                        var sv = FindScroll(dgQRHistory);
+                        double y = sv?.VerticalOffset ?? 0;
+                        await _viewModel.LiveReloadAsync(txtSearch.Text);
+                        if (sv != null && y > 0) { dgQRHistory.UpdateLayout(); sv.ScrollToVerticalOffset(y); }
+                    });
+            }
+
+            private static ScrollViewer FindScroll(DependencyObject root)
+            {
+                for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+                {
+                    var c = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+                    if (c is ScrollViewer sv) return sv;
+                    var r = FindScroll(c);
+                    if (r != null) return r;
+                }
+                return null;
             }
 
             #region === [ PACKSIZE : ใส่ได้เฉพาะตัวเลข ] ===

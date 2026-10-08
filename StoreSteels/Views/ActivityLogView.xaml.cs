@@ -52,6 +52,24 @@ namespace CIMS.Views
                 await LoadPage(0);
             };
             Unloaded += (s, e) => { _cts?.Cancel(); _searchTimer?.Stop(); };
+
+            // ⚡ เรียลไทม์: Log ใหม่จากทุกเครื่องขึ้นเอง - เฉพาะตอนดูหน้าแรกอยู่บนสุด (กำลังเลื่อนอ่าน / หน้าอื่น = ไม่ดึงทับ)
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                () => LiveRefresh.DbToken("SELECT MAX(LogID), COUNT_BIG(*) FROM CIMS.SystemLogs"),
+                () => LoadPage(0),
+                () => !_ready || _page != 0 || ScrollOffset(dgLog) > 0.5);
+        }
+
+        private static double ScrollOffset(DependencyObject root)
+        {
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                var c = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+                if (c is ScrollViewer sv) return sv.VerticalOffset;
+                double v = ScrollOffset(c);
+                if (v >= 0) return v;
+            }
+            return -1;
         }
 
         private ActivityLogFilter BuildFilter()

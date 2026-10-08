@@ -50,6 +50,26 @@ namespace CIMS.Views
             btnImport.Visibility = session?.CanImportForecastOrder == true ? Visibility.Visible : Visibility.Collapsed;
             btnTemplate.Visibility = btnImport.Visibility;   // Template ใช้คู่กับปุ่ม Import
             Loaded += async (s, e) => { if (!_ready) await LoadMonthsAsync(); };
+
+            // ⚡ เรียลไทม์: เครื่องอื่น Import Forecast / Order / Delivery / วันทำงาน -> เดือน / กราฟ / ตารางอัพเดทเอง (คงเดือนที่เลือก + คำค้น)
+            //    กำลังเลื่อนอ่านตารางอยู่ = รอจนกลับขึ้นบนสุด
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(8),
+                () => LiveRefresh.DbToken("SELECT MAX(ImportID), COUNT_BIG(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.ForecastOrderImports",
+                                          "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.CustomerWorkdays"),
+                () => LoadMonthsAsync(SelectedMonth),
+                () => !_ready || _loading || ScrollY(dgRows) > 0.5);
+        }
+
+        private static double ScrollY(DependencyObject root)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                var c = VisualTreeHelper.GetChild(root, i);
+                if (c is ScrollViewer sv) return sv.VerticalOffset;
+                double v = ScrollY(c);
+                if (v >= 0) return v;
+            }
+            return -1;
         }
 
         private DateTime? SelectedMonth => (cbMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?;

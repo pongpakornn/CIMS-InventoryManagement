@@ -58,6 +58,25 @@ namespace CIMS.Views
             Loaded += (s, e) => LoadStocks();
             // คอลัมน์แบบ * กองรวมกันตอนเปิดหน้า (ตารางวัดความกว้างก่อนหน้าจอพร้อม) -> คำนวณความกว้างใหม่เมื่อขนาดเปลี่ยน
             dgCalc.SizeChanged += (s, e) => { if (e.WidthChanged) FitColumns(); };
+
+            // ⚡ เรียลไทม์: เครื่องอื่นคำนวณ / ตั้งวัน / ตั้งสูตร / Import Forecast / ยอด MAX-MIN เปลี่ยน -> ตารางอัพเดทเอง
+            //    กำลังแก้แถวในฟอร์มอยู่ = รอจนปิดฟอร์ม
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(8),
+                () =>
+                {
+                    var st = _stock;
+                    if (st == null) return "";
+                    return LiveRefresh.DbToken(
+                        "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.MaxMinPartConfigs",
+                        "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.MaxMinFormulas",
+                        "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.MaxMinStockSettings",
+                        "SELECT MAX(ImportID), COUNT_BIG(*) FROM CIMS.ForecastOrderImports",
+                        "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.CustomerWorkdays",
+                        st.IsMain ? "SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, MaxQuantity, MinQuantity, PackSize, IsShowInMaster, Customer, Description)) FROM CIMS.Parts"
+                                  : $"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, MaxQuantity, MinQuantity, IsShow)) FROM CIMS.PartStocks WHERE StockID = {st.StkId}") + st.StkId;
+                },
+                () => ReloadAsync(true),
+                () => _editing != null || _stock == null);
         }
 
         #region === [ คลัง / สูตร ] ===
@@ -86,11 +105,15 @@ namespace CIMS.Views
             await ReloadAsync();
         }
 
-        private async Task ReloadAsync()
+        // live = รอบเรียลไทม์: คงจำนวนแถวที่แสดง + ตำแหน่งเลื่อน / ไม่ขึ้นหน้าต่าง Error
+        private async Task ReloadAsync(bool live = false)
         {
             if (_stock == null) return;
             var stock = _stock;
             string key = txtSearch.Text;
+            int keepShown = live ? Math.Max(FirstPage, _shown.Count) : FirstPage;
+            var sv = live ? FindScroll(dgCalc) : null;
+            double keepY = sv?.VerticalOffset ?? 0;
             try
             {
                 var (formulas, setting, rows, month) = await Task.Run(() =>
@@ -111,7 +134,7 @@ namespace CIMS.Views
                 foreach (var g in _all.GroupBy(r => r.GroupKey)) { int n = 0; foreach (var r in g) r.No = ++n; }
 
                 _shown.Clear();
-                foreach (var r in _all.Take(FirstPage)) _shown.Add(r);
+                foreach (var r in _all.Take(keepShown)) _shown.Add(r);
                 txtEmpty.Visibility = _all.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                 txtCount.Text = $"{_all.Count:N0} ITEMS";
 
@@ -123,11 +146,25 @@ namespace CIMS.Views
                 txtLast.Text = (month.HasValue ? "ORDER : " + month.Value.ToString("MMM yyyy", inv).ToUpperInvariant() : "NO ORDER IMPORTED")
                              + "   •   LAST CALC : " + (_setting.LastCalc.HasValue ? _setting.LastCalc.Value.ToString("dd MMM yyyy HH:mm", inv).ToUpperInvariant() : "-");
                 FitColumns();
+                if (sv != null && keepY > 0) { dgCalc.UpdateLayout(); sv.ScrollToVerticalOffset(keepY); }
             }
             catch (Exception ex)
             {
+                if (live) throw;   // รอบเรียลไทม์: ลองใหม่รอบหน้า (ไม่ขึ้นหน้าต่าง)
                 DialogHelper.ShowError("โหลดข้อมูล Max-Min Calculator ไม่สำเร็จ\n" + ex.Message + "\n\n(ตรวจสอบว่ารัน Database/MaxMinCalc.sql แล้ว)");
             }
+        }
+
+        private static ScrollViewer FindScroll(DependencyObject root)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                var c = VisualTreeHelper.GetChild(root, i);
+                if (c is ScrollViewer sv) return sv;
+                var r = FindScroll(c);
+                if (r != null) return r;
+            }
+            return null;
         }
 
         // เลื่อนใกล้ล่างสุด -> แสดงเพิ่มอีก 10 แถว จนครบ

@@ -84,6 +84,29 @@ namespace CIMS.ViewModels
             }
         }
 
+        // ⚡ เรียลไทม์ (1) เครื่องอื่นพิมพ์ไปแล้ว (CIMS.PickListPrintLogs) -> ตัดออกจากรายการนี้ทันที
+        public void RemovePrinted(HashSet<string> printedKeys)
+        {
+            var gone = _allItems.Where(x => printedKeys.Contains(PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo))).ToList();
+            if (gone.Count > 0) RemoveItems(gone);
+        }
+
+        // ⚡ เรียลไทม์ (2) รายการใหม่จาก ERP (อ่านอย่างเดียว นาทีละครั้ง) - ข้อมูลเปลี่ยนจริงค่อยแสดงใหม่ (คงคำค้น)
+        public static string Signature(List<PackingCardModel> list) =>
+            list.Count + "|" + string.Join(",", list.Select(x => PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo) + ":" + x.Qty.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                                .GetHashCode().ToString();
+
+        public List<PackingCardModel> FetchPending() => _erpService.GetPendingPackingCards();
+
+        public void ApplyLive(List<PackingCardModel> data)
+        {
+            if (data == null || Signature(data) == Signature(_allItems)) return;
+            _allItems = data;
+            ApplyFilter();
+        }
+
+        public bool HasSelection => VisibleItems.Any(x => x.IsSelected);
+
         // 🔎 ค้นหาได้ทุกช่อง (Bill No / Item / Group / Material / Work Order / Lot / Job / Qty / วันที่) พิมพ์แล้วกรองทันที
         //    หลายคำคั่นด้วยช่องว่าง = ต้องเจอครบทุกคำ / เรียงที่ใกล้เคียงที่สุดก่อน (ตรงเป๊ะ > ขึ้นต้นด้วย > มีอยู่ข้างใน)
         //    กรองบน Thread เบื้องหลัง + ยกเลิกรอบเก่าเมื่อพิมพ์ต่อ หน้าจอจึงไม่ค้าง

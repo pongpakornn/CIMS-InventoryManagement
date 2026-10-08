@@ -32,6 +32,37 @@ namespace CIMS.Views
             _viewModel.GroupedItems.CollectionChanged += (s, e) => { UpdateItemCountText(); RefitColumns(); };
 
             RunEntryAnimation();
+
+            // ⚡ เรียลไทม์ (1): เครื่องอื่นพิมพ์ Pick List แล้ว -> รายการนั้นหายจากหน้านี้เอง (ดูจาก CIMS ทุก 5 วินาที)
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                () => LiveRefresh.DbToken("SELECT MAX(PrintID), COUNT_BIG(*) FROM CIMS.PickListPrintLogs"),
+                async () =>
+                {
+                    var keys = await System.Threading.Tasks.Task.Run(() => _printLogService.GetPrintedKeys());
+                    _viewModel.RemovePrinted(keys);
+                    UpdateItemCountText();
+                },
+                () => _viewModel.IsLoading);
+
+            // ⚡ เรียลไทม์ (2): รายการใหม่จาก ERP (อ่านอย่างเดียว นาทีละครั้ง) - ข้อมูลเปลี่ยนจริงค่อยแสดงใหม่
+            //    ติ๊กเลือกไว้ / เลื่อนลงไปอ่าน = รอก่อน ไม่แสดงทับ
+            List<PackingCardModel> fresh = null;
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(60),
+                () => { fresh = _viewModel.FetchPending(); return PackingCardViewModel.Signature(fresh); },
+                () => { _viewModel.ApplyLive(fresh); UpdateItemCountText(); },
+                () => _viewModel.IsLoading || _viewModel.HasSelection || ScrollY(dgPackingCards) > 0.5);
+        }
+
+        private static double ScrollY(DependencyObject root)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                var c = VisualTreeHelper.GetChild(root, i);
+                if (c is ScrollViewer sv) return sv.VerticalOffset;
+                double v = ScrollY(c);
+                if (v >= 0) return v;
+            }
+            return -1;
         }
 
         private void UpdateItemCountText()

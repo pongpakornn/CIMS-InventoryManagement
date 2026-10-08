@@ -70,6 +70,49 @@ namespace CIMS.Views
             };
 
             RunEntryAnimation();
+            AttachLiveStructure();
+        }
+
+        // ⚡ เรียลไทม์ส่วนที่เพิ่ม (ตัวเลขยอด / MAX / MIN ใช้รอบ 3 วินาทีเดิม):
+        //   (1) โครงตาราง - เครื่องอื่นเพิ่ม / ลบสินค้า แก้ชื่อ รหัส กลุ่ม รูป BIN -> โหลดใหม่ คงตำแหน่งเลื่อน + แถว Coil ที่เปิดไว้
+        //   (2) ทะเบียน Coil - Coil เข้า / ออก / ย้าย -> แถว Coil ที่เปิดดูอยู่อัพเดทเอง
+        private void AttachLiveStructure()
+        {
+            if (_stock == null || _stock.IsLiveView) return;
+            var stock = _stock;
+            string sql = stock.IsMain
+                ? @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, Category, Customer, Supplier, PartA, PartNumber, Model, Bin,
+                                                         ImageFileName, IsShowInMaster, IsActive)) FROM CIMS.Parts WHERE IsShowInMaster = 1"
+                : $@"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(ps.PartID, ps.IsShow, p.PartCode, p.Description, p.Category, p.Customer, p.Supplier, p.PartA,
+                                                          p.PartNumber, p.Model, p.Bin, p.ImageFileName, p.IsActive))
+                     FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = {stock.StkId}";
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                () => LiveRefresh.DbToken(sql),
+                async () =>
+                {
+                    var sv = GetVisualChild<ScrollViewer>(dgStore);
+                    double y = sv?.VerticalOffset ?? 0;
+                    if (!await _viewModel.LiveReloadAsync(txtSearch.Text)) return;
+                    if (sv != null && y > 0 && chkAutoScroll.IsChecked != true) { dgStore.UpdateLayout(); sv.ScrollToVerticalOffset(y); }
+                    await RefreshOpenCoilsAsync();
+                },
+                () => !_uiReady);
+
+            if (stock.CountCoil && DbSchema.HasCoilRegister)
+                LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                    () => LiveRefresh.DbToken($"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(CoilID, PartID, Status, WeightKG, MotherCoil)) FROM CIMS.Coils WHERE StockID = {stock.StkId}"),
+                    RefreshOpenCoilsAsync,
+                    () => !_uiReady || !_viewModel.Products.Any(p => p.IsCoilOpen));
+        }
+
+        // แถว Coil ที่เปิดดูอยู่: ดึงรายการ Coil ใหม่ แล้วแสดงต่อ
+        private async Task RefreshOpenCoilsAsync()
+        {
+            var open = _viewModel.Products.Where(p => p.IsCoilOpen).ToList();
+            if (open.Count == 0) return;
+            int stkId = _stock.StkId;
+            var fresh = await Task.Run(() => open.Select(p => (p, new CoilService().GetCoilRows(stkId, p.PartId))).ToList());
+            foreach (var (p, rows) in fresh) { p.CoilRows = rows; ShowCoilRows(p); }
         }
 
         public StoreMaxMinView(UserSession session, string categoryCode, string filterType) : this(session)
