@@ -134,6 +134,27 @@ namespace CIMS.Models
             return true;
         }
 
+        // 🧲 ทะเบียน Coil: ช่องเลข Coil ลูก (เช่น #1 CWE0885B-006) / Coil แม่ (เช่น #11 CWE0885B) - null = รูปแบบนี้ไม่มีเลข Coil
+        public int? CoilNoPos { get; set; }
+        public int? MotherCoilPos { get; set; }
+        public bool HasCoilNo => CoilNoPos.HasValue && CoilNoPos.Value > 0;
+
+        // เลข Coil ลูก / แม่ จากป้าย (ไม่มี = null) - ใช้หลัง TryParse ผ่านแล้ว
+        public void ReadCoil(string raw, out string coilNo, out string motherCoil)
+        {
+            coilNo = null; motherCoil = null;
+            if (!HasCoilNo && !(MotherCoilPos > 0)) return;
+            var fields = SplitFields(raw);
+            string F(int? pos)
+            {
+                if (!(pos > 0) || pos.Value > fields.Length) return null;
+                string v = fields[pos.Value - 1].Trim();
+                return v.Length == 0 || v == "-" ? null : v.ToUpperInvariant();
+            }
+            coilNo = F(CoilNoPos);
+            motherCoil = F(MotherCoilPos);
+        }
+
         private void AddCode(List<string> codes, string[] fields, int pos)
         {
             if (pos < 1 || pos > fields.Length) return;

@@ -267,6 +267,54 @@ namespace CIMS.Services
                             }
                         }
 
+                        // 4b) 🧲 ทะเบียน Coil ของรายการนี้: ยกเลิก = ย้อนกลับ (ลูกที่สร้างใหม่ = ลบ / ลูกที่ย้ายมา = คืนคลังเดิม / จ่ายออก = กลับเข้าคลัง)
+                        //     แก้จำนวน = น้ำหนักของลูกนั้นตามจำนวนใหม่
+                        if (CIMS.Helpers.DbSchema.HasCoilRegister)
+                        {
+                            if (newQty.HasValue)
+                            {
+                                using (var cmd = new SqlCommand(@"UPDATE c SET c.WeightKG = @w, c.UpdatedDate = GETDATE() FROM CIMS.Coils c
+                                                                  WHERE c.Status = 'IN' AND c.CoilID IN (SELECT CoilID FROM CIMS.CoilMoves WHERE ScanTransactionID = @tx AND Undone = 0 AND ToStatus = 'IN')", conn, trans))
+                                {
+                                    cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@w", newQty.Value));
+                                    cmd.Parameters.AddWithValue("@tx", txId);
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                            else
+                            {
+                                var moves = new List<(int MoveId, int CoilId, string Action, int? FromStock, int? FromPart, string FromStatus, decimal? FromWeight)>();
+                                using (var cmd = new SqlCommand("SELECT MoveID, CoilID, Action, FromStockID, FromPartID, FromStatus, FromWeightKG FROM CIMS.CoilMoves WHERE ScanTransactionID = @tx AND Undone = 0 ORDER BY MoveID DESC", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@tx", txId);
+                                    using (var r = cmd.ExecuteReader())
+                                        while (r.Read())
+                                            moves.Add((r.GetInt32(0), r.GetInt32(1), r.GetString(2),
+                                                       r.IsDBNull(3) ? (int?)null : r.GetInt32(3), r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                                                       r.IsDBNull(5) ? null : r.GetString(5), r.IsDBNull(6) ? (decimal?)null : r.GetDecimal(6)));
+                                }
+                                foreach (var m in moves)
+                                {
+                                    string sql = m.Action == "CREATE"
+                                        ? @"DELETE FROM CIMS.CoilMoves WHERE CoilID = @c; DELETE FROM CIMS.Coils WHERE CoilID = @c;"
+                                        : @"UPDATE CIMS.Coils SET StockID = @fs, PartID = @fp, Status = @fst, WeightKG = ISNULL(@fw, WeightKG),
+                                                   OutDate = CASE WHEN @fst = 'OUT' THEN OutDate ELSE NULL END, UpdatedDate = GETDATE() WHERE CoilID = @c;
+                                           UPDATE CIMS.CoilMoves SET Undone = 1 WHERE MoveID = @m;";
+                                    using (var cmd = new SqlCommand(sql, conn, trans))
+                                    {
+                                        cmd.Parameters.AddWithValue("@c", m.CoilId);
+                                        cmd.Parameters.AddWithValue("@m", m.MoveId);
+                                        cmd.Parameters.AddWithValue("@fs", (object)m.FromStock ?? DBNull.Value);
+                                        cmd.Parameters.AddWithValue("@fp", (object)m.FromPart ?? DBNull.Value);
+                                        cmd.Parameters.AddWithValue("@fst", (object)m.FromStatus ?? "IN");
+                                        cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@fw", m.FromWeight));
+                                        cmd.ExecuteNonQuery();
+                                    }
+                                }
+                                if (moves.Count > 0) sourceNote = (sourceNote == null ? "" : sourceNote + " | ") + $"ย้อนทะเบียน Coil {moves.Count} รายการ";
+                            }
+                        }
+
                         // 5) บันทึกรายการ + ประวัติการปรับ
                         string note = (newQty.HasValue ? $"EDIT QTY {CIMS.Helpers.Qty.Plain(oldQty)} -> {CIMS.Helpers.Qty.Plain(newQty.Value)}" : "CANCELLED")
                                       + $" by {userId} {DateTime.Now:dd/MM/yyyy HH:mm} : {reason.Trim()}";

@@ -116,6 +116,7 @@ namespace CIMS.Views
             btnOverMax.Visibility = Show(_stock.UseMaxMin);
             btnUnderMin.Visibility = Show(_stock.UseMaxMin);
             btnImport.Visibility = Show(_session != null && _session.CanImportStock(_stock));
+            btnCoilTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && _stock.CountCoil && DbSchema.HasCoilRegister && !_stock.IsLiveView);
 
             // ความเร็วการเลื่อน + การ์ดสินค้า (เฉพาะคลังที่แสดงรูปภาพ) จำค่าไว้ในเครื่องนี้
             // ค่าเดิม (ระดับ 1-5) -> แปลงเป็นตัวเลขความเร็วครั้งแรก
@@ -232,6 +233,15 @@ namespace CIMS.Views
             catch (Exception ex) { DialogHelper.ShowError("อ่านไฟล์ Excel ไม่สำเร็จ\n" + ex.Message); return; }
             if (master) { await ImportMasterFile(dlg.FileName); return; }
 
+            // ไฟล์ COIL LIST (PRODUCT CODE + COIL NO + WEIGHT) ของคลังที่นับ Coil
+            if (_stock.CountCoil && DbSchema.HasCoilRegister)
+            {
+                bool coilFile;
+                try { coilFile = await Task.Run(() => CoilImportService.IsCoilFile(dlg.FileName)); }
+                catch (Exception ex) { DialogHelper.ShowError("อ่านไฟล์ Excel ไม่สำเร็จ\n" + ex.Message); return; }
+                if (coilFile) { await ImportCoilFile(dlg.FileName); return; }
+            }
+
             var service = new StockService();
             List<StockImportRow> rows;
             try
@@ -273,6 +283,55 @@ namespace CIMS.Views
             {
                 DialogHelper.ShowError("นำเข้าข้อมูลไม่สำเร็จ (ยกเลิกทั้งไฟล์ ไม่มีรายการใดถูกบันทึก)\n" + ex.Message);
             }
+        }
+
+        // 📥 Import COIL LIST: ลงทะเบียน Coil ลูก / Coil แม่ / น้ำหนัก -> STOCK (COIL) นับใหม่จากทะเบียน (KG ไม่เปลี่ยน)
+        private async Task ImportCoilFile(string file)
+        {
+            var svc = new CoilImportService();
+            List<CoilImportRow> rows;
+            var stock = _stock;
+            try { rows = await Task.Run(() => svc.Read(file, stock)); }
+            catch (Exception ex) { DialogHelper.ShowError("อ่านไฟล์ Excel ไม่สำเร็จ\n" + ex.Message); return; }
+
+            var valid = rows.Where(r => r.IsValid).ToList();
+            var bad = rows.Where(r => !r.IsValid).ToList();
+            string errs = string.Join("\n", bad.Take(8).Select(r => $"• แถว {r.RowNumber}: {r.Error}")) + (bad.Count > 8 ? $"\n• ... และอีก {bad.Count - 8:N0} แถว" : "");
+            if (valid.Count == 0) { DialogHelper.ShowError("ไม่พบรายการที่นำเข้าได้ในไฟล์นี้\n\n" + errs); return; }
+
+            string summary = $"ไฟล์: {System.IO.Path.GetFileName(file)}\nคลัง: {_stock.Code}\n\n" +
+                             $"COIL ใหม่ {valid.Count(r => !r.IsUpdate):N0} ลูก  •  อัพเดท COIL เดิม {valid.Count(r => r.IsUpdate):N0} ลูก\n" +
+                             $"สินค้า {valid.Select(r => r.PartId).Distinct().Count():N0} รายการ  •  น้ำหนักรวม {valid.Sum(r => r.WeightKG):#,##0.###} KG\n" +
+                             "STOCK (COIL) ของสินค้าในไฟล์ = นับใหม่จากทะเบียน Coil (ยอด KG ไม่เปลี่ยน)" +
+                             (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{errs}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?";
+            if (!DialogHelper.ShowConfirm(summary, "CONFIRM IMPORT")) return;
+
+            try
+            {
+                string user = _session.UserId;
+                var r = await Task.Run(() => svc.Apply(stock, rows, user));
+                LogService.WriteLog(_session.UserId, "COIL_IMPORT",
+                    $"Import COIL LIST -> {_stock.Code} | File: {System.IO.Path.GetFileName(file)} | Added: {r.Added} | Updated: {r.Updated} | Products: {r.Parts} | Skipped rows: {bad.Count}", _stock.Code);
+                DialogHelper.ShowSuccess($"นำเข้า COIL สำเร็จ\nCOIL ใหม่ {r.Added:N0} ลูก  •  อัพเดท {r.Updated:N0} ลูก  •  สินค้า {r.Parts:N0} รายการ");
+                _viewModel.LoadData(txtSearch.Text);
+            }
+            catch (Exception ex) { DialogHelper.ShowError("นำเข้าข้อมูลไม่สำเร็จ (ยกเลิกทั้งไฟล์ ไม่มีรายการใดถูกบันทึก)\n" + ex.Message); }
+        }
+
+        // 📄 Template COIL LIST (YES / NO -> Desktop\CIMS_Export -> เปิดไฟล์)
+        private async void btnCoilTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            if (!DialogHelper.ShowConfirm($"ต้องการสร้างไฟล์ Template สำหรับนำเข้า COIL LIST ของคลัง {_stock.Code} ใช่หรือไม่?\n\n" +
+                    "• กรอก PRODUCT CODE / MOTHER COIL / COIL NO / WEIGHT (KG.) ของ Coil ลูกแต่ละม้วน\n" +
+                    "• นำเข้ากลับด้วยปุ่ม IMPORT EXCEL\n\n" +
+                    "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
+            try
+            {
+                var stock = _stock;
+                string path = await Task.Run(() => new CoilImportService().WriteTemplate(stock));
+                ImportTemplateService.OpenFile(path);
+            }
+            catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ\n" + ex.Message); }
         }
 
         // 📥 Import แบบอัพเดทข้อมูล: ข้อมูลสินค้าตามหัวคอลัมน์ + คลังตาม STOCK / STOCK1-10 (ไม่ระบุ = คลังนี้)
@@ -341,6 +400,7 @@ namespace CIMS.Views
                 string groupLabel = _viewModel.GroupLabel;
                 bool dec = _stock.AllowDecimal;
                 bool coil = _stock.CountCoil;   // คลัง KG ที่นับ Coil -> มีคอลัมน์ QTY (COIL) ด้วย
+                int stkId = _stock.StkId;
                 await Task.Run(() =>
                 {
                     using (var wb = new ClosedXML.Excel.XLWorkbook())
@@ -375,6 +435,44 @@ namespace CIMS.Views
                         ws.Range(2, 4, last, 4).Style.NumberFormat.Format = ImportTemplateService.QtyFormat(dec);
                         if (coil) ws.Range(2, 5, last, 5).Style.NumberFormat.Format = "#,##0";
                         foreach (var (row, text) in groupRows) ImportTemplateService.GroupRow(ws, row, heads.Length, text);
+
+                        // คลังที่นับ Coil: แผ่น COIL DETAIL = Coil แม่ / Coil ลูก / น้ำหนัก ของสินค้าที่ Export (จัดกลุ่มตาม PD CODE)
+                        if (coil && CIMS.Helpers.DbSchema.HasCoilRegister)
+                        {
+                            var coils = new CoilService().GetCoils(stkId, 0).ToLookup(c => c.PartId);
+                            var cs = wb.Worksheets.Add("COIL DETAIL");
+                            string[] ch = { "NO", "MOTHER COIL", "COIL NO", "WEIGHT (KG.)", "WEIGHT (TON)", "LABEL DATE", "RECEIVED" };
+                            ImportTemplateService.Header(cs, ch, new double[] { 6.4, 20, 22, 15, 15, 15, 19 });
+                            int cr = 2;
+                            var cGroups = new List<(int Row, string Text)>();
+                            foreach (var p in rows.Where(p => coils.Contains(p.PartId)))
+                            {
+                                var list = coils[p.PartId].ToList();
+                                cGroups.Add((cr, $"{p.PartCode}  {p.PartName}   ({list.Count:N0} COIL  •  {list.Sum(c => c.WeightKG):#,##0.###} KG)"));
+                                cr++;
+                                int no = 1;
+                                foreach (var c in list)
+                                {
+                                    cs.Cell(cr, 1).Value = no++;
+                                    cs.Cell(cr, 2).Value = c.MotherCoil ?? "-";
+                                    cs.Cell(cr, 3).Value = c.CoilNo;
+                                    cs.Cell(cr, 4).Value = c.WeightKG;
+                                    cs.Cell(cr, 5).Value = Math.Round(c.WeightKG / 1000m, 3);
+                                    cs.Cell(cr, 6).Value = c.LabelDate ?? "-";
+                                    cs.Cell(cr, 7).Value = c.ReceivedDate?.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "-";
+                                    cr++;
+                                }
+                            }
+                            int clast = cr - 1;
+                            ImportTemplateService.Body(cs, clast, ch.Length);
+                            if (clast >= 2)
+                            {
+                                cs.Range(2, 1, clast, 1).Style.Font.Bold = true;
+                                cs.Range(2, 4, clast, 4).Style.NumberFormat.Format = "#,##0.###";
+                                cs.Range(2, 5, clast, 5).Style.NumberFormat.Format = "#,##0.000";
+                            }
+                            foreach (var (row, text) in cGroups) ImportTemplateService.GroupRow(cs, row, ch.Length, text);
+                        }
                         wb.SaveAs(path);
                     }
                 });
@@ -620,9 +718,45 @@ namespace CIMS.Views
             sv.ScrollToVerticalOffset(_currentScrollOffset);
         }
 
+        // ตั้งที่ตัวแถวโดยตรง (Style ของแถวแพ้ค่า RowDetailsVisibilityMode ของตาราง)
+        private void ShowCoilRows(StoreProductModel p)
+        {
+            if (dgStore.ItemContainerGenerator.ContainerFromItem(p) is DataGridRow row)
+                row.DetailsVisibility = p.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void dgStore_LoadingRow(object sender, DataGridRowEventArgs e)
         {
             if (e.Row.Item != null) _rowMap[e.Row.Item] = e.Row;
+            // แถวถูกใช้ซ้ำ (Recycling) -> เปิด / ปิด Coil ตามสินค้าของแถวนั้น
+            e.Row.DetailsVisibility = e.Row.Item is StoreProductModel sp && sp.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // คลังที่นับ Coil: กด PD CODE -> เปิด / ปิด Coil แม่ / Coil ลูก ใต้แถวสินค้านั้น
+        private async void dgStore_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_stock == null || !_stock.CountCoil || !DbSchema.HasCoilRegister) return;
+
+            // DataGrid จับเมาส์ไว้ตอนเลือกเซลล์ -> OriginalSource เป็นตัวตาราง: หาเซลล์จากจุดที่กดแทน
+            var dep = VisualTreeHelper.HitTest(dgStore, e.GetPosition(dgStore))?.VisualHit;
+            while (dep != null && !(dep is DataGridCell) && !(dep is System.Windows.Controls.Primitives.DataGridDetailsPresenter))
+                dep = dep is Visual || dep is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+            if (!(dep is DataGridCell cell) || cell.Column != colCode) return;
+            if (!(cell.DataContext is StoreProductModel p)) return;
+
+            if (p.IsCoilOpen) { p.IsCoilOpen = false; ShowCoilRows(p); return; }
+
+            int stkId = _stock.StkId, ptId = p.PartId;
+            try
+            {
+                p.CoilRows = await Task.Run(() => new CoilService().GetCoilRows(stkId, ptId));
+                p.IsCoilOpen = true;
+                ShowCoilRows(p);
+            }
+            catch (Exception ex)
+            {
+                NotificationManager.Show("COIL", "โหลดรายการ Coil ไม่สำเร็จ\n" + ex.Message, false);
+            }
         }
 
         private void dgStore_UnloadingRow(object sender, DataGridRowEventArgs e)

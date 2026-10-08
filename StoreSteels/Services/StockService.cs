@@ -349,7 +349,8 @@ namespace CIMS.Services
             using (var conn = new SqlConnection(_connectionString))
             {
                 string sql = @"SELECT FormatID, FormatName, Delimiter, CodePosition, AltCodePosition, QuantityPosition, MinFields, SampleText, IsActive, SourceStockID,
-                                      DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd, MatchBy, NameFields
+                                      DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd, MatchBy, NameFields"
+                               + (CIMS.Helpers.DbSchema.HasCoilRegister ? ", CoilNoPosition, MotherCoilPosition" : ", CAST(NULL AS INT) AS CoilNoPosition, CAST(NULL AS INT) AS MotherCoilPosition") + @"
                                FROM CIMS.BarcodeFormats" + (activeOnly ? " WHERE IsActive = 1" : "") + " ORDER BY FormatName";
                 using (var cmd = new SqlCommand(sql, conn))
                 {
@@ -377,7 +378,9 @@ namespace CIMS.Services
                                 MatchStart = rdr["MatchStart"] == DBNull.Value ? null : rdr["MatchStart"].ToString(),
                                 MatchEnd = rdr["MatchEnd"] == DBNull.Value ? null : rdr["MatchEnd"].ToString(),
                                 MatchBy = rdr["MatchBy"] == DBNull.Value ? "CODE" : rdr["MatchBy"].ToString(),
-                                NameFields = rdr["NameFields"] == DBNull.Value ? null : rdr["NameFields"].ToString()
+                                NameFields = rdr["NameFields"] == DBNull.Value ? null : rdr["NameFields"].ToString(),
+                                CoilNoPos = rdr["CoilNoPosition"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["CoilNoPosition"]),
+                                MotherCoilPos = rdr["MotherCoilPosition"] == DBNull.Value ? (int?)null : Convert.ToInt32(rdr["MotherCoilPosition"])
                             });
                         }
                     }
@@ -398,13 +401,13 @@ namespace CIMS.Services
             {
                 string sql = f.FmtId == 0
                     ? @"INSERT INTO CIMS.BarcodeFormats (FormatName, Delimiter, CodePosition, AltCodePosition, QuantityPosition, MinFields, SampleText, IsActive, SourceStockID, CreatedBy,
-                                                     DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd, MatchBy, NameFields)
-                        VALUES (@name, @delim, @code, @alt, @qty, @min, @sample, @active, @src, @uid, @dmode, @trim, @cpre, @ccut, @mstart, @mend, @mby, @nfld);
+                                                     DelimiterMode, TrimChars, CodePrefix, CodeCut, MatchStart, MatchEnd, MatchBy, NameFields, CoilNoPosition, MotherCoilPosition)
+                        VALUES (@name, @delim, @code, @alt, @qty, @min, @sample, @active, @src, @uid, @dmode, @trim, @cpre, @ccut, @mstart, @mend, @mby, @nfld, @cpos, @mpos);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);"
                     : @"UPDATE CIMS.BarcodeFormats SET FormatName = @name, Delimiter = @delim, CodePosition = @code, AltCodePosition = @alt,
                             QuantityPosition = @qty, MinFields = @min, SampleText = @sample, IsActive = @active, SourceStockID = @src,
                             DelimiterMode = @dmode, TrimChars = @trim, CodePrefix = @cpre, CodeCut = @ccut, MatchStart = @mstart, MatchEnd = @mend,
-                            MatchBy = @mby, NameFields = @nfld, UpdatedBy = @uid, UpdatedDate = GETDATE()
+                            MatchBy = @mby, NameFields = @nfld, CoilNoPosition = @cpos, MotherCoilPosition = @mpos, UpdatedBy = @uid, UpdatedDate = GETDATE()
                         WHERE FormatID = @id;
                         SELECT @id;";
 
@@ -429,6 +432,10 @@ namespace CIMS.Services
                     cmd.Parameters.AddWithValue("@mby", f.MatchByName ? "NAME" : "CODE");
                     cmd.Parameters.AddWithValue("@nfld", string.IsNullOrWhiteSpace(f.NameFields) ? (object)DBNull.Value : f.NameFields.Trim());
                     cmd.Parameters.AddWithValue("@uid", userId);
+                    cmd.Parameters.AddWithValue("@cpos", (object)f.CoilNoPos ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@mpos", (object)f.MotherCoilPos ?? DBNull.Value);
+                    if (!CIMS.Helpers.DbSchema.HasCoilRegister)
+                        cmd.CommandText = cmd.CommandText.Replace(", CoilNoPosition, MotherCoilPosition)", ")").Replace(", @cpos, @mpos)", ")").Replace("CoilNoPosition = @cpos, MotherCoilPosition = @mpos, ", "");
                     conn.Open();
                     f.FmtId = Convert.ToInt32(cmd.ExecuteScalar());
                     return f.FmtId;

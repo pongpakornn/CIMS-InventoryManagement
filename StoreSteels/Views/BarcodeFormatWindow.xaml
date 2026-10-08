@@ -122,6 +122,32 @@
                             </Grid>
                         </Border>
 
+                        <!-- 🧲 ทะเบียน Coil: ช่องเลข Coil ลูก / Coil แม่ บนป้าย (ไม่กรอก = ไม่เก็บรายลูก) -->
+                        <Border Style="{StaticResource StkSection}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="2*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="COIL NO FIELD #" Style="{StaticResource StkLabel}"/>
+                                        <TextBox x:Name="txtCoilNoPos" Style="{StaticResource StkInput}" MaxLength="3" Tag="optional" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="MOTHER COIL FIELD #" Style="{StaticResource StkLabel}"/>
+                                        <TextBox x:Name="txtMotherPos" Style="{StaticResource StkInput}" MaxLength="3" Tag="optional" TextChanged="Field_TextChanged" PreviewTextInput="Digits_PreviewTextInput"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="4" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="11" FontWeight="SemiBold" Foreground="#8A8490"
+                                               Text="COIL REGISTER: each child coil (e.g. CWE0885B-006) is kept one by one with its weight from QTY FIELD #. Scanning IN to a stock with AUTO DEDUCT moves that coil from the source stock. Leave empty = no coil detail."/>
+                                </Grid>
+                                <TextBlock x:Name="txtCoilResult" FontSize="12" FontWeight="Bold" Foreground="#6D4C9F" Margin="2,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- ค้นสินค้าด้วยรหัส หรือ ชื่อสินค้า (PRODUCT NAME) จากช่องที่กำหนด -->
                         <Border Style="{StaticResource StkSection}">
                             <StackPanel>

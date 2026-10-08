@@ -111,6 +111,22 @@ namespace CIMS.Models
             set { _isRemarkEditing = value; OnPropertyChanged(); }
         }
 
+        #region === [ Coil ] ===
+
+        // คลังที่นับ Coil: กด PD CODE -> แสดง Coil แม่ / Coil ลูก ใต้แถวสินค้า (โหลดตอนกดเปิด)
+        private bool _isCoilOpen;
+        public bool IsCoilOpen { get => _isCoilOpen; set { _isCoilOpen = value; OnPropertyChanged(); } }
+
+        private System.Collections.Generic.List<CoilRowModel> _coilRows;
+        public System.Collections.Generic.List<CoilRowModel> CoilRows
+        {
+            get => _coilRows;
+            set { _coilRows = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasCoilRows)); }
+        }
+        public bool HasCoilRows => _coilRows != null && _coilRows.Count > 0;
+
+        #endregion
+
         public int Priority { get; set; }
         public bool IsActive { get; set; }
         public bool IsShow { get; set; }

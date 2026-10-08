@@ -12,6 +12,27 @@ namespace CIMS.Helpers
         private static bool? _liveSource;
         private static bool? _countCoil;
         private static bool? _columnOrder;
+        private static bool? _coilRegister;
+
+        // Update_20261008.sql: ทะเบียน Coil (CIMS.Coils / CIMS.CoilMoves + BarcodeFormats.CoilNoPosition)
+        public static bool HasCoilRegister
+        {
+            get
+            {
+                if (_coilRegister.HasValue) return _coilRegister.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('CIMS.Coils', 'U') IS NOT NULL AND COL_LENGTH('CIMS.BarcodeFormats', 'CoilNoPosition') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _coilRegister = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _coilRegister.Value;
+            }
+        }
 
         // Update_20261006d.sql: CIMS.Stocks.ColumnOrder (ลำดับคอลัมน์ตามที่ติ๊กเลือก)
         public static bool HasColumnOrder => _columnOrder ?? (_columnOrder = ColumnExists("ColumnOrder")) ?? false;

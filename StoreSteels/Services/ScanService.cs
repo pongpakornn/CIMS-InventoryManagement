@@ -233,7 +233,128 @@ namespace CIMS.Services
             bool isOtherStock = stock != null && !stock.IsMain;
             return !isOtherStock || txType == "RETURN" ? (object)DBNull.Value : (remainder ? 0 : 1);
         }
-        public bool UpdateStock(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo, string txType = "IN", StockModel stock = null, bool remainder = false)
+
+        // ==========================================
+        // 🧲 ทะเบียน Coil (CIMS.Coils) - เลข Coil ลูก / แม่ จากป้าย (Barcode Format ที่ตั้ง COIL NO FIELD #)
+        // ==========================================
+        public class CoilLabel
+        {
+            public string CoilNo { get; set; }       // Coil ลูก เช่น CWE0885B-006
+            public string MotherCoil { get; set; }   // Coil แม่ เช่น CWE0885B
+            public bool HasCoilNo => !string.IsNullOrWhiteSpace(CoilNo);
+        }
+
+        public class CoilState
+        {
+            public int CoilId { get; set; }
+            public int StockId { get; set; }
+            public string StockCode { get; set; }
+            public int PartId { get; set; }
+            public string Status { get; set; }
+        }
+
+        // Coil ลูกนี้อยู่ที่ไหน (null = ยังไม่มีในทะเบียน)
+        public CoilState FindCoil(string coilNo)
+        {
+            if (string.IsNullOrWhiteSpace(coilNo) || !CIMS.Helpers.DbSchema.HasCoilRegister) return null;
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"SELECT c.CoilID, c.StockID, s.StockCode, c.PartID, c.Status FROM CIMS.Coils c
+                                              JOIN CIMS.Stocks s ON s.StockID = c.StockID WHERE c.CoilNo = @c", conn))
+            {
+                cmd.Parameters.AddWithValue("@c", coilNo.Trim());
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    return r.Read() ? new CoilState { CoilId = r.GetInt32(0), StockId = r.GetInt32(1), StockCode = r.GetString(2), PartId = r.GetInt32(3), Status = r.GetString(4) } : null;
+            }
+        }
+
+        // รับ Coil ลูกเข้าคลัง (ใหม่ = สร้าง / มีอยู่แล้ว = ย้ายมา) - บันทึก CoilMoves ผูกกับรายการสแกน (ใช้ตอน ADJUST ยกเลิก)
+        internal static void CoilReceive(SqlConnection conn, SqlTransaction trans, CoilLabel coil, int ptId, int stkId, decimal weight, int? txId, string userId, string action = null)
+        {
+            if (coil == null || !coil.HasCoilNo || !CIMS.Helpers.DbSchema.HasCoilRegister) return;
+            int coilId = 0, fromStock = 0, fromPart = 0; string fromStatus = null; decimal fromWeight = 0;
+            using (var cmd = new SqlCommand("SELECT CoilID, StockID, PartID, Status, WeightKG FROM CIMS.Coils WITH (UPDLOCK, HOLDLOCK) WHERE CoilNo = @c", conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@c", coil.CoilNo.Trim());
+                using (var r = cmd.ExecuteReader())
+                    if (r.Read()) { coilId = r.GetInt32(0); fromStock = r.GetInt32(1); fromPart = r.GetInt32(2); fromStatus = r.GetString(3); fromWeight = r.GetDecimal(4); }
+            }
+            if (coilId == 0)
+            {
+                using (var cmd = new SqlCommand(@"INSERT INTO CIMS.Coils (CoilNo, MotherCoil, PartID, StockID, WeightKG, Status, ReceivedBy)
+                                                  VALUES (@c, @m, @p, @s, @w, 'IN', @u); SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@c", coil.CoilNo.Trim());
+                    cmd.Parameters.AddWithValue("@m", string.IsNullOrWhiteSpace(coil.MotherCoil) ? (object)DBNull.Value : coil.MotherCoil.Trim());
+                    cmd.Parameters.AddWithValue("@p", ptId);
+                    cmd.Parameters.AddWithValue("@s", stkId);
+                    cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@w", weight));
+                    cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                    coilId = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+                AddCoilMove(conn, trans, coilId, action ?? "CREATE", txId, null, null, null, null, stkId, ptId, "IN", weight, userId);
+            }
+            else
+            {
+                using (var cmd = new SqlCommand(@"UPDATE CIMS.Coils SET StockID = @s, PartID = @p, WeightKG = @w, Status = 'IN', OutDate = NULL,
+                                                         MotherCoil = ISNULL(@m, MotherCoil), ReceivedDate = GETDATE(), ReceivedBy = @u, UpdatedDate = GETDATE()
+                                                  WHERE CoilID = @id", conn, trans))
+                {
+                    cmd.Parameters.AddWithValue("@id", coilId);
+                    cmd.Parameters.AddWithValue("@s", stkId);
+                    cmd.Parameters.AddWithValue("@p", ptId);
+                    cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@w", weight));
+                    cmd.Parameters.AddWithValue("@m", string.IsNullOrWhiteSpace(coil.MotherCoil) ? (object)DBNull.Value : coil.MotherCoil.Trim());
+                    cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                    cmd.ExecuteNonQuery();
+                }
+                AddCoilMove(conn, trans, coilId, action ?? "MOVE", txId, fromStock, fromPart, fromStatus, fromWeight, stkId, ptId, "IN", weight, userId);
+            }
+        }
+
+        // จ่าย Coil ลูกออกทั้งลูก (อยู่ในคลังนี้เท่านั้น)
+        private static void CoilOut(SqlConnection conn, SqlTransaction trans, CoilLabel coil, int stkId, int? txId, string userId)
+        {
+            if (coil == null || !coil.HasCoilNo || !CIMS.Helpers.DbSchema.HasCoilRegister) return;
+            int coilId = 0, part = 0; decimal w = 0;
+            using (var cmd = new SqlCommand("SELECT CoilID, PartID, WeightKG FROM CIMS.Coils WITH (UPDLOCK, HOLDLOCK) WHERE CoilNo = @c AND StockID = @s AND Status = 'IN'", conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@c", coil.CoilNo.Trim());
+                cmd.Parameters.AddWithValue("@s", stkId);
+                using (var r = cmd.ExecuteReader())
+                    if (r.Read()) { coilId = r.GetInt32(0); part = r.GetInt32(1); w = r.GetDecimal(2); }
+            }
+            if (coilId == 0) return;
+            using (var cmd = new SqlCommand("UPDATE CIMS.Coils SET Status = 'OUT', OutDate = GETDATE(), UpdatedDate = GETDATE() WHERE CoilID = @id", conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@id", coilId);
+                cmd.ExecuteNonQuery();
+            }
+            AddCoilMove(conn, trans, coilId, "OUT", txId, stkId, part, "IN", w, stkId, part, "OUT", w, userId);
+        }
+
+        private static void AddCoilMove(SqlConnection conn, SqlTransaction trans, int coilId, string action, int? txId, int? fromStock, int? fromPart, string fromStatus, decimal? fromWeight,
+                                        int toStock, int toPart, string toStatus, decimal weight, string userId)
+        {
+            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.CoilMoves (CoilID, Action, ScanTransactionID, FromStockID, FromPartID, FromStatus, FromWeightKG, ToStockID, ToPartID, ToStatus, WeightKG, UserID)
+                                              VALUES (@c, @a, @tx, @fs, @fp, @fst, @fw, @ts, @tp, @tst, @w, @u)", conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@c", coilId);
+                cmd.Parameters.AddWithValue("@a", action);
+                cmd.Parameters.AddWithValue("@tx", (object)txId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@fs", (object)fromStock ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@fp", (object)fromPart ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@fst", (object)fromStatus ?? DBNull.Value);
+                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@fw", fromWeight));
+                cmd.Parameters.AddWithValue("@ts", toStock);
+                cmd.Parameters.AddWithValue("@tp", toPart);
+                cmd.Parameters.AddWithValue("@tst", toStatus);
+                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@w", weight));
+                cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+        }
+        public bool UpdateStock(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo, string txType = "IN", StockModel stock = null, bool remainder = false, CoilLabel coil = null)
         {
             // กันพลาด: ปัดตาม DECIMAL QTY ของคลัง (คลังที่ไม่เปิด = จำนวนเต็มเสมอ)
             if (stock != null) qty = CIMS.Helpers.Qty.Round(qty, stock.AllowDecimal);
@@ -252,7 +373,8 @@ namespace CIMS.Services
 
                     // ✅ เพิ่มคอลัมน์ ReferenceNo + StockID (คลังที่แสกน)
                     string insertLogSql = @"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
-                                    VALUES (@UserId, @Qty, @TxType, GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box)";
+                                    VALUES (@UserId, @Qty, @TxType, GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box);
+                                    SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
                     // กล่อง / Coil ที่รายการนี้ขยับ: ดู BoxMove()
                     object boxMove = BoxMove(stock, txType, remainder);
@@ -297,7 +419,9 @@ namespace CIMS.Services
                             : (refNo.Length > RefNoMaxLength ? refNo.Substring(0, RefNoMaxLength) : refNo);
                         cmdLog.Parameters.AddWithValue("@RefNo", (object)safeRefNo ?? DBNull.Value);
 
-                        cmdLog.ExecuteNonQuery();
+                        int txId = Convert.ToInt32(cmdLog.ExecuteScalar());
+                        // 🧲 ป้ายที่มีเลข Coil ลูก: เก็บ / ย้าย Coil ลูกเข้าคลังนี้ (สแกนเศษไม่นับ Coil)
+                        if (stock != null && stock.CountCoil && !remainder) CoilReceive(conn, trans, coil, ptId, stock.StkId, qty, txId, userId);
                     }
 
                     trans.Commit();
@@ -326,6 +450,7 @@ namespace CIMS.Services
             public string SourceCode { get; set; }
             public string SourcePartCode { get; set; } // สินค้าในคลังต้นทางที่ถูกตัด (BIN เดียวกัน / สินค้าเดียวกัน)
             public bool MatchedByBin { get; set; }
+            public string MatchedHow { get; set; }      // COIL / MOTHER COIL / BIN / SAME PRODUCT
             public bool Short => Saved && Deducted < RequestedQty;
             public decimal RequestedQty { get; set; }
         }
@@ -342,7 +467,7 @@ namespace CIMS.Services
         //   ไม่มี BIN / ไม่เจอ BIN เดียวกัน = สินค้าตัวเดียวกัน (แบบเดิม) / BIN ซ้ำหลายตัว = ตัวเดียวกันก่อน แล้วตัวที่ยอดมากสุด
         //   รับเข้าเต็มจำนวนตามป้ายเสมอ (ของอยู่หน้างานแล้ว) ตัดต้นทาง "เท่าที่มี" (ไม่ติดลบ) / คลังนับ Coil: รับเข้า +1 Coil, ต้นทาง -1 Coil
         public DeductResult UpdateStockWithDeduct(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo,
-                                                  StockModel stock, int sourceStkId, bool remainder = false)
+                                                  StockModel stock, int sourceStkId, bool remainder = false, CoilLabel coil = null)
         {
             if (stock != null) qty = CIMS.Helpers.Qty.Round(qty, stock.AllowDecimal);
             var result = new DeductResult { RequestedQty = qty };
@@ -355,7 +480,7 @@ namespace CIMS.Services
                     try
                     {
                         // 1) รับเข้าคลังที่สแกน (CIMS.sp_Stock_AddQty: คลังหลัก = CIMS.Parts / คลังอื่น = CIMS.PartStocks)
-                        decimal toBalance;
+                        decimal toBalance; int txId;
                         using (var cmd = new SqlCommand("CIMS.sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
                         {
                             cmd.Parameters.AddWithValue("@StkId", stock.StkId);
@@ -368,7 +493,8 @@ namespace CIMS.Services
                         }
 
                         using (var cmd = new SqlCommand(@"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
-                                                          VALUES (@UserId, @Qty, 'IN', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box)", conn, trans))
+                                                          VALUES (@UserId, @Qty, 'IN', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box);
+                                                          SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@UserId", userId);
                             cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
@@ -378,10 +504,10 @@ namespace CIMS.Services
                             cmd.Parameters.AddWithValue("@RefNo", (object)safeRefNo ?? DBNull.Value);
                             cmd.Parameters.Add("@StkId", SqlDbType.Int).Value = stock.StkId;
                             cmd.Parameters.Add("@Box", SqlDbType.Int).Value = boxMove;
-                            cmd.ExecuteNonQuery();
+                            txId = Convert.ToInt32(cmd.ExecuteScalar());
                         }
 
-                        // 2) คลังต้นทาง + สินค้าที่จะตัด (BIN เดียวกัน)
+                        // 2) คลังต้นทาง + สินค้าที่จะตัด: Coil ลูกเดียวกัน > Coil แม่เดียวกัน > BIN เดียวกัน > สินค้าตัวเดียวกัน
                         bool sourceCoil = false;
                         using (var cmd = new SqlCommand("SELECT StockCode, " + (CIMS.Helpers.DbSchema.HasCountCoil ? "CountCoil" : "CAST(0 AS BIT)") + " FROM CIMS.Stocks WHERE StockID = @s", conn, trans))
                         {
@@ -398,6 +524,31 @@ namespace CIMS.Services
                             bin = BinKey(cmd.ExecuteScalar());
                         }
 
+                        // 🧲 ทะเบียน Coil: Coil ลูกนี้อยู่ในคลังต้นทาง -> สินค้าของลูกนั้น / ไม่เจอลูก -> สินค้าที่มี Coil แม่เดียวกันในคลังต้นทาง
+                        int coilPart = 0; string how = null;
+                        if (coil != null && CIMS.Helpers.DbSchema.HasCoilRegister)
+                        {
+                            if (coil.HasCoilNo)
+                                using (var cmd = new SqlCommand("SELECT PartID FROM CIMS.Coils WHERE CoilNo = @c AND StockID = @s AND Status = 'IN'", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@c", coil.CoilNo.Trim());
+                                    cmd.Parameters.AddWithValue("@s", sourceStkId);
+                                    object v = cmd.ExecuteScalar();
+                                    if (v != null && v != DBNull.Value) { coilPart = Convert.ToInt32(v); how = "COIL"; }
+                                }
+                            if (coilPart == 0 && !string.IsNullOrWhiteSpace(coil.MotherCoil))
+                                using (var cmd = new SqlCommand(@"SELECT TOP 1 PartID FROM CIMS.Coils WHERE MotherCoil = @m AND StockID = @s AND Status = 'IN'
+                                                                  GROUP BY PartID ORDER BY COUNT(*) DESC, PartID", conn, trans))
+                                {
+                                    cmd.Parameters.AddWithValue("@m", coil.MotherCoil.Trim());
+                                    cmd.Parameters.AddWithValue("@s", sourceStkId);
+                                    object v = cmd.ExecuteScalar();
+                                    if (v != null && v != DBNull.Value) { coilPart = Convert.ToInt32(v); how = "MOTHER COIL"; }
+                                }
+                        }
+                        // Coil แม่ใช้เป็น BIN ได้ด้วย (สินค้าที่กรอก BIN = เลข Coil แม่)
+                        string mbin = BinKey(coil?.MotherCoil);
+
                         int srcPart = 0; int srcCoil = 0;
                         using (var cmd = new SqlCommand(@"
                             SELECT TOP 1 ps.PartID, ps.Quantity, ps.BoxQuantity, p.PartCode,
@@ -405,12 +556,17 @@ namespace CIMS.Services
                             FROM CIMS.PartStocks ps WITH (UPDLOCK, HOLDLOCK)
                             JOIN CIMS.Parts p ON p.PartID = ps.PartID
                             WHERE ps.StockID = @s
-                              AND ((@bin <> '' AND UPPER(LTRIM(RTRIM(ISNULL(p.Bin, '')))) = @bin) OR ps.PartID = @p)
+                              AND ((@cp > 0 AND ps.PartID = @cp)
+                                   OR (@cp = 0 AND ((@bin <> '' AND UPPER(LTRIM(RTRIM(ISNULL(p.Bin, '')))) = @bin)
+                                                    OR (@mbin <> '' AND UPPER(LTRIM(RTRIM(ISNULL(p.Bin, '')))) = @mbin)
+                                                    OR ps.PartID = @p)))
                             ORDER BY CASE WHEN ps.PartID = @p THEN 0 ELSE 1 END, ps.Quantity DESC, ps.PartID", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@s", sourceStkId);
                             cmd.Parameters.AddWithValue("@p", ptId);
                             cmd.Parameters.AddWithValue("@bin", bin);
+                            cmd.Parameters.AddWithValue("@mbin", mbin);
+                            cmd.Parameters.AddWithValue("@cp", coilPart);
                             using (var r = cmd.ExecuteReader())
                                 if (r.Read())
                                 {
@@ -418,7 +574,8 @@ namespace CIMS.Services
                                     result.SourceBefore = CIMS.Helpers.Qty.Read(r[1]);
                                     srcCoil = Convert.ToInt32(r[2]);
                                     result.SourcePartCode = r.GetString(3);
-                                    result.MatchedByBin = Convert.ToInt32(r[4]) == 1 && srcPart != ptId;
+                                    result.MatchedByBin = (coilPart > 0 || Convert.ToInt32(r[4]) == 1 || mbin.Length > 0) && srcPart != ptId;
+                                    result.MatchedHow = how ?? (srcPart == ptId ? "SAME PRODUCT" : "BIN");
                                 }
                         }
 
@@ -463,6 +620,9 @@ namespace CIMS.Services
                             }
                         }
 
+                        // 🧲 ย้าย Coil ลูก (มีอยู่ในคลังต้นทาง) / เพิ่มใหม่ เข้าคลังที่รับ - น้ำหนักตามป้าย
+                        if (stock.CountCoil && !remainder) CoilReceive(conn, trans, coil, ptId, stock.StkId, qty, txId, userId);
+
                         trans.Commit();
                         result.Saved = true;
                     }
@@ -480,7 +640,7 @@ namespace CIMS.Services
         // ==========================================
         // 📤 ขาออก: UpdateStockOut
         // ==========================================
-        public bool UpdateStockOut(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo, StockModel stock = null, bool remainder = false)
+        public bool UpdateStockOut(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo, StockModel stock = null, bool remainder = false, CoilLabel coil = null)
         {
             if (stock != null) qty = CIMS.Helpers.Qty.Round(qty, stock.AllowDecimal);
             bool isOther = stock != null && !stock.IsMain;
@@ -539,7 +699,8 @@ namespace CIMS.Services
 
                         // ✅ เพิ่มคอลัมน์ ReferenceNo
                         string insertLogSql = @"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
-                                        VALUES (@UserId, @Qty, 'OUT', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box)";
+                                        VALUES (@UserId, @Qty, 'OUT', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box);
+                                        SELECT CAST(SCOPE_IDENTITY() AS INT);";
                         using (SqlCommand cmdLog = new SqlCommand(insertLogSql, conn, trans))
                         {
                             cmdLog.Parameters.Add("@Box", SqlDbType.Int).Value = isOther || mainCoil ? (object)boxOut : DBNull.Value;
@@ -555,7 +716,9 @@ namespace CIMS.Services
                                 : (refNo.Length > RefNoMaxLength ? refNo.Substring(0, RefNoMaxLength) : refNo);
                             cmdLog.Parameters.Add("@RefNo", SqlDbType.VarChar, RefNoMaxLength).Value = (object)safeRefNo ?? DBNull.Value;
 
-                            cmdLog.ExecuteNonQuery();
+                            int txId = Convert.ToInt32(cmdLog.ExecuteScalar());
+                            // 🧲 จ่ายออกทั้งลูก: Coil ลูกนี้ (อยู่ในคลังนี้) -> OUT / สแกนเศษไม่นับ Coil
+                            if (stock != null && stock.CountCoil && !remainder) CoilOut(conn, trans, coil, stock.StkId, txId, userId);
                         }
 
                         trans.Commit();

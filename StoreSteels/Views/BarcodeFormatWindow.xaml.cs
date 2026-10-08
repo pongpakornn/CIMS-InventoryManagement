@@ -104,6 +104,8 @@ namespace CIMS.Views
             txtMatchEnd.Text = f.MatchEnd ?? "";
             cbMatchBy.SelectedIndex = f.MatchByName ? 1 : 0;
             txtNameFields.Text = f.NameFields ?? "";
+            txtCoilNoPos.Text = f.CoilNoPos?.ToString() ?? "";
+            txtMotherPos.Text = f.MotherCoilPos?.ToString() ?? "";
             SelectSourceStock(f.SourceStkId);
             btnDelete.IsEnabled = f.FmtId > 0;
             btnDelete.Visibility = _session.CanDeleteStore ? Visibility.Visible : Visibility.Collapsed;
@@ -132,6 +134,8 @@ namespace CIMS.Views
                 MatchEnd = string.IsNullOrWhiteSpace(txtMatchEnd.Text) ? null : txtMatchEnd.Text.Trim(),
                 MatchBy = cbMatchBy.SelectedIndex == 1 ? "NAME" : "CODE",
                 NameFields = string.IsNullOrWhiteSpace(txtNameFields.Text) ? null : txtNameFields.Text.Trim(),
+                CoilNoPos = ParsePos(txtCoilNoPos?.Text),
+                MotherCoilPos = ParsePos(txtMotherPos?.Text),
                 CodePos = codePos,
                 AltCodePos = alt,
                 QtyPos = qty,
@@ -146,7 +150,7 @@ namespace CIMS.Views
         // จำนวนช่องขั้นต่ำ = เลขช่องที่ใหญ่ที่สุดที่ใช้ (รหัส / รหัสสำรอง / จำนวน / ช่องชื่อสินค้า)
         private static int RequiredMinFields(BarcodeFormatModel f)
         {
-            int m = Math.Max(f.CodePos, Math.Max(f.AltCodePos ?? 0, f.QtyPos ?? 0));
+            int m = Math.Max(f.CodePos, Math.Max(f.AltCodePos ?? 0, Math.Max(f.QtyPos ?? 0, Math.Max(f.CoilNoPos ?? 0, f.MotherCoilPos ?? 0))));
             if (f.MatchByName) foreach (int n in f.NamePositions()) m = Math.Max(m, n);
             return m;
         }
@@ -164,7 +168,7 @@ namespace CIMS.Views
 
         private void UpdatePreview()
         {
-            if (icFields == null || txtParseResult == null || cbMatchBy == null || txtLookupResult == null) return;
+            if (icFields == null || txtParseResult == null || cbMatchBy == null || txtLookupResult == null || txtCoilNoPos == null) return;
 
             var f = BuildFromInputs();
             string sample = txtSample.Text ?? "";
@@ -176,13 +180,14 @@ namespace CIMS.Views
             var green = (Brush)new BrushConverter().ConvertFrom("#2E7D32");
             var blue = (Brush)new BrushConverter().ConvertFrom("#0288D1");
             var gray = (Brush)new BrushConverter().ConvertFrom("#F1EEF6");
+            var orange = (Brush)new BrushConverter().ConvertFrom("#EF6C00");
             var dark = (Brush)FindResource("MainPurple");
 
             var nameFields = f.MatchByName ? f.NamePositions() : new List<int>();
             icFields.ItemsSource = fields.Select((text, i) =>
             {
                 int n = i + 1;
-                Brush bg = (f.MatchByName ? nameFields.Contains(n) : n == f.CodePos) ? purple : n == f.AltCodePos ? blue : n == f.QtyPos ? green : gray;
+                Brush bg = (f.MatchByName ? nameFields.Contains(n) : n == f.CodePos) ? purple : n == f.AltCodePos ? blue : n == f.QtyPos ? green : (n == f.CoilNoPos || n == f.MotherCoilPos) ? orange : gray;
                 return new FieldChip { Number = n, Text = text.Trim(), Background = bg, Foreground = bg == gray ? dark : Brushes.White };
             }).ToList();
 
@@ -200,6 +205,15 @@ namespace CIMS.Views
                 txtParseResult.Text = !f.Matches(sample)
                     ? "✗ NOT MATCH   (label does not start / end with the text set in LABEL FILTERS)"
                     : $"✗ NOT MATCH   ({fields.Length} field(s) found, need at least {f.MinFields})";
+
+            // เลข Coil ที่อ่านได้จากป้ายทดสอบ
+            if (txtCoilResult != null)
+            {
+                string coilNo = null, mother = null;
+                if (ok) f.ReadCoil(sample, out coilNo, out mother);
+                txtCoilResult.Visibility = ok && (f.HasCoilNo || f.MotherCoilPos > 0) ? Visibility.Visible : Visibility.Collapsed;
+                txtCoilResult.Text = $"🧲 COIL NO: {coilNo ?? "-"}     MOTHER COIL: {mother ?? "-"}";
+            }
 
             ShowLookup(ok ? f : null, codes);
         }
@@ -281,7 +295,7 @@ namespace CIMS.Views
                 bool isNew = f.FmtId == 0;
                 int id = _stockService.SaveFormat(f, _session.UserId);
                 LogService.WriteLog(_session.UserId, isNew ? "BARCODE_FMT_CREATE" : "BARCODE_FMT_UPDATE",
-                    $"{f.Name} | Delim: {f.Delimiter} | Code#{f.CodePos} Alt#{f.AltCodePos} Qty#{f.QtyPos} Min{f.MinFields} | Match: {(f.MatchByName ? "NAME#" + string.Join(",", f.NamePositions()) : "CODE")} | Active: {f.IsActive} | DeductStk: {f.SourceStkId}", f.Name);
+                    $"{f.Name} | Delim: {f.Delimiter} | Code#{f.CodePos} Alt#{f.AltCodePos} Qty#{f.QtyPos} Min{f.MinFields} Coil#{f.CoilNoPos} Mother#{f.MotherCoilPos} | Match: {(f.MatchByName ? "NAME#" + string.Join(",", f.NamePositions()) : "CODE")} | Active: {f.IsActive} | DeductStk: {f.SourceStkId}", f.Name);
                 NotificationManager.Show("Barcode Format", $"บันทึกรูปแบบ {f.Name} สำเร็จ", true);
                 Reload(id);
             }

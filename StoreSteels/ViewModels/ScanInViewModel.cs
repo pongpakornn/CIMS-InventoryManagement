@@ -898,6 +898,7 @@ namespace CIMS.ViewModels
             List<string> supplierCodes = null;
             decimal? supplierQty = null;
             BarcodeFormatModel supplierFmt = null;
+            string supplierRaw = finalSearchCode;   // ป้ายดิบ (ใช้อ่านเลข Coil ตามรูปแบบที่ใช้จริง)
             if (!isPackingCardScan)
             {
                 string raw = finalSearchCode;
@@ -957,6 +958,26 @@ namespace CIMS.ViewModels
                 return;
             }
 
+            // 🧲 ทะเบียน Coil: เลข Coil ลูก / แม่ จากป้าย (รูปแบบที่ตั้ง COIL NO FIELD #) + กันสแกนลูกเดิมซ้ำ
+            ScanService.CoilLabel coil = null;
+            if (isSupplierScan && stock.CountCoil && (supplierFmt.HasCoilNo || supplierFmt.MotherCoilPos > 0))
+            {
+                supplierFmt.ReadCoil(supplierRaw, out string coilNo, out string mother);
+                coil = new ScanService.CoilLabel { CoilNo = coilNo, MotherCoil = mother };
+                if (coil.HasCoilNo && !IsRemainderMode)
+                {
+                    var st = await Task.Run(() => _scanService.FindCoil(coil.CoilNo));
+                    string err = null;
+                    if (!isOut && st != null && st.Status == "IN" && st.StockId == stock.StkId)
+                        err = $"Coil {coil.CoilNo} อยู่ในคลัง {stock.Code} แล้ว (สแกนซ้ำ) - ไม่บันทึก";
+                    else if (isOut && st != null && st.Status == "OUT")
+                        err = $"Coil {coil.CoilNo} จ่ายออกไปแล้ว - ไม่บันทึก";
+                    else if (isOut && st != null && st.Status == "IN" && st.StockId != stock.StkId)
+                        err = $"Coil {coil.CoilNo} อยู่ที่คลัง {st.StockCode} ไม่ใช่คลัง {stock.Code} - ไม่บันทึก";
+                    if (err != null) { ScanError(err + $"\n\nCode: {rawBarcodeFull}"); BarcodeInput = string.Empty; return; }
+                }
+            }
+
             ScanService.DeductResult deductResult = null;
             bool remainder = IsRemainderMode;
             bool remainderCancelled = false;
@@ -1000,14 +1021,14 @@ namespace CIMS.ViewModels
                     bool isSaved;
                     if (useDeduct)
                     {
-                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, supplierFmt.SourceStkId.Value, remainder);
+                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, supplierFmt.SourceStkId.Value, remainder, coil);
                         isSaved = deductResult.Saved;
                     }
                     else
                     {
                         isSaved = isOut
-                            ? _scanService.UpdateStockOut(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, remainder)
-                            : _scanService.UpdateStock(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, "IN", stock, remainder);
+                            ? _scanService.UpdateStockOut(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, remainder, coil)
+                            : _scanService.UpdateStock(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, "IN", stock, remainder, coil);
                     }
                     if (isSaved)
                     {
@@ -1015,7 +1036,8 @@ namespace CIMS.ViewModels
                         string logRef = stock.IsMain ? rawBarcodeFull : $"{rawBarcodeFull} | STOCK: {stock.Code}";
                         if (remainder) logRef += " | REMAINDER";
                         if (deductResult != null)
-                            logRef += $" | DEDUCT {deductResult.SourceCode}{(deductResult.MatchedByBin ? $" ({deductResult.SourcePartCode} BIN)" : "")}: {deductResult.Deducted} (bal {deductResult.SourceBefore}->{deductResult.SourceAfter})";
+                            logRef += $" | DEDUCT {deductResult.SourceCode}{(deductResult.MatchedByBin ? $" ({deductResult.SourcePartCode} {deductResult.MatchedHow})" : "")}: {deductResult.Deducted} (bal {deductResult.SourceBefore}->{deductResult.SourceAfter})";
+                        if (coil?.HasCoilNo == true) logRef += $" | COIL {coil.CoilNo}";
                         LogService.WriteScanLog(uid, isOut ? "SCAN_OUT" : "SCAN_IN", part.PartCode, part.PartACode, originalQty, logRef);
                         part.Qty = originalQty;
                         return part;
