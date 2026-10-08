@@ -81,6 +81,7 @@
                     _stocks = new List<StockModel>();
                 }
                 SetStockChips(true, null);
+                btnStockDelete.Visibility = DeletableStocks().Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
                 // ช่องกรองตารางตามคลัง: ALL STOCKS + ทุกคลัง
                 _loadingFilter = true;
@@ -174,23 +175,43 @@
             // 📄 Template สำหรับ IMPORT EXCEL: หัวคอลัมน์ที่ระบบอ่านได้ + ชีทวิธีกรอก + รายชื่อรหัสคลัง
             private async void Template_Click(object sender, RoutedEventArgs e)
             {
-                if (_viewModel.CurrentUser?.CanAddProduct != true) { DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ Import สินค้า", "ACCESS DENIED"); return; }
+                var user = _viewModel.CurrentUser;
+                if (user?.CanAddProduct != true) { DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ Import สินค้า", "ACCESS DENIED"); return; }
+
+                // เลือกคลัง -> Template ตามคอลัมน์ที่คลังนั้นแสดงใน Store (Max-Min) / ALL COLUMNS = ทุกคอลัมน์ทุกคลัง
+                var options = new List<TemplateChoiceWindow.Option>
+                {
+                    new TemplateChoiceWindow.Option { Key = "", Title = "ALL COLUMNS (ทุกคลัง)", Detail = "ทุกคอลัมน์ที่ระบบอ่านได้ ใส่รหัสคลังเองที่ STOCK1 - STOCK3", UseWith = "IMPORT EXCEL  •  Inventory Registration / Store (Max-Min)" }
+                };
+                foreach (var s in _stocks.Where(s => user.CanViewStock(s) && !s.IsLiveView))
+                    options.Add(new TemplateChoiceWindow.Option
+                    {
+                        Key = s.StkId.ToString(),
+                        Title = $"{s.Code}  •  {s.Name}",
+                        Detail = string.Join(" · ", ImportTemplateService.PartHeadsFor(s).Where(h => h != "NO")),
+                        UseWith = $"คอลัมน์ตาม Store (Max-Min) ของ {s.Code}  •  STOCK1 = {s.Code}" + (s.CountCoil ? "  •  มี COIL NO / MOTHER COIL" : "")
+                    });
+                string key = TemplateChoiceWindow.Choose("เลือกคลัง: ระบบสร้าง Template ตามคอลัมน์ที่คลังนั้นแสดงใน Store (Max-Min)", options.ToArray());
+                if (key == null) return;
+                var forStock = key.Length == 0 ? null : _stocks.FirstOrDefault(s => s.StkId.ToString() == key);
+
                 if (!DialogHelper.ShowConfirm(
-                        "ต้องการสร้างไฟล์ Template สำหรับลงทะเบียนสินค้าหลายรายการใช่หรือไม่?\n\n" +
-                        "• ไฟล์มีหัวคอลัมน์ที่ระบบอ่านได้ พร้อมชีทวิธีกรอก และรายชื่อรหัสคลัง\n" +
+                        $"ต้องการสร้างไฟล์ Template สำหรับลงทะเบียนสินค้าหลายรายการ{(forStock == null ? "" : $" ของคลัง {forStock.Code}")} ใช่หรือไม่?\n\n" +
+                        (forStock == null ? "• ไฟล์มีหัวคอลัมน์ที่ระบบอ่านได้ทั้งหมด พร้อมชีทวิธีกรอก และรายชื่อรหัสคลัง\n"
+                                          : $"• คอลัมน์ตามที่ {forStock.Code} แสดงใน Store (Max-Min) และ STOCK1 = {forStock.Code} ใส่ให้แล้ว\n") +
                         "• กรอกข้อมูลในชีทแรก แล้วนำเข้าด้วยปุ่ม IMPORT EXCEL\n\n" +
                         "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
                 btnTemplate.IsEnabled = false;
                 try
                 {
-                    string path = ImportTemplateService.NewPath("Inventory_Registration_Template");
+                    string path = ImportTemplateService.NewPath(forStock == null ? "Inventory_Registration_Template" : $"Inventory_Registration_{ImagePaths.SafeCode(forStock.Code)}");
                     var stocks = _stocks;
                     await Task.Run(() =>
                     {
                         System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
-                        new ImportTemplateService().CreatePartTemplate(path, stocks);
+                        new ImportTemplateService().CreatePartTemplate(path, stocks, forStock);
                     });
-                    LogService.WriteLog(_viewModel.CurrentUser?.UserId, "PART_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)}", "");
+                    LogService.WriteLog(_viewModel.CurrentUser?.UserId, "PART_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)} | Stock: {forStock?.Code ?? "ALL"}", "");
                     NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
                     ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
                 }
@@ -591,15 +612,25 @@
 
             // ✅ นำฟังก์ชันกลับเข้ามาอยู่ก่อนปีกกาปิดคลาสอันแรกแล้วครับ
             // 🗑 ADMIN DELETE (Level 1): เลือกคลังในหน้าต่าง แล้วลบรายการที่ติ๊ก / ลบทั้งหมดในคลัง
+            // คลังที่ลบได้: Level 1 = ทุกคลัง / ผู้ใช้อื่น = DEL ของ Product Control + DEL ของคลังนั้น
+            private List<StockModel> DeletableStocks()
+            {
+                var u = _viewModel.CurrentUser;
+                if (u == null) return new List<StockModel>();
+                if (u.UserLevel == 1) return _stocks;
+                return u.CanDeleteProduct ? _stocks.Where(u.CanDeleteInStock).ToList() : new List<StockModel>();
+            }
+
             private void AdminDelete_Click(object sender, RoutedEventArgs e)
             {
-                if (_viewModel.CurrentUser?.UserLevel != 1)
+                var allowed = DeletableStocks();
+                if (allowed.Count == 0)
                 {
-                    DialogHelper.ShowWarning("เฉพาะผู้ดูแลระบบ (Level 1) เท่านั้นที่ใช้ปุ่มนี้ได้", "ACCESS DENIED");
+                    DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ลบสินค้าในคลังใด (ต้องมี DEL ของ Inventory Registration และ DEL ของคลัง)", "ACCESS DENIED");
                     return;
                 }
                 var ticked = _viewModel.Products.Where(x => x.IsSelected && x.PtId > 0).Select(x => x.PtId).Distinct().ToList();
-                var w = new AdminDeleteWindow(_viewModel.CurrentUser, _stocks, ticked);
+                var w = new AdminDeleteWindow(_viewModel.CurrentUser, allowed, ticked);
                 if (w.ShowDialog() == true) _viewModel.LoadData(txtSearch.Text);
             }
 

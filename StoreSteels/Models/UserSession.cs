@@ -101,6 +101,8 @@ namespace CIMS.Models
         public bool CanEditStock(StockModel s) => s != null && CanViewStock(s) && P(s.PermSysId, p => p.CanEdit);
         // ลบคลัง (คลังหลักลบไม่ได้)
         public bool CanDeleteStock(StockModel s) => s != null && !s.IsMain && CanDeleteStore;
+        // DEL ของคลัง (ติ๊ก DEL ที่สิทธิ์คลังนั้น) = ลบสินค้าในคลังนั้นจากหน้า Product Control ได้
+        public bool CanDeleteInStock(StockModel s) => s != null && CanViewStock(s) && P(s.PermSysId, p => p.CanDelete);
         public bool CanImportStock(StockModel s) => s != null && s.InExcel && CanViewStock(s) && P(s.PermSysId, p => p.CanAdd);
 
         // แก้รหัสคลังแล้ว ชื่อสิทธิ์ในฐานข้อมูลเปลี่ยนตาม -> เปลี่ยนในข้อมูลผู้ใช้ที่ Login อยู่ด้วย ไม่ต้อง Login ใหม่

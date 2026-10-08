@@ -251,9 +251,9 @@
                             ToolTip="Excel file to fill in for IMPORT EXCEL (many products at once)"/>
                     <Button Content="📥 IMPORT EXCEL" Style="{StaticResource CyberButton}" Background="{StaticResource MainPurple}" Width="170" Height="45" Margin="0,0,10,0" Click="Import_Click" Visibility="{Binding AddVisibility}" FontSize="12" FontWeight="ExtraBold" />
                     <Button Content="EXPORT QR SELECT" Style="{StaticResource CyberButton}" Width="200" Height="45" Click="Export_Click" FontSize="12" FontWeight="ExtraBold" />
-                    <!-- 🗑 ลบสินค้าแบบ Admin (Level 1): เลือกคลัง -> ลบที่ติ๊ก / ลบทั้งหมดในคลัง -->
-                    <Button Content="🗑 ADMIN DELETE" Style="{StaticResource CyberButton}" Background="#B3261E" Width="170" Height="45" Margin="10,0,0,0"
-                            Click="AdminDelete_Click" Visibility="{Binding AdminVisibility}" FontSize="12" FontWeight="ExtraBold" ToolTip="Admin only: delete the ticked products or every product in a stock"/>
+                    <!-- 🗑 ลบสินค้าในคลัง: Level 1 / ผู้ที่มี DEL ของ Product Control + DEL ของคลัง -> เลือกคลัง -> ลบที่ติ๊ก / ลบทั้งหมดในคลัง -->
+                    <Button x:Name="btnStockDelete" Content="🗑 STOCK DELETE" Style="{StaticResource CyberButton}" Background="#B3261E" Width="170" Height="45" Margin="10,0,0,0"
+                            Click="AdminDelete_Click" Visibility="Collapsed" FontSize="12" FontWeight="ExtraBold" ToolTip="Delete the ticked products or every product in a stock you have DEL rights on"/>
                 </StackPanel>
             </Grid>
 

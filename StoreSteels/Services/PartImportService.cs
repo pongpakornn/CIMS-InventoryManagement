@@ -53,6 +53,7 @@ namespace CIMS.Services
         public PartImportRow CoilOwner { get; set; }   // แถวแรกของสินค้านั้น
         public int CoilStockId { get; set; }           // คลังที่นับ Coil ที่ Coil นี้เข้า
         public bool CoilStockIsMain { get; set; }
+        public PartImportRow ContOwner { get; set; }    // แถว Coil ที่เว้น PRODUCT CODE ไว้ = ของสินค้าแถวบน
         public List<int> OtherStockIds { get; } = new List<int>();
         public string Error { get; set; }
         public bool IsValid => string.IsNullOrEmpty(Error);
@@ -107,7 +108,7 @@ namespace CIMS.Services
         // หัวคอลัมน์ที่ไม่ตรงรายการด้านบน: <MAX|MIN|QTY|STOCK|BALANCE>(หน่วย) -> MAX / MIN / ยอดคงเหลือ
         //   STOCK (BOX) / QTY (BOX) = จำนวนกล่อง, STOCK (PCS) = ชิ้น (แบบ StorePC), หน่วยอื่น = ยอดคงเหลือ (QTY) ของคลัง
         //   MAX (DAY) / MIN (DAY) เป็นค่าของ Max-Min Calculator ไม่ใช่ของคลัง -> ไม่นับ
-        private static string MatchUnitHeader(string h)
+        internal static string MatchUnitHeader(string h)
         {
             foreach (var (prefix, key) in new[] { ("MAX", "MAX"), ("MIN", "MIN"), ("QTY", "QTY"), ("STOCK", "QTY"), ("BALANCE", "QTY"), ("ONHAND", "QTY") })
             {
@@ -157,6 +158,7 @@ namespace CIMS.Services
                 string Get(int r, string key) => cols.TryGetValue(key, out int c) ? ws.Cell(r, c).GetString().Trim() : "";
 
                 int lastRow = ws.LastRowUsed()?.RowNumber() ?? headerRow;
+                PartImportRow lastProduct = null;
                 for (int r = headerRow + 1; r <= lastRow; r++)
                 {
                     var item = new PartImportRow
@@ -184,8 +186,17 @@ namespace CIMS.Services
                         if (sc.Length > 0) item.StockCodes.Add(sc);
                     }
                     string psz = Get(r, "PACKSIZE");
+                    // แถว Coil ใต้แถวสินค้า (PRODUCT CODE / NAME ว่าง แต่มี COIL NO) = Coil เพิ่มของสินค้าแถวบน
+                    if (string.IsNullOrEmpty(item.Code) && string.IsNullOrEmpty(item.Name) && item.CoilNo != null)
+                    {
+                        if (lastProduct == null) { item.Error = $"COIL NO {item.CoilNo}: ไม่มีแถวสินค้าด้านบน (ใส่ PRODUCT CODE ที่แถวแรกของสินค้า)"; rows.Add(item); continue; }
+                        item.ContOwner = lastProduct;
+                        item.Code = lastProduct.Code; item.Name = lastProduct.Name; item.PartA = lastProduct.PartA;
+                        item.StockText = lastProduct.StockText; item.StockCodes.AddRange(lastProduct.StockCodes);
+                    }
                     // PRODUCT CODE นำเข้าตามไฟล์ (ไม่เอาช่องอื่นมาใส่แทน) - ไม่มีรหัสให้ใส่ "-" ในไฟล์
                     if (string.IsNullOrEmpty(item.Code) && string.IsNullOrEmpty(item.Name)) continue;
+                    if (item.ContOwner == null) lastProduct = item;
 
                     if (string.IsNullOrEmpty(item.Code)) item.Error = "ไม่มี PRODUCT CODE (ถ้าไม่มีรหัสให้ใส่ - )";
                     else if (string.IsNullOrEmpty(item.Name)) item.Error = "ไม่มีชื่อสินค้า";
@@ -211,7 +222,7 @@ namespace CIMS.Services
                         string s = Get(r, key);
                         if (s.Length == 0 || item.Error != null) return null;
                         if (CIMS.Helpers.Qty.TryParse(s, out decimal v) && v >= 0) return CIMS.Helpers.Qty.Round(v, true);
-                        item.Error = $"{label} ต้องเป็นตัวเลขไม่ติดลบ ({s})";
+                        item.Error = s.Any(char.IsDigit) ? $"{label} ต้องเป็นตัวเลขไม่ติดลบ ({s})" : $"{label} ต้องเป็นตัวเลข ไม่ใช่ชื่อหน่วย ({s}) - ใส่ยอด / น้ำหนักเป็นตัวเลข (หน่วยของคลังตั้งที่ EDIT STOCK)";
                         return null;
                     }
                     item.Max = Num("MAX", "MAX");
@@ -220,7 +231,7 @@ namespace CIMS.Services
                     item.Coil = Whole("COIL", "STOCK (COIL)");
                     item.StockPcs = Num("STOCKPCS", "STOCK (PCS)");
                     // QTY (KG.) / QTY (SHEET) ... = ยอดคงเหลือของคลัง (คอลัมน์เดียวกับ STOCK (PCS) ของคลังที่นับเป็นชิ้น)
-                    decimal? qty = Num("QTY", "QTY");
+                    decimal? qty = Num("QTY", "STOCK (UNIT)");
                     if (item.Error == null && qty.HasValue)
                     {
                         if (item.StockPcs.HasValue && item.StockPcs.Value != qty.Value)
@@ -301,7 +312,9 @@ namespace CIMS.Services
             foreach (var r in rows.Where(x => x.IsValid))
             {
                 string k = Key(r.Code, r.PartA);
-                if (existing.Contains(k)) r.Error = "สินค้านี้ลงทะเบียนไว้แล้ว (PRODUCT CODE + PART A) - เพิ่ม / อัพเดทผ่าน IMPORT EXCEL หน้า Store (Max-Min)";
+                if (r.ContOwner != null && (!r.ContOwner.IsValid || r.ContOwner.CoilNo == null))
+                    r.Error = r.ContOwner.IsValid ? $"แถวสินค้า {r.ContOwner.RowNumber} ต้องใส่ COIL NO ด้วย (สินค้าหลาย Coil)" : $"สินค้าแถว {r.ContOwner.RowNumber} ไม่ผ่าน ({r.ContOwner.Error})";
+                else if (existing.Contains(k)) r.Error = "สินค้านี้ลงทะเบียนไว้แล้ว (PRODUCT CODE + PART A) - เพิ่ม / อัพเดทผ่าน IMPORT EXCEL หน้า Store (Max-Min)";
                 else if (first.TryGetValue(k, out var owner))
                 {
                     if (r.CoilNo != null && owner.CoilNo != null) { r.IsCoilExtra = true; r.CoilOwner = owner; }

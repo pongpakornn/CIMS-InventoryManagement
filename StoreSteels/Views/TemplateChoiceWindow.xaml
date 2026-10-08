@@ -1,4 +1,4 @@
-<Window x:Class="CIMS.Views.TemplateChoiceWindow"
+﻿<Window x:Class="CIMS.Views.TemplateChoiceWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Template Excel" Width="660" SizeToContent="Height"
@@ -21,6 +21,7 @@
                 </Grid>
             </Border>
 
+            <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <ItemsControl x:Name="icOptions" Margin="26,18,26,6">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -54,6 +55,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </ScrollViewer>
 
             <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" HorizontalAlignment="Right" Margin="0,0,26,22" Click="Cancel_Click"/>
         </StackPanel>

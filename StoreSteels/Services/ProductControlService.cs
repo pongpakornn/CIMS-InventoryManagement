@@ -505,11 +505,27 @@ namespace CIMS.Services
         // 🗑 ADMIN DELETE: ลบสินค้าออกจากระบบทั้งตัว (ทุกคลัง + ประวัติสแกน / Max-Min ของสินค้านั้น) แม้ยังมียอดคงเหลือ
         //   stocks = คลังที่เลือก / ptIds = รายการที่ติ๊ก (null = ทุกสินค้าในคลังที่เลือก)
         //   ลบเฉพาะสินค้าที่อยู่ในคลังที่เลือกเท่านั้น - ทั้งหมดอยู่ใน Transaction เดียว คืนรายการที่ลบ (รหัส | PART A)
-        public List<string> AdminDeleteParts(IEnumerable<StockModel> stocks, IEnumerable<int> ptIds)
+        public List<string> AdminDeleteParts(IEnumerable<StockModel> stocks, IEnumerable<int> ptIds) => DeleteInStocks(stocks, ptIds, true).Deleted;
+
+        public class StockDeleteResult
+        {
+            public List<string> Deleted { get; } = new List<string>();   // ลบออกจากระบบทั้งตัว
+            public List<string> Removed { get; } = new List<string>();   // เอาออกเฉพาะคลังที่เลือก (ยังอยู่ในคลังอื่น)
+        }
+
+        // 🗑 ลบสินค้าในคลังที่เลือก
+        //   admin (Level 1) = ลบออกจากระบบทั้งตัวเสมอ (แบบเดิม)
+        //   ผู้ใช้ที่มีสิทธิ์ DEL ของคลัง = สินค้าที่อยู่แค่ในคลังที่เลือก -> ลบทั้งตัว / ยังอยู่คลังอื่น -> เอาออกเฉพาะคลังที่เลือก (ไม่แตะข้อมูลคลังอื่น)
+        //   Coil ในทะเบียนของสินค้า / คลังที่ลบ ถูกลบไปด้วย - ทั้งหมดใน Transaction เดียว
+        public StockDeleteResult DeleteInStocks(IEnumerable<StockModel> stocks, IEnumerable<int> ptIds, bool admin)
         {
             var stockList = stocks.ToList();
-            var deleted = new List<string>();
-            if (stockList.Count == 0) return deleted;
+            var res = new StockDeleteResult();
+            var deleted = res.Deleted;
+            if (stockList.Count == 0) return res;
+            bool coilReg = CIMS.Helpers.DbSchema.HasCoilRegister;
+            bool mainChosen = stockList.Any(s => s.IsMain);
+            string otherIds = string.Join(",", stockList.Where(s => !s.IsMain).Select(s => s.StkId).DefaultIfEmpty(0));
 
             using (var conn = new SqlConnection(_connectionString))
             {
@@ -531,21 +547,42 @@ namespace CIMS.Services
                             }
                         }
                         var targets = ptIds == null ? inStocks.ToList() : ptIds.Where(inStocks.Contains).Distinct().ToList();
-                        if (targets.Count == 0) { trans.Rollback(); return deleted; }
+                        if (targets.Count == 0) { trans.Rollback(); return res; }
 
-                        using (var cmd = new SqlCommand("CREATE TABLE #del (PartID INT PRIMARY KEY)", conn, trans)) cmd.ExecuteNonQuery();
+                        using (var cmd = new SqlCommand("CREATE TABLE #del (PartID INT PRIMARY KEY, KeepElsewhere BIT NOT NULL DEFAULT 0)", conn, trans)) cmd.ExecuteNonQuery();
                         foreach (var chunk in targets.Select((id, i) => new { id, i }).GroupBy(x => x.i / 900))
                         {
                             using (var cmd = new SqlCommand("INSERT INTO #del (PartID) VALUES " + string.Join(",", chunk.Select(x => $"({x.id})")), conn, trans))
                                 cmd.ExecuteNonQuery();
                         }
-                        using (var cmd = new SqlCommand("SELECT p.PartCode, ISNULL(p.PartA, '') FROM CIMS.Parts p JOIN #del d ON d.PartID = p.PartID ORDER BY p.PartCode", conn, trans))
-                        using (var r = cmd.ExecuteReader())
-                            while (r.Read()) deleted.Add(r.GetString(1).Length > 0 ? $"{r.GetString(0)} | {r.GetString(1)}" : r.GetString(0));
+                        // ผู้ใช้ทั่วไป: สินค้าที่ยังอยู่คลังอื่น (คลังอื่นที่ไม่ได้เลือก / คลังหลักที่ไม่ได้เลือก) = เอาออกเฉพาะคลังที่เลือก
+                        if (!admin)
+                            using (var cmd = new SqlCommand($@"
+                                UPDATE d SET KeepElsewhere = 1 FROM #del d
+                                WHERE EXISTS (SELECT 1 FROM CIMS.PartStocks ps WHERE ps.PartID = d.PartID AND ps.StockID NOT IN ({otherIds}))
+                                   OR ({(mainChosen ? "0" : "1")} = 1 AND EXISTS (SELECT 1 FROM CIMS.Parts p WHERE p.PartID = d.PartID AND p.IsShowInMaster = 1))", conn, trans))
+                                cmd.ExecuteNonQuery();
 
-                        using (var cmd = new SqlCommand(@"
-                            DELETE ps FROM CIMS.PartStocks ps JOIN #del d ON d.PartID = ps.PartID;
-                            DELETE p FROM CIMS.Parts p JOIN #del d ON d.PartID = p.PartID;
+                        using (var cmd = new SqlCommand("SELECT p.PartCode, ISNULL(p.PartA, ''), d.KeepElsewhere FROM CIMS.Parts p JOIN #del d ON d.PartID = p.PartID ORDER BY p.PartCode", conn, trans))
+                        using (var r = cmd.ExecuteReader())
+                            while (r.Read())
+                            {
+                                string name = r.GetString(1).Length > 0 ? $"{r.GetString(0)} | {r.GetString(1)}" : r.GetString(0);
+                                if (r.GetBoolean(2)) res.Removed.Add(name); else deleted.Add(name);
+                            }
+
+                        string coilAll = coilReg ? @"
+                            DELETE m FROM CIMS.CoilMoves m JOIN CIMS.Coils c ON c.CoilID = m.CoilID JOIN #del d ON d.PartID = c.PartID AND d.KeepElsewhere = 0;
+                            DELETE c FROM CIMS.Coils c JOIN #del d ON d.PartID = c.PartID AND d.KeepElsewhere = 0;" : "";
+                        string mainStk = string.Join(",", stockList.Where(s => s.IsMain).Select(s => s.StkId).DefaultIfEmpty(0));
+                        string coilHere = coilReg ? $@"
+                            DELETE m FROM CIMS.CoilMoves m JOIN CIMS.Coils c ON c.CoilID = m.CoilID JOIN #del d ON d.PartID = c.PartID AND d.KeepElsewhere = 1 WHERE c.StockID IN ({otherIds},{mainStk});
+                            DELETE c FROM CIMS.Coils c JOIN #del d ON d.PartID = c.PartID AND d.KeepElsewhere = 1 WHERE c.StockID IN ({otherIds},{mainStk});" : "";
+                        using (var cmd = new SqlCommand(coilAll + coilHere + $@"
+                            DELETE ps FROM CIMS.PartStocks ps JOIN #del d ON d.PartID = ps.PartID AND d.KeepElsewhere = 0;
+                            DELETE p FROM CIMS.Parts p JOIN #del d ON d.PartID = p.PartID AND d.KeepElsewhere = 0;
+                            DELETE ps FROM CIMS.PartStocks ps JOIN #del d ON d.PartID = ps.PartID AND d.KeepElsewhere = 1 WHERE ps.StockID IN ({otherIds});
+                            {(mainChosen ? "UPDATE p SET IsShowInMaster = 0 FROM CIMS.Parts p JOIN #del d ON d.PartID = p.PartID AND d.KeepElsewhere = 1;" : "")}
                             DROP TABLE #del;", conn, trans) { CommandTimeout = 300 })
                             cmd.ExecuteNonQuery();
 
@@ -558,7 +595,7 @@ namespace CIMS.Services
                     }
                 }
             }
-            return deleted;
+            return res;
         }
 
         // 🎯 ตรวจสอบค่าซ้ำในระบบผ่าน PartCode (partACode มิเรอร์จาก PartCode)

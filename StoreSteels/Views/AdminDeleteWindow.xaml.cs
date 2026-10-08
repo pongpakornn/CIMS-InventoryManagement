@@ -80,14 +80,19 @@ namespace CIMS.Views
 
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (_session?.UserLevel != 1) return;
             var chosen = Chosen();
+            // Level 1 = ทุกคลัง / ผู้ใช้อื่น = ต้องมี DEL ของ Inventory Registration + DEL ของทุกคลังที่เลือก
+            bool admin = _session?.UserLevel == 1;
+            if (_session == null || (!admin && (!_session.CanDeleteProduct || chosen.Any(c => !_session.CanDeleteInStock(c.Stock))))) return;
             string reason = (txtReason.Text ?? "").Trim();
             if (chosen.Count == 0 || reason.Length == 0) return;
             bool all = rbAll.IsChecked == true;
 
             string what = all ? $"สินค้าทั้งหมดในคลัง {string.Join(", ", chosen.Select(c => c.Code))}" : $"สินค้าที่ติ๊กไว้ {_tickedIds.Count:N0} รายการ (เฉพาะที่อยู่ในคลัง {string.Join(", ", chosen.Select(c => c.Code))})";
-            if (!DialogHelper.ShowConfirm($"ยืนยันการลบ{what}\n\nสินค้าจะถูกลบออกจากระบบทั้งหมด (ทุกคลัง ประวัติสแกน และค่า Max-Min) แม้ยังมียอดคงเหลือ\nลบแล้วกู้คืนไม่ได้\n\nเหตุผล: {reason}", "CONFIRM ADMIN DELETE"))
+            string how = admin
+                ? "สินค้าจะถูกลบออกจากระบบทั้งหมด (ทุกคลัง ประวัติสแกน ค่า Max-Min และ Coil) แม้ยังมียอดคงเหลือ"
+                : "สินค้าที่อยู่แค่ในคลังที่เลือก = ลบออกจากระบบ (ประวัติสแกน ค่า Max-Min และ Coil)\nสินค้าที่ยังอยู่คลังอื่น = เอาออกเฉพาะคลังที่เลือก (ข้อมูลคลังอื่นไม่เปลี่ยน)";
+            if (!DialogHelper.ShowConfirm($"ยืนยันการลบ{what}\n\n{how}\nลบแล้วกู้คืนไม่ได้\n\nเหตุผล: {reason}", "CONFIRM DELETE"))
                 return;
 
             btnDelete.IsEnabled = false;
@@ -95,14 +100,15 @@ namespace CIMS.Views
             {
                 var stocks = chosen.Select(c => c.Stock).ToList();
                 var ids = all ? null : _tickedIds.ToList();
-                var deleted = await Task.Run(() => _service.AdminDeleteParts(stocks, ids));
-                DeletedCount = deleted.Count;
-                LogService.WriteLog(_session.UserId, "ADMIN_DELETE_PART",
-                    $"{(all ? "Delete ALL" : "Delete ticked")} in {string.Join(", ", stocks.Select(s => s.Code))} | Deleted: {deleted.Count} | Reason: {reason} | Codes: {string.Join(", ", deleted.Take(100))}{(deleted.Count > 100 ? " ..." : "")}",
+                var res = await Task.Run(() => _service.DeleteInStocks(stocks, ids, admin));
+                var deleted = res.Deleted;
+                DeletedCount = deleted.Count + res.Removed.Count;
+                LogService.WriteLog(_session.UserId, admin ? "ADMIN_DELETE_PART" : "STOCK_DELETE_PART",
+                    $"{(all ? "Delete ALL" : "Delete ticked")} in {string.Join(", ", stocks.Select(s => s.Code))} | Deleted: {deleted.Count} | Removed from stock only: {res.Removed.Count} | Reason: {reason} | Codes: {string.Join(", ", deleted.Concat(res.Removed).Take(100))}{(DeletedCount > 100 ? " ..." : "")}",
                     string.Join(",", stocks.Select(s => s.Code)));
-                if (deleted.Count == 0) DialogHelper.ShowWarning("ไม่พบสินค้าที่ตรงกับคลังที่เลือก ไม่มีรายการใดถูกลบ");
-                else DialogHelper.ShowSuccess($"ลบสินค้าออกจากระบบแล้ว {deleted.Count:N0} รายการ");
-                DialogResult = deleted.Count > 0;
+                if (DeletedCount == 0) DialogHelper.ShowWarning("ไม่พบสินค้าที่ตรงกับคลังที่เลือก ไม่มีรายการใดถูกลบ");
+                else DialogHelper.ShowSuccess($"ลบสินค้าออกจากระบบแล้ว {deleted.Count:N0} รายการ" + (res.Removed.Count > 0 ? $"\nเอาออกเฉพาะคลังที่เลือก (ยังอยู่คลังอื่น) {res.Removed.Count:N0} รายการ" : ""));
+                DialogResult = DeletedCount > 0;
             }
             catch (Exception ex)
             {

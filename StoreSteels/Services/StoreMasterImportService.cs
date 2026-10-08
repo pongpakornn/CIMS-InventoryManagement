@@ -34,6 +34,7 @@ namespace CIMS.Services
         public bool IsCoilExtra { get; set; }
         public StoreMasterRow CoilOwner { get; set; }
         public StockModel CoilStock { get; set; }
+        public StoreMasterRow ContOwner { get; set; }   // แถว Coil ที่เว้น PRODUCT CODE ไว้ = ของสินค้าแถวบน
         public decimal? Qty { get; set; }
         public int? Box { get; set; }
         public int? Coil { get; set; }   // QTY (COIL) - คลังที่นับ Coil
@@ -121,8 +122,16 @@ namespace CIMS.Services
                 foreach (var cell in row.CellsUsed())
                 {
                     string h = Norm(cell.GetString());
+                    bool hit = false;
                     foreach (var kv in Headers)
-                        if (!cols.ContainsKey(kv.Key) && kv.Value.Contains(h)) { cols[kv.Key] = cell.Address.ColumnNumber; break; }
+                        if (!cols.ContainsKey(kv.Key) && kv.Value.Contains(h)) { cols[kv.Key] = cell.Address.ColumnNumber; hit = true; break; }
+                    // หัวคอลัมน์ที่มีหน่วยต่อท้าย เช่น MAX (COIL) / STOCK (SHEET.) (แบบเดียวกับ Import หน้า Inventory Registration)
+                    if (!hit && !Headers.Values.Any(v => v.Contains(h)))
+                    {
+                        string key = PartImportService.MatchUnitHeader(h);
+                        if (key == "STOCKBOX") key = "BOX";
+                        if (key != null && !cols.ContainsKey(key)) cols[key] = cell.Address.ColumnNumber;
+                    }
                 }
                 if (cols.ContainsKey("CODE") && cols.ContainsKey("NAME")) return row.RowNumber();
             }
@@ -144,6 +153,7 @@ namespace CIMS.Services
                 string Get(int r, string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c).GetString().Trim() : "";
                 string Opt(int r, string k) { string v = Get(r, k); return v.Length == 0 ? null : v; }
                 int last = ws.LastRowUsed()?.RowNumber() ?? header;
+                StoreMasterRow lastProduct = null;
 
                 for (int r = header + 1; r <= last; r++)
                 {
@@ -157,19 +167,26 @@ namespace CIMS.Services
                         MotherCoil = Opt(r, "MOTHERCOIL") is string mc && mc != "-" ? mc.ToUpperInvariant() : null,
                         Remark = cols.ContainsKey("REMARK") ? Get(r, "REMARK") : null
                     };
+                    // แถว Coil ใต้แถวสินค้า (PRODUCT CODE / NAME ว่าง แต่มี COIL NO) = Coil เพิ่มของสินค้าแถวบน
+                    if (x.Code.Length == 0 && x.Name == null && x.CoilNo != null)
+                    {
+                        if (lastProduct == null) { x.Error = $"COIL NO {x.CoilNo}: ไม่มีแถวสินค้าด้านบน (ใส่ PRODUCT CODE ที่แถวแรกของสินค้า)"; rows.Add(x); continue; }
+                        x.ContOwner = lastProduct; x.Code = lastProduct.Code; x.Name = lastProduct.Name; x.PartA = lastProduct.PartA;
+                    }
                     // PRODUCT CODE นำเข้าตามไฟล์ (ไม่เอาช่องอื่นมาใส่แทน) - ไม่มีรหัสให้ใส่ "-" ในไฟล์
                     if (x.Code.Length == 0 && x.Name == null) continue;
+                    if (x.ContOwner == null) lastProduct = x;
                     if (x.Code.Length == 0) { x.Error = "ไม่มี PRODUCT CODE (ถ้าไม่มีรหัสให้ใส่ - )"; rows.Add(x); continue; }
 
                     void Num(string key, string label, Action<decimal> set, bool whole)
                     {
                         string s = Get(r, key);
                         if (s.Length == 0 || x.Error != null) return;
-                        if (!TryDec(s, out decimal v) || v < 0 || (whole && v != Math.Floor(v))) x.Error = $"{label} ไม่ถูกต้อง ({s})";
+                        if (!TryDec(s, out decimal v) || v < 0 || (whole && v != Math.Floor(v))) x.Error = s.Any(char.IsDigit) ? $"{label} ไม่ถูกต้อง ({s})" : $"{label} ต้องเป็นตัวเลข ไม่ใช่ชื่อหน่วย ({s}) - ใส่ยอด / น้ำหนักเป็นตัวเลข";
                         else set(v);
                     }
                     Num("PACKSIZE", "PACKSIZE", v => x.PackSize = (int)v, true);
-                    Num("QTY", "QTY", v => x.Qty = v, false);
+                    Num("QTY", "STOCK (UNIT)", v => x.Qty = v, false);
                     decimal? pcs = null;
                     Num("PCS", "STOCK (PCS)", v => pcs = v, false);
                     if (x.Error == null && pcs.HasValue)
@@ -234,6 +251,11 @@ namespace CIMS.Services
             var seen = new Dictionary<string, StoreMasterRow>();
             foreach (var x in rows.Where(v => v.IsValid))
             {
+                if (x.ContOwner != null && (!x.ContOwner.IsValid || x.ContOwner.CoilNo == null))
+                {
+                    x.Error = x.ContOwner.IsValid ? $"แถวสินค้า {x.ContOwner.RowNumber} ต้องใส่ COIL NO ด้วย (สินค้าหลาย Coil)" : $"สินค้าแถว {x.ContOwner.RowNumber} ไม่ผ่าน ({x.ContOwner.Error})";
+                    continue;
+                }
                 if (seen.TryGetValue(K(x.Code, x.PartA), out var owner))
                 {
                     if (x.CoilNo != null && owner.CoilNo != null) { x.IsCoilExtra = true; x.CoilOwner = owner; }
