@@ -26,6 +26,7 @@ namespace CIMS.Services
         public string PartNo { get; set; }
         public string Model { get; set; }
         public string Remark { get; set; }
+        public string Image { get; set; }   // IMAGE = ชื่อไฟล์รูป (ว่าง = ไม่เปลี่ยน)
         public decimal? Qty { get; set; }
         public int? Box { get; set; }
         public int? Coil { get; set; }   // QTY (COIL) - คลังที่นับ Coil
@@ -70,7 +71,9 @@ namespace CIMS.Services
             ["MODEL"] = new[] { "MODEL", "MODELCODE", "โมเดล" },
             ["SHOWHIDE"] = new[] { "SHOW/HIDE", "SHOWHIDE", "SHOW", "HIDE", "แสดง/ซ่อน" },
             ["REMARK"] = new[] { "REMARK", "REMARKS", "หมายเหตุ" },
-            ["QTY"] = new[] { "QTY", "QUANTITY", "QTYKG", "QTYPCS", "QTYSHEET", "QTYBOX", "STOCKPCS", "STOCKQTY", "STOCKKG", "STOCKKGS", "STOCKSHEET", "STOCKUNIT", "BALANCE", "จำนวน", "ยอด" },
+            ["QTY"] = new[] { "QTY", "QUANTITY", "QTYKG", "QTYPCS", "QTYSHEET", "QTYBOX", "STOCKQTY", "STOCKKG", "STOCKKGS", "STOCKSHEET", "STOCKUNIT", "BALANCE", "จำนวน", "ยอด" },
+            ["PCS"] = new[] { "STOCKPCS" },   // STOCK (PCS) = ตัวเลขเดียวกับ QTY ของคลังที่นับเป็นชิ้น
+            ["IMAGE"] = new[] { "IMAGE", "IMAGEFILE", "IMAGEFILENAME", "PICTURE", "รูป", "รูปภาพ" },
             ["BOX"] = new[] { "STOCKBOX" },
             ["COIL"] = new[] { "QTYCOIL", "COIL", "COILS", "STOCKCOIL", "COILQTY" },   // QTY (COIL) ของคลังที่นับ Coil
             ["MAX"] = new[] { "MAX", "QTYMAX", "MAXKG", "MAXPCS", "MAXBOX", "MAXSHEET", "MAXUNIT" },
@@ -139,6 +142,7 @@ namespace CIMS.Services
                         RowNumber = r, Code = Get(r, "CODE"), Name = Opt(r, "NAME"),
                         Supplier = Opt(r, "SUPPLIER"), Category = Opt(r, "CATEGORY"), Bin = Opt(r, "BIN"), QrCode = Opt(r, "QRCODE"),
                         Customer = Opt(r, "CUSTOMER"), PartA = Opt(r, "PARTA"), PartNo = Opt(r, "PARTNO"), Model = Opt(r, "MODEL"),
+                        Image = Opt(r, "IMAGE") == "-" ? null : Opt(r, "IMAGE"),
                         Remark = cols.ContainsKey("REMARK") ? Get(r, "REMARK") : null
                     };
                     // PRODUCT CODE นำเข้าตามไฟล์ (ไม่เอาช่องอื่นมาใส่แทน) - ไม่มีรหัสให้ใส่ "-" ในไฟล์
@@ -154,6 +158,13 @@ namespace CIMS.Services
                     }
                     Num("PACKSIZE", "PACKSIZE", v => x.PackSize = (int)v, true);
                     Num("QTY", "QTY", v => x.Qty = v, false);
+                    decimal? pcs = null;
+                    Num("PCS", "STOCK (PCS)", v => pcs = v, false);
+                    if (x.Error == null && pcs.HasValue)
+                    {
+                        if (x.Qty.HasValue && x.Qty.Value != pcs.Value) x.Error = $"STOCK (UNIT) ({x.Qty}) ไม่ตรงกับ STOCK (PCS) ({pcs}) - ใส่อย่างใดอย่างหนึ่ง";
+                        else x.Qty = pcs;
+                    }
                     Num("BOX", "STOCK (BOX)", v => x.Box = (int)v, true);
                     Num("COIL", "STOCK (COIL)", v => x.Coil = (int)v, true);
                     Num("MAX", "MAX", v => x.Max = v, false);
@@ -235,7 +246,7 @@ namespace CIMS.Services
                                 INSERT INTO CIMS.Parts (PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category, Bin, StockQuantity, IsActive, IsShowInMaster,
                                                       ImageFileName, Supplier, Customer, PartA, PartNumber, Model)
                                 VALUES (@code, @name, ISNULL(@psz, 0), ISNULL(@qr, @code), 0, 0, ISNULL(@cat, 'GENERAL'), ISNULL(@bin, 'N/A'), 0, 1, @show,
-                                        NULL, @sup, @cust, @parta, @partno, @model);
+                                        @img, @sup, @cust, @parta, @partno, @model);
                                 SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, tr))
                             {
                                 AddPart(cmd, x);
@@ -251,7 +262,7 @@ namespace CIMS.Services
                                 UPDATE CIMS.Parts SET Description = ISNULL(@name, Description), PackSize = ISNULL(@psz, PackSize), QRCode = ISNULL(@qr, QRCode),
                                        Category = ISNULL(@cat, Category), Bin = ISNULL(@bin, Bin), Supplier = ISNULL(@sup, Supplier),
                                        Customer = ISNULL(@cust, Customer), PartA = ISNULL(@parta, PartA), PartNumber = ISNULL(@partno, PartNumber),
-                                       Model = ISNULL(@model, Model), IsActive = 1,
+                                       Model = ISNULL(@model, Model), ImageFileName = ISNULL(@img, ImageFileName), IsActive = 1,
                                        IsShowInMaster = CASE WHEN @inMain = 1 THEN ISNULL(@show, 1) ELSE IsShowInMaster END
                                 WHERE PartID = @id", conn, tr))
                             {
@@ -318,6 +329,7 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@parta", V(x.PartA));
             cmd.Parameters.AddWithValue("@partno", V(x.PartNo));
             cmd.Parameters.AddWithValue("@model", V(x.Model));
+            cmd.Parameters.AddWithValue("@img", V(x.Image));
         }
     }
 }

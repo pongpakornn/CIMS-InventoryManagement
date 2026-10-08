@@ -97,7 +97,8 @@ namespace CIMS.Services
         public static readonly string[] PartHeads =
         {
             "NO", "PRODUCT CODE", "PRODUCT NAME", "SUPPLIER", "CUSTOMER", "CATEGORY", "PART A", "PART NO", "MODEL",
-            "PACK SIZE", "BIN", "QR CODE", "STOCK1", "STOCK2", "STOCK3", "SHOW/HIDE", "MAX", "MIN", "STOCK (UNIT)", "STOCK (BOX)", "STOCK (COIL)", "REMARK"
+            "PACK SIZE", "BIN", "QR CODE", "IMAGE", "STOCK1", "STOCK2", "STOCK3", "SHOW/HIDE", "MAX", "MIN",
+            "STOCK (UNIT)", "STOCK (BOX)", "STOCK (COIL)", "STOCK (PCS)", "REMARK"
         };
 
         public void CreatePartTemplate(string path, List<StockModel> stocks)
@@ -105,7 +106,7 @@ namespace CIMS.Services
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.AddWorksheet("PRODUCTS");
-                Header(ws, PartHeads, new double[] { 6.4, 18, 34, 14, 14, 14, 16, 18, 14, 10, 10, 16, 14, 14, 14, 11, 9, 9, 10, 11, 11, 24 });
+                Header(ws, PartHeads, new double[] { 6.4, 18, 34, 14, 14, 14, 16, 18, 14, 10, 10, 16, 28, 14, 14, 14, 11, 9, 9, 10, 11, 11, 11, 24 });
                 Body(ws, 31, PartHeads.Length);   // 30 แถวว่างพร้อมเส้นตาราง
                 for (int r = 2; r <= 31; r++) ws.Cell(r, 1).Value = r - 1;
 
@@ -118,11 +119,13 @@ namespace CIMS.Services
                     ("PART A / PART NO / MODEL", "รหัสเพิ่มเติม (ไม่บังคับ) - ใช้ค้นหาและสแกนได้"),
                     ("PACK SIZE", "จำนวนต่อ 1 กล่อง / 1 ป้าย (ตัวเลข)"),
                     ("BIN / QR CODE", "ตำแหน่งเก็บ / รหัส QR ของสินค้า (ไม่บังคับ) - BIN ว่าง = N/A"),
+                    ("IMAGE", "ชื่อไฟล์รูปในโฟลเดอร์ 1. Image Stock เช่น STOCK-4C\\STOCK-4C-01.png (ไม่บังคับ / ว่าง = ไม่มีรูป หรือไม่เปลี่ยนรูปเดิม) - ใส่รูปทีละรายการได้ที่ปุ่มรูปในหน้า Inventory Registration"),
                     ("STOCK1 - STOCK3", "รหัสคลังที่สินค้าอยู่ ช่องละ 1 คลัง (ดูชีท STOCK CODES) - ไม่ใส่เลย = คลังหลัก"),
                     ("SHOW/HIDE", "1 = แสดง / 0 = ซ่อน ในตาราง Store (Max-Min) - ว่าง = แสดง"),
                     ("MAX / MIN", "MAX / MIN ของคลังที่ใส่ (ทศนิยมได้ถ้าคลังเปิด DECIMAL QTY) - หัวคอลัมน์ใส่หน่วยได้ เช่น MAX (KG.) / MIN (BOX)"),
                     ("STOCK (UNIT) / STOCK (BOX)", "ยอดคงเหลือตามหน่วยของคลัง (KG / PCS ...) / จำนวนกล่อง - ใส่อย่างใดอย่างหนึ่งหรือทั้งคู่ (ไม่ใส่ = 0) - หัวคอลัมน์ใส่หน่วยได้ เช่น STOCK (KG.)"),
                     ("STOCK (COIL)", "จำนวน Coil (จำนวนเต็ม) ของคลังที่นับ Coil เช่นคลัง KG - ยอด KG ใส่ที่ STOCK (UNIT) แยกกัน / คลังอื่นไม่ใช้ช่องนี้"),
+                    ("STOCK (PCS)", "ยอดเป็นชิ้น (ตัวเลขเดียวกับ STOCK (UNIT) ของคลังที่นับเป็นชิ้น) - ใส่ช่องใดช่องหนึ่ง ถ้าใส่ทั้งคู่ต้องเท่ากัน"),
                     ("REMARK", "หมายเหตุ (ไม่บังคับ)"),
                     ("NO", "ลำดับ - ระบบไม่ได้ใช้ ลบหรือเว้นว่างได้"),
                     ("", "กรอกข้อมูลในชีท PRODUCTS (ชีทแรก) ได้ไม่จำกัดแถว แล้วกด IMPORT EXCEL ในหน้า Inventory Registration"),

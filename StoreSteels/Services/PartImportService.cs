@@ -42,6 +42,7 @@ namespace CIMS.Services
         public int? Coil { get; set; }   // QTY (COIL) - คลังที่นับ Coil
         public decimal? StockPcs { get; set; }
         public string Remark { get; set; }
+        public string Image { get; set; }   // IMAGE = ชื่อไฟล์รูป (เก็บตามไฟล์ / ว่าง = ไม่มีรูป)
         public List<int> OtherStockIds { get; } = new List<int>();
         public string Error { get; set; }
         public bool IsValid => string.IsNullOrEmpty(Error);
@@ -62,6 +63,7 @@ namespace CIMS.Services
             ["PACKSIZE"] = new[] { "PACKSIZE", "PSZ", "PACK", "PCS" },
             ["BIN"] = new[] { "BIN", "LOCATION", "LOC" },
             ["QRCODE"] = new[] { "QRCODE", "QR" },
+            ["IMAGE"] = new[] { "IMAGE", "IMAGEFILE", "IMAGEFILENAME", "PICTURE", "รูป", "รูปภาพ" },
             ["STOCK"] = new[] { "STOCK", "STOCKCODE", "คลัง" },
             ["CUSTOMER"] = new[] { "CUSTOMER", "CUST", "CUSTOMERCODE", "ลูกค้า" },
             ["PARTA"] = new[] { "PARTA", "PARTACODE" },
@@ -154,6 +156,7 @@ namespace CIMS.Services
                         Category = Get(r, "CATEGORY"),
                         Bin = Get(r, "BIN"),
                         QrCode = Get(r, "QRCODE"),
+                        Image = Get(r, "IMAGE"),
                         StockText = Get(r, "STOCK"),
                         Customer = Get(r, "CUSTOMER"),
                         PartA = Get(r, "PARTA"),
@@ -207,7 +210,7 @@ namespace CIMS.Services
                     if (item.Error == null && qty.HasValue)
                     {
                         if (item.StockPcs.HasValue && item.StockPcs.Value != qty.Value)
-                            item.Error = $"QTY ({qty}) ไม่ตรงกับ STOCK (PCS) ({item.StockPcs}) - ใส่อย่างใดอย่างหนึ่ง";
+                            item.Error = $"STOCK (UNIT) ({qty}) ไม่ตรงกับ STOCK (PCS) ({item.StockPcs}) - ใส่อย่างใดอย่างหนึ่ง";
                         else item.StockPcs = qty;
                     }
                     string rmk = Get(r, "REMARK");
@@ -311,7 +314,7 @@ namespace CIMS.Services
                             INSERT INTO CIMS.Parts (PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category,
                                                   Bin, StockQuantity, IsActive, IsShowInMaster, ImageFileName, Supplier,
                                                   Customer, PartA, PartNumber, Model)
-                            VALUES (@code, @name, @psz, @qr, @mmax, @mmin, @cat, @bin, @mqty, 1, @show, NULL, @sup,
+                            VALUES (@code, @name, @psz, @qr, @mmax, @mmin, @cat, @bin, @mqty, 1, @show, @img, @sup,
                                     @cust, @parta, @partno, @model);
                             IF @inMain = 1 AND @rmk IS NOT NULL UPDATE CIMS.Parts SET Remark = @rmk WHERE PartID = SCOPE_IDENTITY();
                             SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
@@ -329,6 +332,7 @@ namespace CIMS.Services
                             cmd.Parameters.AddWithValue("@parta", string.IsNullOrWhiteSpace(r.PartA) ? (object)DBNull.Value : r.PartA);
                             cmd.Parameters.AddWithValue("@partno", string.IsNullOrWhiteSpace(r.PartNo) ? (object)DBNull.Value : r.PartNo);
                             cmd.Parameters.AddWithValue("@model", string.IsNullOrWhiteSpace(r.Model) ? (object)DBNull.Value : r.Model);
+                            cmd.Parameters.AddWithValue("@img", string.IsNullOrWhiteSpace(r.Image) || r.Image.Trim() == "-" ? (object)DBNull.Value : r.Image.Trim());
                             // MAX / MIN / ยอด / REMARK ของคลังหลัก (เฉพาะเมื่อระบุคลังหลัก) - ยอด: STOCK (PCS) ก่อน ไม่มีใช้ BOX x PACKSIZE
                             bool inMain = r.InMain;
                             cmd.Parameters.AddWithValue("@inMain", inMain ? 1 : 0);
