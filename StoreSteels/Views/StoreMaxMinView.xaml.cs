@@ -644,8 +644,9 @@ namespace CIMS.Views
                 var stock = _stock;
                 var c = await Task.Run(() => new StoreProductService().GetStatusCounts(stock));
                 if (c == null) return;
-                btnOverMax.Content = $"📈 MAX Stock  ({c.Value.Max:N0})";
-                btnUnderMin.Content = $"📉 MIN Stock  ({c.Value.Min:N0})";
+                btnOverMax.Content = $"📈 MAX  ({c.Value.Max:N0})";
+                btnUnderMin.Content = $"📉 MIN  ({c.Value.Min:N0})";
+                btnNoOrder.Content = $"⚪ NO ORDER  ({c.Value.NoOrder:N0})";
                 btnShowAll.Content = $"🔄 SHOW ALL  ({c.Value.Total:N0})";
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Store counts: {ex.Message}"); }
@@ -681,6 +682,13 @@ namespace CIMS.Views
                 vm.SelectedFilterType = "UNDER_MIN";
                 vm.LoadData(txtSearch.Text);
             }
+        }
+
+        // ⚪ NO ORDER: รายการที่ไม่อยู่ทั้ง MAX และ MIN (เช่นยังไม่ตั้ง MAX / MIN)
+        private void btnNoOrder_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SelectedFilterType = "NO_ORDER";
+            _viewModel.LoadData(txtSearch.Text);
         }
 
         private void btnShowAll_Click(object sender, RoutedEventArgs e)
@@ -1168,26 +1176,45 @@ namespace CIMS.Views
             }
         }
 
+        // 🔗 การ์ดเลื่อนพร้อมตาราง: การ์ดใบแรก = แถวบนสุดที่เห็นในตาราง ใบถัดไป = แถวถัดลงมา
+        //    แถวบนสุดเลื่อนพ้นไปกี่ % การ์ดก็เลื่อนไปทางซ้ายเท่านั้น (ทั้ง SHOW PRODUCTION และเลื่อนเอง) -> สินค้าบนการ์ดตรงกับตารางเสมอ
         private void CardStep(double dt)
         {
             if (_cardsStatic || cardTrack.Children.Count == 0) return;
             double width = cardCanvas.ActualWidth;
             if (width <= 0) return;
-
-            cardShift.X -= _speed * 2.5 * dt;
-
-            // ใบซ้ายสุดพ้นขอบแล้ว -> ย้ายไปต่อท้ายเป็นสินค้าถัดไป
-            while (cardTrack.Children.Count > 0 && cardShift.X <= -CardSlot)
-            {
-                var first = (FrameworkElement)cardTrack.Children[0];
-                cardTrack.Children.RemoveAt(0);
-                first.DataContext = _cardItems[_nextCard % _cardItems.Count];
-                _nextCard = (_nextCard + 1) % _cardItems.Count;
-                cardTrack.Children.Add(first);
-                cardShift.X += CardSlot;
-            }
-
             FillCards(width); // ขยายหน้าต่างแล้วเติมการ์ดให้เต็ม
+
+            var products = _viewModel.Products;
+            if (products.Count == 0) return;
+            if (_tableScroll == null) _tableScroll = GetVisualChild<ScrollViewer>(dgStore);
+            if (_tableScroll == null) return;
+            if (_tablePresenter == null)
+                _tablePresenter = _tableScroll.Template?.FindName("PART_ScrollContentPresenter", _tableScroll) as ScrollContentPresenter;
+            UIElement origin = (UIElement)_tablePresenter ?? _tableScroll;
+
+            // แถวบนสุดที่ยังเห็นอยู่ + เลื่อนพ้นขอบบนไปแล้วกี่ส่วน
+            object topItem = null; double topY = double.MaxValue, frac = 0;
+            foreach (var kv in _rowMap)
+            {
+                var row = kv.Value;
+                if (!row.IsLoaded || row.ActualHeight <= 0) continue;
+                double y = row.TranslatePoint(new Point(0, 0), origin).Y;
+                if (y + row.ActualHeight <= 0.5 || y >= topY) continue;
+                topY = y; topItem = kv.Key;
+                frac = Math.Max(0, Math.Min(1, -y / row.ActualHeight));
+            }
+            if (topItem == null) return;
+            int start = products.IndexOf(topItem as StoreProductModel);
+            if (start < 0) return;
+
+            for (int k = 0; k < cardTrack.Children.Count; k++)
+            {
+                var card = (FrameworkElement)cardTrack.Children[k];
+                var item = products[(start + k) % products.Count];
+                if (!ReferenceEquals(card.DataContext, item)) card.DataContext = item;
+            }
+            cardShift.X = -frac * CardSlot;
         }
 
         // ค่าบนการ์ดตามคอลัมน์ที่คลังเลือกแสดง (หัวข้อ, ชื่อ Property)
@@ -1290,20 +1317,53 @@ namespace CIMS.Views
             }
             info.Children.Add(head);
 
+            // ข้อมูลตามคอลัมน์ที่ตารางแสดง (ลำดับเดียวกับตาราง): CUSTOMER (ถ้าแถบกลุ่มไม่ใช่ลูกค้า) -> PD CODE (ตัวใหญ่) -> PART A / PART NO / MODEL
+            var grey = new SolidColorBrush(Color.FromRgb(0x6F, 0x69, 0x76));
+            if (_stock.ColCustomer && !_stock.GroupByCustomer)
+            {
+                var cust = new TextBlock { FontSize = 11, FontWeight = FontWeights.Bold, Foreground = grey, Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+                cust.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(StoreProductModel.Customer)) { StringFormat = "CUSTOMER : {0}" });
+                info.Children.Add(cust);
+            }
+
             var title = new TextBlock
             {
                 FontSize = 17, FontWeight = FontWeights.Black, Foreground = new SolidColorBrush(Color.FromRgb(0x2D, 0x2A, 0x32)),
-                Margin = new Thickness(0, 6, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
+                Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
             };
-            title.SetBinding(TextBlock.TextProperty, titlePath);
+            title.SetBinding(TextBlock.TextProperty, _stock.ColCode ? nameof(StoreProductModel.PartCode) : titlePath);
             info.Children.Add(title);
+
+            var ids = new List<(string Label, string Path)>();
+            foreach (string key in _stock.ColumnOrderList())
+            {
+                if (key == "PARTA" && _stock.ColPartA) ids.Add(("PART A", nameof(StoreProductModel.PartA)));
+                else if (key == "PARTNO" && _stock.ColPartNo) ids.Add(("PART NO", nameof(StoreProductModel.PartNo)));
+                else if (key == "MODEL" && _stock.ColModel) ids.Add(("MODEL", nameof(StoreProductModel.Model)));
+            }
+            if (!_stock.ColCode) ids.RemoveAll(x => x.Path == titlePath);   // ตัวที่ใช้เป็นหัวข้อแล้ว ไม่ซ้ำ
+            if (ids.Count > 0)
+            {
+                var idLine = new TextBlock { FontSize = 11, FontWeight = FontWeights.Bold, Foreground = grey, Margin = new Thickness(0, 1, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+                for (int n = 0; n < ids.Count; n++)
+                {
+                    if (n > 0) idLine.Inlines.Add(new System.Windows.Documents.Run("  •  "));
+                    idLine.Inlines.Add(new System.Windows.Documents.Run(ids[n].Label + " : "));
+                    var v = new System.Windows.Documents.Run { Foreground = purple };
+                    v.SetBinding(System.Windows.Documents.Run.TextProperty, new System.Windows.Data.Binding(ids[n].Path) { Mode = System.Windows.Data.BindingMode.OneWay });
+                    idLine.Inlines.Add(v);
+                }
+                info.Children.Add(idLine);
+            }
 
             if (_stock.ColName)
             {
                 var name = new TextBlock
                 {
                     FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x6F, 0x69, 0x76)),
-                    TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 34, Margin = new Thickness(0, 1, 0, 0)
+                    TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxHeight = (ids.Count > 0 || (_stock.ColCustomer && !_stock.GroupByCustomer)) ? 17 : 34,   // มีบรรทัดรหัสเพิ่ม -> ชื่อ 1 บรรทัด (การ์ดสูงเท่าเดิม)
+                    Margin = new Thickness(0, 1, 0, 0)
                 };
                 name.SetBinding(TextBlock.TextProperty, nameof(StoreProductModel.PartName));
                 info.Children.Add(name);

@@ -78,7 +78,7 @@ namespace CIMS.Services
         }
 
         // 🔢 จำนวนรายการทั้งคลัง / อยู่ในสถานะ MAX / MIN (เงื่อนไขเดียวกับปุ่ม MAX Stock / MIN Stock) - null = ระบบเก่า (ไม่มี view)
-        public (int Total, int Max, int Min)? GetStatusCounts(StockModel stock)
+        public (int Total, int Max, int Min, int NoOrder)? GetStatusCounts(StockModel stock)
         {
             if (!UseStockView(stock)) return null;
             using (var conn = new SqlConnection(GlobalConfig.ConnStr))
@@ -91,7 +91,7 @@ namespace CIMS.Services
                 cmd.Parameters.AddWithValue("@stk", stock.StkId);
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
-                    return r.Read() ? (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2)) : (0, 0, 0);
+                    return r.Read() ? (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2), r.GetInt32(0) - r.GetInt32(1) - r.GetInt32(2)) : (0, 0, 0, 0);
             }
         }
 
@@ -207,6 +207,9 @@ namespace CIMS.Services
                     sql.Append("AND StockStatus IN ('OVER_MAX', 'NORMAL_GOOD') AND ISNULL([Max], 0) > 0 ");
                 else if (filterType == "UNDER_MIN")
                     sql.Append("AND StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK') AND ISNULL([Min], 0) > 0 ");
+                // NO ORDER = ไม่อยู่ทั้งกลุ่ม MAX และ MIN (ยังไม่ตั้ง MAX / MIN ฯลฯ) -> MAX + MIN + NO ORDER = ทั้งหมด
+                else if (filterType == "NO_ORDER")
+                    sql.Append("AND NOT ((ISNULL(StockStatus, '') IN ('OVER_MAX', 'NORMAL_GOOD') AND ISNULL([Max], 0) > 0) OR (ISNULL(StockStatus, '') IN ('UNDER_MIN', 'OUT_OF_STOCK') AND ISNULL([Min], 0) > 0)) ");
 
                 sql.Append("ORDER BY GroupKey, PartCode OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY OPTION (MAX_GRANT_PERCENT = 5)");
 
@@ -343,6 +346,8 @@ namespace CIMS.Services
                     AND ISNULL([Min], 0) > 0
                 ");
                 }
+                else if (filterType == "NO_ORDER")
+                    sql.Append(" AND NOT ((ISNULL(StockStatus, '') IN ('OVER_MAX', 'NORMAL_GOOD') AND ISNULL([Max], 0) > 0) OR (ISNULL(StockStatus, '') IN ('UNDER_MIN', 'OUT_OF_STOCK') AND ISNULL([Min], 0) > 0)) ");
 
                 sql.Append("ORDER BY PartCode OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY");
 

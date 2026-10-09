@@ -388,13 +388,13 @@
                             ToolTip="ALL STOCKS" Click="btnBackToStocks_Click"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="📦 STORE ( MAX - MIN )" FontSize="25" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,0"/>
-                        <TextBlock x:Name="txtStockInfo" FontSize="13" FontWeight="Bold" Foreground="#8A8490" Margin="7,2,0,0" MaxWidth="360" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <TextBlock x:Name="txtStockInfo" FontSize="13" FontWeight="Bold" Foreground="#8A8490" Margin="7,2,0,0" MaxWidth="320" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding GroupLabel, StringFormat='{}{0}:'}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Foreground="#555" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="cbCategory" Width="160" Height="38" Margin="0,0,15,0"
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <TextBlock Text="{Binding GroupLabel, StringFormat='{}{0}:'}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Foreground="#555" Margin="0,3,8,3"/>
+                    <ComboBox x:Name="cbCategory" Width="150" Height="38" Margin="0,0,10,0"
                               Style="{StaticResource CyberComboBox}"
                               ItemContainerStyle="{StaticResource CyberComboBoxItem}"
                               ItemsSource="{Binding Categories}"
@@ -402,27 +402,32 @@
                               SelectionChanged="cbCategory_SelectionChanged"
                               VerticalContentAlignment="Center" Padding="10,0"/>
 
-                    <Button x:Name="btnImport" Content="📥 IMPORT EXCEL" Width="160" Margin="0,0,8,0" Click="btnImport_Click"
+                    <Button x:Name="btnImport" Content="📥 IMPORT EXCEL" MinWidth="130" Padding="12,0" Margin="0,3,8,3" Click="btnImport_Click"
                         Style="{StaticResource ModernHeaderButton}" Visibility="Collapsed"
                         Background="{StaticResource MainPurple}" Foreground="#81C784"/>
 
                     <!-- คลังที่นับ Coil: Template COIL LIST (Import ผ่านปุ่ม IMPORT EXCEL - ระบบดูจากหัวคอลัมน์ COIL NO) -->
-                    <Button x:Name="btnCoilTemplate" Content="📄 COIL TEMPLATE" Width="170" Margin="0,0,8,0" Click="btnCoilTemplate_Click"
+                    <Button x:Name="btnCoilTemplate" Content="📄 COIL TEMPLATE" MinWidth="140" Padding="12,0" Margin="0,3,8,3" Click="btnCoilTemplate_Click"
                         Style="{StaticResource ModernHeaderButton}" Visibility="Collapsed"
                         Background="{StaticResource MainPurple}" Foreground="#FFD54F"/>
 
-                    <Button x:Name="btnOverMax" Content="📈 MAX Stock" MinWidth="160" Padding="12,0" Margin="0,0,8,0" Click="btnOverMax_Click"
+                    <Button x:Name="btnOverMax" Content="📈 MAX" MinWidth="110" Padding="12,0" Margin="0,3,8,3" Click="btnOverMax_Click"
                         Style="{StaticResource ModernHeaderButton}"
                         Background="{StaticResource MainPurple}" Foreground="#FFAB40"/>
 
-                    <Button x:Name="btnUnderMin" Content="📉 MIN Stock" MinWidth="160" Padding="12,0" Margin="0,0,8,0" Click="btnUnderMin_Click"
+                    <Button x:Name="btnUnderMin" Content="📉 MIN" MinWidth="110" Padding="12,0" Margin="0,3,8,3" Click="btnUnderMin_Click"
                         Style="{StaticResource ModernHeaderButton}"
                         Background="{StaticResource MainPurple}" Foreground="#FF6B6B"/>
 
-                    <Button x:Name="btnShowAll" Content="🔄 SHOW ALL" MinWidth="120" Padding="12,0" Click="btnShowAll_Click"
+                    <!-- ⚪ NO ORDER = ไม่อยู่ทั้ง MAX และ MIN (เช่นยังไม่ตั้ง MAX / MIN) -> MAX + MIN + NO ORDER = SHOW ALL -->
+                    <Button x:Name="btnNoOrder" Content="⚪ NO ORDER" MinWidth="130" Padding="12,0" Margin="0,3,8,3" Click="btnNoOrder_Click"
+                        Style="{StaticResource ModernHeaderButton}"
+                        Background="{StaticResource MainPurple}" Foreground="#BDBDBD"/>
+
+                    <Button x:Name="btnShowAll" Content="🔄 SHOW ALL" MinWidth="120" Padding="12,0" Margin="0,3,0,3" Click="btnShowAll_Click"
                         Style="{StaticResource ModernHeaderButton}"
                         Background="{StaticResource MainPurple}" Foreground="White"/>
-                </StackPanel>
+                </WrapPanel>
             </Grid>
 
             <Grid Grid.Row="1" Margin="5,0,5,25">
