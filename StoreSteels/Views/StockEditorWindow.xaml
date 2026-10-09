@@ -146,6 +146,12 @@
                                 <TextBlock Text="Keep decimals in QTY / MAX / MIN and scans (e.g. 1,234.50 KG). Off = whole numbers."
                                            FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+                            <!-- 🔢 MAX / MIN แสดง / เก็บทศนิยมหรือไม่ (แยกจาก DECIMAL QTY) -->
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <CheckBox x:Name="chkMaxMinDecimal" Content="MAX / MIN DECIMAL" Style="{StaticResource StkChip}" VerticalAlignment="Center"/>
+                                <TextBlock Text="MAX / MIN with decimals (e.g. 5.50). Off = whole numbers (e.g. 6), even when DECIMAL QTY is on."
+                                           FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

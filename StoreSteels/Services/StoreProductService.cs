@@ -22,7 +22,7 @@ namespace CIMS.Services
         public List<StoreProductModel> GetProducts(StockModel stock, string searchKeyword, string category, string filterType, int skip, int take)
         {
             if (!UseStockView(stock)) return GetProducts(searchKeyword, category, filterType, skip, take);
-            return QueryProducts("CIMS.vw_StockMonitoring", stock.StkId, searchKeyword, category, filterType, skip, take, stock.AllowDecimal);
+            return QueryProducts("CIMS.vw_StockMonitoring", stock.StkId, searchKeyword, category, filterType, skip, take, stock.AllowDecimal, stock.MaxMinDecimal);
         }
 
         // ตัวเลือกกรองด้านบน (CATEGORY หรือ CUSTOMER ตามที่คลังจัดกลุ่ม)
@@ -50,7 +50,7 @@ namespace CIMS.Services
         public List<StoreProductModel> GetMinimalStockUpdates(StockModel stock, List<string> partCodes)
         {
             if (!UseStockView(stock)) return GetMinimalStockUpdates(partCodes);
-            return QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, partCodes, stock.AllowDecimal);
+            return QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, partCodes, stock.AllowDecimal, stock.MaxMinDecimal);
         }
 
         // ⚡ เรียลไทม์แบบเบา: ค่าเดียวที่เปลี่ยนเมื่อยอด / MAX / MIN / REMARK / SHOW ของคลังนี้เปลี่ยน (นับแถว + CHECKSUM)
@@ -79,7 +79,7 @@ namespace CIMS.Services
 
         // ตัวเลขล่าสุดของทั้งคลัง (เฉพาะคอลัมน์ที่เปลี่ยนได้) - ใช้ตอน GetChangeToken บอกว่ามีการเปลี่ยน
         public List<StoreProductModel> GetStockNumbers(StockModel stock) =>
-            QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, null, stock.AllowDecimal);
+            QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, null, stock.AllowDecimal, stock.MaxMinDecimal);
 
         // box: แก้ STOCK (BOX) -> คลังอื่นเก็บ BoxQuantity (Trigger คำนวณ QTY = BOX x Pack Size) / คลังหลักแปลงเป็นจำนวน x Pack Size
         // ptId: แถวที่แก้ (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - 0 = หาจากรหัสแบบเดิม
@@ -174,7 +174,7 @@ namespace CIMS.Services
             }
         }
 
-        private List<StoreProductModel> QueryProducts(string viewName, int stkId, string searchKeyword, string category, string filterType, int skip, int take, bool dec = false)
+        private List<StoreProductModel> QueryProducts(string viewName, int stkId, string searchKeyword, string category, string filterType, int skip, int take, bool dec = false, bool? mmDec = null)
         {
             var list = new List<StoreProductModel>();
             using (SqlConnection conn = new SqlConnection(GlobalConfig.ConnStr))
@@ -216,8 +216,8 @@ namespace CIMS.Services
                             PartName = rdr["PartName"]?.ToString() ?? "",
                             PackSize = rdr["PackSize"]?.ToString() ?? "",
                             // ยอด / MAX / MIN ตามการตั้งค่าคลัง: DECIMAL QTY = 1234.50 / ปกติ = 1234
-                            Max = rdr["Max"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), dec),
-                            Min = rdr["Min"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), dec),
+                            Max = rdr["Max"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), mmDec ?? dec),
+                            Min = rdr["Min"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), mmDec ?? dec),
                             Qty = rdr["QtyStkb"] == DBNull.Value ? "" : CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["QtyStkb"]), dec),
                             Remark = rdr["Remark"]?.ToString() ?? "",
                             Bin = rdr["Bin"]?.ToString() ?? "",
@@ -244,7 +244,7 @@ namespace CIMS.Services
             return Convert.ToDecimal(v).ToString("#,0.##", System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private List<StoreProductModel> QueryMinimalUpdates(string viewName, int stkId, List<string> partCodes, bool dec = false)
+        private List<StoreProductModel> QueryMinimalUpdates(string viewName, int stkId, List<string> partCodes, bool dec = false, bool? mmDec = null)
         {
             var list = new List<StoreProductModel>();
             // partCodes = null -> ทั้งคลัง / มีรายการ -> เฉพาะรหัสนั้น (SQL Server รับพารามิเตอร์ได้ไม่เกิน ~2,100 ตัว -> เกินนั้นดึงทั้งคลังแทน)
@@ -272,8 +272,8 @@ namespace CIMS.Services
                         {
                             PartId = Convert.ToInt32(rdr["PartID"]),
                             PartCode = rdr["PartCode"]?.ToString() ?? "",
-                            Max = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), dec),
-                            Min = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), dec),
+                            Max = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Max"]), mmDec ?? dec),
+                            Min = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["Min"]), mmDec ?? dec),
                             Qty = CIMS.Helpers.Qty.Edit(Convert.ToDecimal(rdr["QtyStkb"]), dec),
                             Remark = rdr["Remark"]?.ToString() ?? "",
                             StockStatus = rdr["StockStatus"]?.ToString() ?? "NORMAL",

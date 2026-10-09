@@ -32,6 +32,8 @@ namespace CIMS.Views
             this.CurrentUser = session;             // เก็บข้อมูลคน Login
             this.DataContext = this;                // ทำให้ Binding {Binding CurrentUser.UserLevel} ทำงานได้
             this.Closing += MainView_Closing;       // [เพิ่ม] ดักจับการปิด Window ทุกกรณีรวมถึงกด X เพื่อให้ UserID อัพเดทสถานะเป็น Offline เสมอ
+            AppUpdate.StartPeriodicCheck();   // 🔄 เปิดค้างไว้ -> ตรวจเวอร์ชันใหม่ทุก 10 นาที
+            txtAppVersion.Text = AppUpdate.VersionText;
 
             #region === [ Initial Navigation Logic : ตัดสินใจนำทางไปยังหน้าแรกที่เหมาะสมตามสิทธิ์การใช้งาน ตัวเก่าแบบไม่มีเงื่อนไข ] ===
             // เริ่มต้นที่หน้าแรก

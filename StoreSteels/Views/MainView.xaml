@@ -254,6 +254,8 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
+                    <!-- เวอร์ชันโปรแกรมที่ติดตั้ง (ClickOnce) -->
+                    <TextBlock x:Name="txtAppVersion" FontSize="9" Foreground="#55FFFFFF" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -120,13 +120,14 @@ namespace CIMS.ViewModels
                 {
                     // คลังที่เปิด DECIMAL QTY เก็บทศนิยม (สูงสุด 3 ตำแหน่ง) / คลังอื่นปัดเป็นจำนวนเต็มเหมือนเดิม
                     bool dec = Stock?.AllowDecimal == true;
+                    bool mmDec = Stock?.MaxMinDecimal == true;   // MAX / MIN ทศนิยมตามที่คลังตั้ง (MAX / MIN DECIMAL)
                     // ช่องว่าง / "-" = 0 / พิมพ์ผิด (ไม่ใช่ตัวเลข) -> แจ้งเตือน ไม่บันทึก (เดิมบันทึกเป็น 0 ทับค่าเดิมเงียบๆ)
                     decimal Field(string text, string name)
                     {
                         string t = (text ?? "").Trim();
                         if (t.Length == 0 || t == "-") return 0;
                         if (!Qty.TryParse(t, out decimal v)) throw new FormatException($"{name} \"{t}\" ไม่ใช่ตัวเลข");
-                        return Qty.Round(Math.Max(0, v), dec);
+                        return Qty.Round(Math.Max(0, v), mmDec);
                     }
                     void CheckNumber(string text, string original, string name)
                     {

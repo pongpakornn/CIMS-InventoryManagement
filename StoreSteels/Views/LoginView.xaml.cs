@@ -14,6 +14,9 @@ namespace CIMS.Views
         {
             InitializeComponent();
 
+            // 🔄 มีเวอร์ชันใหม่บน Server -> ถามอัพเดท (กรณีไม่ได้อัพเดทตอนเปิดโปรแกรม)
+            Loaded += async (s, e) => await AppUpdate.CheckAndPromptAsync(true);
+
             // ดึงค่า Username และ Password ที่บันทึกไว้
             string savedUser = CIMS.Properties.Settings.Default.SavedUsername;
             string savedPass = CIMS.Properties.Settings.Default.SavedPassword;

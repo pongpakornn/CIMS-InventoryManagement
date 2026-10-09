@@ -47,6 +47,9 @@ namespace CIMS.Models
         public bool CountCoil { get; set; }
         // กด PD CODE แล้วแสดงแถว Coil ย่อย: null = ตาม STOCK (COIL) / ตั้งเองได้ที่หน้าสร้าง / แก้คลัง
         public bool? ShowCoilRowsSetting { get; set; }
+        // MAX / MIN ทศนิยม: null = ตาม DECIMAL QTY / ตั้งเองได้ที่หน้าสร้าง / แก้คลัง
+        public bool? MaxMinDecimalSetting { get; set; }
+        public bool MaxMinDecimal => MaxMinDecimalSetting ?? AllowDecimal;
         public bool ShowCoilRows => CountCoil && (ShowCoilRowsSetting ?? true);
         // คอลัมน์ของแถว Coil ย่อย: COILNO, MOTHER, WEIGHT, COIL, TON, RECEIVED (null = แสดงทั้งหมด)
         public static readonly string[] CoilRowKeys = { "COILNO", "MOTHER", "WEIGHT", "COIL", "TON", "RECEIVED" };

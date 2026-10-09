@@ -34,6 +34,10 @@ namespace CIMS.Helpers
             }
         }
 
+        // Update_20261009.sql: CIMS.Stocks.MaxMinDecimal (MAX / MIN แสดง / เก็บทศนิยม แยกจาก DECIMAL QTY)
+        private static bool? _maxMinDecimal;
+        public static bool HasMaxMinDecimal => _maxMinDecimal ?? (_maxMinDecimal = ColumnExists("MaxMinDecimal")) ?? false;
+
         // Update_20261008b.sql: CIMS.Stocks.ShowCoilRows (กด PD CODE แล้วแสดงแถว Coil ย่อย - ตั้งได้ตอนสร้าง / แก้คลัง)
         private static bool? _coilRows;
         public static bool HasCoilRows => _coilRows ?? (_coilRows = ColumnExists("ShowCoilRows")) ?? false;

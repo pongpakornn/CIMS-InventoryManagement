@@ -49,6 +49,7 @@ namespace CIMS.Views
             chkColNo.IsChecked = s.ColNo;
             chkColModel.IsChecked = s.ColModel;
             chkAllowDecimal.IsChecked = s.AllowDecimal;
+            chkMaxMinDecimal.IsChecked = s.MaxMinDecimal;
             chkCountCoil.IsChecked = s.CountCoil;
             chkCoilRows.IsChecked = s.ShowCoilRowsSetting ?? true;
             foreach (var cb in SubRowChips()) cb.IsChecked = s.CoilRowShows((string)cb.Tag);
@@ -205,6 +206,7 @@ namespace CIMS.Views
             s.ColNo = chkColNo.IsChecked == true;
             s.ColModel = chkColModel.IsChecked == true;
             s.AllowDecimal = chkAllowDecimal.IsChecked == true;
+            s.MaxMinDecimalSetting = chkMaxMinDecimal.IsChecked == true;
             s.CountCoil = chkCountCoil.IsChecked == true;
             s.ShowCoilRowsSetting = chkCoilRows.IsChecked == true;
             var subKeys = SubRowChips().Where(cb => cb.IsChecked == true).Select(cb => (string)cb.Tag).ToList();
