@@ -19,13 +19,32 @@ namespace CIMS.Helpers
     {
         private static string Env(string name) => Environment.GetEnvironmentVariable(name);
 
-        public static bool IsNetworkDeployed => string.Equals(Env("ClickOnce_IsNetworkDeployed"), "true", StringComparison.OrdinalIgnoreCase);
+        // เปิดผ่าน ClickOnce (ไอคอนใน Start Menu) = มี Environment Variables
+        // เปิดจากไอคอนที่ปักหมุดไว้ที่ Taskbar / Shortcut ไปที่ CIMS.exe ตรงๆ = ไม่มี -> ดูจากโฟลเดอร์ที่ ClickOnce ติดตั้ง (...\Apps\2.0\...)
+        private static string BaseDir => AppContext.BaseDirectory ?? "";
+        private static bool InClickOnceCache => BaseDir.IndexOf(@"\Apps\2.0\", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        public static Version CurrentVersion =>
-            Version.TryParse(Env("ClickOnce_CurrentVersion"), out var v) ? v : typeof(AppUpdate).Assembly.GetName().Version;
+        public static bool IsNetworkDeployed =>
+            string.Equals(Env("ClickOnce_IsNetworkDeployed"), "true", StringComparison.OrdinalIgnoreCase) || InClickOnceCache;
 
-        // ไฟล์ CIMS.application บน Server (ที่ Publish ไว้)
-        public static string UpdateLocation => Env("ClickOnce_UpdateLocation") ?? Env("ClickOnce_ActivationUri");
+        // เวอร์ชันที่ติดตั้ง: จาก ClickOnce / ชื่อโฟลเดอร์ติดตั้ง (เช่น ..._0001.0000.0000.000c_... = 1.0.0.12)
+        public static Version CurrentVersion
+        {
+            get
+            {
+                if (Version.TryParse(Env("ClickOnce_CurrentVersion"), out var v)) return v;
+                var m = System.Text.RegularExpressions.Regex.Match(BaseDir, @"_([0-9a-fA-F]{4})\.([0-9a-fA-F]{4})\.([0-9a-fA-F]{4})\.([0-9a-fA-F]{4})_");
+                if (m.Success)
+                    return new Version(Convert.ToInt32(m.Groups[1].Value, 16), Convert.ToInt32(m.Groups[2].Value, 16),
+                                       Convert.ToInt32(m.Groups[3].Value, 16), Convert.ToInt32(m.Groups[4].Value, 16));
+                return typeof(AppUpdate).Assembly.GetName().Version;
+            }
+        }
+
+        // ไฟล์ CIMS.application บน Server (ที่ Publish ไว้) - ไม่มีข้อมูลจาก ClickOnce = โฟลเดอร์ Publish เดียวกับโฟลเดอร์รูป (1. Image Stock)
+        public static string UpdateLocation =>
+            Env("ClickOnce_UpdateLocation") ?? Env("ClickOnce_ActivationUri")
+            ?? (InClickOnceCache ? Path.Combine(Path.GetDirectoryName(ImagePaths.StockRoot.TrimEnd('\\')), "CIMS.application") : null);
 
         public static string VersionText => IsNetworkDeployed ? $"v{CurrentVersion}" : "v" + CurrentVersion + " (DEV)";
 

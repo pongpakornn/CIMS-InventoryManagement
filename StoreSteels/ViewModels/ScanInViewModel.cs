@@ -670,8 +670,9 @@ namespace CIMS.ViewModels
                                            && (isOut ? s.CanScanOut : s.CanScanIn)
                                            && CheckChannel(s, isOut, isPickList, supplierFmt) == null).ToList();
 
-            if (!isOut && supplierFmt?.SourceStkId != null && candidates.Count > 1)
-                candidates.RemoveAll(s => s.StkId == supplierFmt.SourceStkId.Value);
+            int? deductSrc = DeductSourceFor(supplierFmt);
+            if (!isOut && deductSrc != null && candidates.Count > 1)
+                candidates.RemoveAll(s => s.StkId == deductSrc.Value);
 
             if (candidates.Count == 0)
             {
@@ -902,7 +903,8 @@ namespace CIMS.ViewModels
             if (!isPackingCardScan)
             {
                 string raw = finalSearchCode;
-                var r = await Task.Run(() => { var f = MatchSupplier(raw, multiScope ? null : stock, out var c, out var q); return (f, c, q); });
+                bool receiving = !isOut;
+                var r = await Task.Run(() => { var f = MatchSupplier(raw, multiScope ? null : stock, out var c, out var q, receiving); return (f, c, q); });
                 supplierFmt = r.f; supplierCodes = r.c; supplierQty = r.q;
             }
             bool isSupplierScan = supplierFmt != null;
@@ -960,9 +962,10 @@ namespace CIMS.ViewModels
 
             // 🧲 ทะเบียน Coil: เลข Coil ลูก / แม่ จากป้าย (รูปแบบที่ตั้ง COIL NO FIELD #) + กันสแกนลูกเดิมซ้ำ
             ScanService.CoilLabel coil = null;
-            if (isSupplierScan && stock.CountCoil && (supplierFmt.HasCoilNo || supplierFmt.MotherCoilPos > 0))
+            var coilFmt = isSupplierScan ? CoilFormatFor(supplierFmt) : null;
+            if (isSupplierScan && stock.CountCoil && coilFmt != null)
             {
-                supplierFmt.ReadCoil(supplierRaw, out string coilNo, out string mother);
+                coilFmt.ReadCoil(supplierRaw, out string coilNo, out string mother);
                 coil = new ScanService.CoilLabel { CoilNo = coilNo, MotherCoil = mother };
                 if (coil.HasCoilNo && !IsRemainderMode)
                 {
@@ -1016,12 +1019,12 @@ namespace CIMS.ViewModels
                     // บันทึกจริงกรณีโหมดปกติ: รับเข้า หรือ ตัดสต็อกออก (UpdateStockOut คืน false ถ้าสต็อกไม่พอ)
                     // 🔁 ป้าย Supplier ที่ผูก "ตัดยอดจากคลัง" ไว้ (เช่น Panta -> STOCK-PANTA) + สแกนรับเข้า (ทุกคลัง ไม่จำกัดคลังหลัก)
                     //    -> รับเข้าเต็มจำนวน และตัดสินค้าที่ BIN เดียวกันในคลังต้นทางอัตโนมัติใน Transaction เดียวกัน
-                    bool useDeduct = !isOut && isSupplierScan && supplierFmt.SourceStkId.HasValue
-                                     && supplierFmt.SourceStkId.Value != stock.StkId;
+                    int? deductFrom = isSupplierScan ? DeductSourceFor(supplierFmt) : null;
+                    bool useDeduct = !isOut && deductFrom.HasValue && deductFrom.Value != stock.StkId;
                     bool isSaved;
                     if (useDeduct)
                     {
-                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, supplierFmt.SourceStkId.Value, remainder, coil);
+                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, deductFrom.Value, remainder, coil);
                         isSaved = deductResult.Saved;
                     }
                     else
@@ -1204,7 +1207,10 @@ namespace CIMS.ViewModels
         // รูปแบบทั้งหมดที่อ่านป้ายล่าสุดได้ (คลังเลือกหลายรูปแบบ = ใช้ร่วมกันได้ ดู FormatForStock)
         private List<(BarcodeFormatModel Fmt, List<string> Codes, decimal? Qty)> _supplierHits = new List<(BarcodeFormatModel, List<string>, decimal?)>();
 
-        private BarcodeFormatModel MatchSupplier(string raw, StockModel stock, out List<string> codes, out decimal? qty)
+        // receiving = สแกนรับเข้า: หลายรูปแบบเจอสินค้า -> เลือกรูปแบบที่สินค้าอยู่ "คลังที่รับ" ก่อน (ไม่ใช่คลังต้นทางที่จะถูกตัด)
+        //   เช่นป้าย Panta: รูปแบบ Panta (รหัส = Coil แม่) เจอสินค้าม้วนใหญ่ใน STOCK-PANTA / Panta-2 (ชื่อสินค้า) เจอสินค้าใน STOCK-MAT
+        //   -> ใช้ Panta-2 รับเข้า STOCK-MAT แล้วตัด PANTA ผ่าน Coil แม่ (ไม่รับเข้า PANTA ผิดคลัง)
+        private BarcodeFormatModel MatchSupplier(string raw, StockModel stock, out List<string> codes, out decimal? qty, bool receiving = false)
         {
             codes = null; qty = null;
             // รูปแบบที่คลังรับก่อน - สแกนร่วมหลายคลัง / AUTO = รูปแบบที่คลังไหนก็ได้ในขอบเขตรับก่อน
@@ -1218,23 +1224,46 @@ namespace CIMS.ViewModels
 
             var pick = hits[0];
             if (hits.Count > 1)
-                foreach (var h in hits)
-                    if (_scanService.FindPart(h.Fmt, h.Codes, out _) != null) { pick = h; break; }
+            {
+                var found = hits.Select(h => (Hit: h, Part: _scanService.FindPart(h.Fmt, h.Codes, out _))).Where(x => x.Part != null).ToList();
+                if (found.Count > 0)
+                {
+                    pick = found[0].Hit;
+                    if (receiving && found.Count > 1)
+                    {
+                        var sources = new HashSet<int>(hits.Where(h => h.Fmt.SourceStkId.HasValue).Select(h => h.Fmt.SourceStkId.Value));
+                        var scope = stock != null ? new List<StockModel> { stock } : ScopeStocks;
+                        var receiveIds = new HashSet<int>(scope.Where(s => !sources.Contains(s.StkId)).Select(s => s.StkId));
+                        foreach (var x in found)
+                            if (_scanService.GetPartStockIds(x.Part.PartId).Overlaps(receiveIds)) { pick = x.Hit; break; }
+                    }
+                }
+            }
             codes = pick.Codes; qty = pick.Qty;
             return pick.Fmt;
         }
 
         // 🏷️ คลังเลือกรูปแบบป้ายไว้หลายรูปแบบ = ใช้ร่วมกันได้: ถ้ารูปแบบที่เลือกมาไม่ได้ผูกกับคลังนี้
-        //    แต่มีรูปแบบอื่นของคลังนี้อ่านป้ายเดียวกันได้ -> ใช้รูปแบบนั้นแทน (รูปแบบที่เจอสินค้าก่อน)
+        //    แต่มีรูปแบบอื่นของคลังนี้อ่านป้ายเดียวกันได้ -> ใช้รูปแบบนั้นแทน (รูปแบบที่เจอสินค้า "ในคลังนี้" ก่อน)
         private void FormatForStock(StockModel stock, ref BarcodeFormatModel fmt, ref List<string> codes, ref decimal? qty)
         {
             if (stock == null || fmt == null || stock.FormatIds.Contains(fmt.FmtId)) return;
             var mine = _supplierHits.Where(h => stock.FormatIds.Contains(h.Fmt.FmtId)).ToList();
             if (mine.Count == 0) return;
-            var pick = mine.FirstOrDefault(h => _scanService.FindPart(h.Fmt, h.Codes, out _) != null);
-            if (pick.Fmt == null) pick = mine[0];
+            var withPart = mine.Select(h => (Hit: h, Part: _scanService.FindPart(h.Fmt, h.Codes, out _))).Where(x => x.Part != null).ToList();
+            var inStock = withPart.FirstOrDefault(x => _scanService.GetPartStockIds(x.Part.PartId).Contains(stock.StkId));
+            var pick = inStock.Hit.Fmt != null ? inStock.Hit : withPart.Count > 0 ? withPart[0].Hit : mine[0];
             fmt = pick.Fmt; codes = pick.Codes; qty = pick.Qty;
         }
+
+        // คลังต้นทางที่ตัดยอด: รูปแบบที่ใช้ไม่ได้ตั้ง "ตัดยอดจากคลัง" แต่รูปแบบอื่นที่อ่านป้ายเดียวกันได้ตั้งไว้ -> ใช้ค่านั้น
+        private int? DeductSourceFor(BarcodeFormatModel fmt) =>
+            fmt?.SourceStkId ?? _supplierHits.Select(h => h.Fmt.SourceStkId).FirstOrDefault(s => s.HasValue);
+
+        // รูปแบบที่ใช้อ่านเลข Coil ลูก / แม่: รูปแบบที่ใช้ไม่มีช่อง Coil -> ใช้รูปแบบอื่นที่อ่านป้ายเดียวกันได้และตั้งช่อง Coil ไว้
+        private BarcodeFormatModel CoilFormatFor(BarcodeFormatModel fmt) =>
+            fmt != null && (fmt.HasCoilNo || fmt.MotherCoilPos > 0) ? fmt
+            : _supplierHits.Select(h => h.Fmt).FirstOrDefault(f => f.HasCoilNo || f.MotherCoilPos > 0);
 
         // คลังนี้รับป้ายนี้ไหม: รูปแบบที่เลือก หรือรูปแบบอื่นของคลังที่อ่านป้ายเดียวกันได้
         private bool StockAcceptsLabel(StockModel stock, BarcodeFormatModel fmt) =>
