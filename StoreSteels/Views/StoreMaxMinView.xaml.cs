@@ -79,15 +79,32 @@ namespace CIMS.Views
         //   (2) ทะเบียน Coil - Coil เข้า / ออก / ย้าย -> แถว Coil ที่เปิดดูอยู่อัพเดทเอง
         private void AttachLiveStructure()
         {
-            if (_stock == null || _stock.IsLiveView) return;
+            if (_stock == null) return;
             var stock = _stock;
+
+            // (0) ตั้งค่าคลังนี้ถูกแก้จากเครื่องอื่น (คอลัมน์ / หน่วย / ชื่อ ...) -> เปิดหน้าใหม่ด้วยค่าล่าสุด / คลังถูกลบ -> กลับหน้าการ์ดคลัง
+            if (stock.StkId > 0)
+                LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
+                    () => LiveRefresh.DbToken($"SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Stocks WHERE StockID = {stock.StkId}",
+                                              $"SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.StockBarcodeFormats WHERE StockID = {stock.StkId}"),
+                    async () =>
+                    {
+                        var fresh = (await Task.Run(() => new StockService().GetStocks())).FirstOrDefault(s => s.StkId == stock.StkId);
+                        var main = Window.GetWindow(this) as MainView;
+                        if (main == null) return;
+                        if (fresh == null) { main.NavigateToPage(new StockCardsView(_session), "STORE ( MAX-MIN )"); return; }
+                        main.NavigateToPage(new StoreMaxMinView(_session, fresh), "STORE ( MAX-MIN )");
+                    },
+                    () => !_uiReady);
+
+            if (stock.IsLiveView) return;
             string sql = stock.IsMain
                 ? @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, Category, Customer, Supplier, PartA, PartNumber, Model, Bin,
                                                          ImageFileName, IsShowInMaster, IsActive)) FROM CIMS.Parts WHERE IsShowInMaster = 1"
                 : $@"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(ps.PartID, ps.IsShow, p.PartCode, p.Description, p.Category, p.Customer, p.Supplier, p.PartA,
                                                           p.PartNumber, p.Model, p.Bin, p.ImageFileName, p.IsActive))
                      FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = {stock.StkId}";
-            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                 () => LiveRefresh.DbToken(sql),
                 async () =>
                 {
@@ -100,7 +117,7 @@ namespace CIMS.Views
                 () => !_uiReady);
 
             if (stock.ShowCoilRows && DbSchema.HasCoilRegister)
-                LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                     () => LiveRefresh.DbToken($"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(CoilID, PartID, Status, WeightKG, MotherCoil)) FROM CIMS.Coils WHERE StockID = {stock.StkId}"),
                     RefreshOpenCoilsAsync,
                     () => !_uiReady || (!_showAllCoils && !_viewModel.Products.Any(p => p.IsCoilOpen)));
@@ -493,6 +510,11 @@ namespace CIMS.Views
                         string[] heads = coil ? new[] { "NO", "PD CODE", "PRODUCT NAME", qtyHeader, "STOCK (COIL)" } : new[] { "NO", "PD CODE", "PRODUCT NAME", qtyHeader };
                         ImportTemplateService.Header(ws, heads, new double[] { 6.4, 20, 46, 16, 13 });
 
+                        // คลังที่นับ Coil: แถว Coil ย่อยใต้สินค้าแต่ละตัว (เลข Coil / Coil แม่ / น้ำหนัก) - เหมือนกด PD CODE ในตาราง
+                        var coilsOf = coil && CIMS.Helpers.DbSchema.HasCoilRegister
+                            ? new CoilService().GetCoils(stkId, 0).ToLookup(c => c.PartId) : null;
+                        var coilRowNos = new List<int>();
+
                         int r = 2;
                         var groupRows = new List<(int Row, string Text)>();
                         foreach (var g in rows.GroupBy(p => string.IsNullOrWhiteSpace(p.GroupKey) ? "-" : p.GroupKey))
@@ -509,6 +531,17 @@ namespace CIMS.Views
                                 if (CIMS.Helpers.Qty.TryParse(p.Qty, out decimal q)) ws.Cell(r, 4).Value = q; else ws.Cell(r, 4).Value = p.Qty;
                                 if (coil) { if (CIMS.Helpers.Qty.TryParse(p.StockBox, out decimal cq)) ws.Cell(r, 5).Value = cq; else ws.Cell(r, 5).Value = 0; }
                                 r++;
+                                if (coilsOf != null && coilsOf.Contains(p.PartId))
+                                    foreach (var c in coilsOf[p.PartId])
+                                    {
+                                        ws.Cell(r, 2).Value = "↳ " + c.CoilNo;
+                                        ws.Cell(r, 3).Value = "MOTHER COIL : " + (string.IsNullOrWhiteSpace(c.MotherCoil) ? "-" : c.MotherCoil)
+                                                            + (c.ReceivedDate.HasValue ? "   •   RECEIVED " + c.ReceivedDate.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "");
+                                        ws.Cell(r, 4).Value = c.WeightKG;
+                                        ws.Cell(r, 5).Value = 1;
+                                        coilRowNos.Add(r);
+                                        r++;
+                                    }
                             }
                         }
                         int last = r - 1;
@@ -518,6 +551,16 @@ namespace CIMS.Views
                         ws.Range(2, 4, last, 4).Style.NumberFormat.Format = ImportTemplateService.QtyFormat(dec);
                         if (coil) ws.Range(2, 5, last, 5).Style.NumberFormat.Format = "#,##0";
                         foreach (var (row, text) in groupRows) ImportTemplateService.GroupRow(ws, row, heads.Length, text);
+                        // แถว Coil ย่อย: พื้นม่วงอ่อน ตัวเทา ชิดซ้ายในช่อง PD CODE (แยกจากแถวสินค้าได้ชัด) - น้ำหนักทศนิยมตามจริง
+                        foreach (int cr0 in coilRowNos)
+                        {
+                            var rr = ws.Range(cr0, 1, cr0, heads.Length);
+                            rr.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#F4F0FC");
+                            rr.Style.Font.FontColor = ClosedXML.Excel.XLColor.FromHtml("#5F5A66");
+                            rr.Style.Font.Bold = false;
+                            ws.Cell(cr0, 2).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Left;
+                            ws.Cell(cr0, 4).Style.NumberFormat.Format = "#,##0.00#";
+                        }
 
                         // คลังที่นับ Coil: แผ่น COIL DETAIL = Coil แม่ / Coil ลูก / น้ำหนัก ของสินค้าที่ Export (จัดกลุ่มตาม PD CODE)
                         if (coil && CIMS.Helpers.DbSchema.HasCoilRegister)
@@ -551,7 +594,7 @@ namespace CIMS.Views
                             if (clast >= 2)
                             {
                                 cs.Range(2, 1, clast, 1).Style.Font.Bold = true;
-                                cs.Range(2, 4, clast, 4).Style.NumberFormat.Format = "#,##0.###";
+                                cs.Range(2, 4, clast, 4).Style.NumberFormat.Format = "#,##0.00#";
                                 cs.Range(2, 5, clast, 5).Style.NumberFormat.Format = "#,##0.000";
                             }
                             foreach (var (row, text) in cGroups) ImportTemplateService.GroupRow(cs, row, ch.Length, text);
@@ -596,7 +639,7 @@ namespace CIMS.Views
 
             _refreshTimer = new DispatcherTimer();
             // ⏱️ แก้ไข: ล็อกเวลารีเฟรชเบื้องหลังให้เป็น 3 วินาที (ไม่ใช้ 0 วินาทีแล้ว เพื่อไม่ให้เบียดบังฟังก์ชันอื่น)
-            _refreshTimer.Interval = TimeSpan.FromSeconds(3);
+            _refreshTimer.Interval = TimeSpan.FromSeconds(2);
             _refreshTimer.Tick += RefreshTimer_Tick;
             _refreshTimer.Start();
         }
@@ -1177,58 +1220,26 @@ namespace CIMS.Views
             }
         }
 
-        // 🔗 การ์ดเลื่อนพร้อมตาราง: การ์ดใบแรก = แถวบนสุดที่เห็นในตาราง ใบถัดไป = แถวถัดลงมา
-        //    แถวบนสุดเลื่อนพ้นไปกี่ % การ์ดก็เลื่อนไปทางซ้ายเท่านั้น (ทั้ง SHOW PRODUCTION และเลื่อนเอง) -> สินค้าบนการ์ดตรงกับตารางเสมอ
+        // 🃏 การ์ดเลื่อนวนของตัวเอง (ไม่ผูกกับตาราง): ใบซ้ายสุดพ้นขอบ -> ย้ายไปต่อท้ายพร้อมสินค้าถัดไป (เปลี่ยนข้อมูลแค่ใบเดียว ลื่นต่อเนื่อง)
         private void CardStep(double dt)
         {
             if (_cardsStatic || cardTrack.Children.Count == 0) return;
             double width = cardCanvas.ActualWidth;
             if (width <= 0) return;
-            FillCards(width); // ขยายหน้าต่างแล้วเติมการ์ดให้เต็ม
 
-            var products = _viewModel.Products;
-            if (products.Count == 0) return;
-            if (_tableScroll == null) _tableScroll = GetVisualChild<ScrollViewer>(dgStore);
-            if (_tableScroll == null) return;
-            if (_tablePresenter == null)
-                _tablePresenter = _tableScroll.Template?.FindName("PART_ScrollContentPresenter", _tableScroll) as ScrollContentPresenter;
-            UIElement origin = (UIElement)_tablePresenter ?? _tableScroll;
+            cardShift.X -= _speed * 2.5 * dt;
 
-            // แถวบนสุดที่ยังเห็นอยู่ + เลื่อนพ้นขอบบนไปแล้วกี่ส่วน
-            object topItem = null; double topY = double.MaxValue, frac = 0;
-            foreach (var kv in _rowMap)
+            while (cardTrack.Children.Count > 0 && cardShift.X <= -CardSlot)
             {
-                var row = kv.Value;
-                if (!row.IsLoaded || row.ActualHeight <= 0) continue;
-                double y = row.TranslatePoint(new Point(0, 0), origin).Y;
-                if (y + row.ActualHeight <= 0.5 || y >= topY) continue;
-                topY = y; topItem = kv.Key;
-                frac = Math.Max(0, Math.Min(1, -y / row.ActualHeight));
-            }
-            if (topItem == null) return;
-            int start = products.IndexOf(topItem as StoreProductModel);
-            if (start < 0) return;
-
-            // แถวบนเลื่อนพ้นไป 1 แถว -> ย้ายการ์ดใบแรกไปต่อท้าย เปลี่ยนสินค้าแค่ใบนั้นใบเดียว (ใบอื่นไม่ต้องผูกข้อมูล / โหลดรูปใหม่)
-            int n = cardTrack.Children.Count;
-            var firstCard = (FrameworkElement)cardTrack.Children[0];
-            if (n > 1 && !ReferenceEquals(firstCard.DataContext, products[start % products.Count])
-                && ReferenceEquals(((FrameworkElement)cardTrack.Children[1]).DataContext, products[start % products.Count]))
-            {
+                var first = (FrameworkElement)cardTrack.Children[0];
                 cardTrack.Children.RemoveAt(0);
-                cardTrack.Children.Add(firstCard);
-                firstCard.DataContext = products[(start + n - 1) % products.Count];
+                first.DataContext = _cardItems[_nextCard % _cardItems.Count];
+                _nextCard = (_nextCard + 1) % _cardItems.Count;
+                cardTrack.Children.Add(first);
+                cardShift.X += CardSlot;
             }
-            else
-            {
-                for (int k = 0; k < n; k++)   // กระโดด (เลื่อนเอง / โหลดใหม่) -> ผูกใหม่เฉพาะใบที่ไม่ตรง
-                {
-                    var card = (FrameworkElement)cardTrack.Children[k];
-                    var item = products[(start + k) % products.Count];
-                    if (!ReferenceEquals(card.DataContext, item)) card.DataContext = item;
-                }
-            }
-            cardShift.X = -frac * CardSlot;
+
+            FillCards(width); // ขยายหน้าต่างแล้วเติมการ์ดให้เต็ม
         }
 
         // ค่าบนการ์ดตามคอลัมน์ที่คลังเลือกแสดง (หัวข้อ, ชื่อ Property)
@@ -1331,52 +1342,40 @@ namespace CIMS.Views
             }
             info.Children.Add(head);
 
-            // ข้อมูลตามคอลัมน์ที่ตารางแสดง (ลำดับเดียวกับตาราง): CUSTOMER (ถ้าแถบกลุ่มไม่ใช่ลูกค้า) -> PD CODE (ตัวใหญ่) -> PART A / PART NO / MODEL
+            // ข้อมูลบนการ์ด (บนลงล่าง): ลูกค้า (แถบ) -> PD CODE -> PART NO (ตัวใหญ่ แบบเดิม) -> ชื่อสินค้า
             var grey = new SolidColorBrush(Color.FromRgb(0x6F, 0x69, 0x76));
-            if (_stock.ColCustomer && !_stock.GroupByCustomer)
+            bool custLine = _stock.ColCustomer && !_stock.GroupByCustomer;
+            if (custLine)
             {
                 var cust = new TextBlock { FontSize = 11, FontWeight = FontWeights.Bold, Foreground = grey, Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
-                cust.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(StoreProductModel.Customer)) { StringFormat = "CUSTOMER : {0}" });
+                cust.SetBinding(TextBlock.TextProperty, nameof(StoreProductModel.Customer));
                 info.Children.Add(cust);
+            }
+
+            // PD CODE (บรรทัดใหม่ใต้ลูกค้า) - ถ้าหัวข้อใหญ่เป็น PD CODE อยู่แล้ว ไม่แสดงซ้ำ
+            bool pdLine = _stock.ColCode && titlePath != nameof(StoreProductModel.PartCode);
+            if (pdLine)
+            {
+                var pd = new TextBlock { FontSize = 13, FontWeight = FontWeights.Bold, Foreground = purple, Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+                pd.SetBinding(TextBlock.TextProperty, nameof(StoreProductModel.PartCode));
+                info.Children.Add(pd);
             }
 
             var title = new TextBlock
             {
                 FontSize = 17, FontWeight = FontWeights.Black, Foreground = new SolidColorBrush(Color.FromRgb(0x2D, 0x2A, 0x32)),
-                Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
+                Margin = new Thickness(0, pdLine ? 0 : 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
             };
-            title.SetBinding(TextBlock.TextProperty, _stock.ColCode ? nameof(StoreProductModel.PartCode) : titlePath);
+            title.SetBinding(TextBlock.TextProperty, titlePath);
             info.Children.Add(title);
-
-            var ids = new List<(string Label, string Path)>();
-            foreach (string key in _stock.ColumnOrderList())
-            {
-                if (key == "PARTA" && _stock.ColPartA) ids.Add(("PART A", nameof(StoreProductModel.PartA)));
-                else if (key == "PARTNO" && _stock.ColPartNo) ids.Add(("PART NO", nameof(StoreProductModel.PartNo)));
-                else if (key == "MODEL" && _stock.ColModel) ids.Add(("MODEL", nameof(StoreProductModel.Model)));
-            }
-            if (!_stock.ColCode) ids.RemoveAll(x => x.Path == titlePath);   // ตัวที่ใช้เป็นหัวข้อแล้ว ไม่ซ้ำ
-            if (ids.Count > 0)
-            {
-                var idLine = new TextBlock { FontSize = 11, FontWeight = FontWeights.Bold, Foreground = grey, Margin = new Thickness(0, 1, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
-                for (int n = 0; n < ids.Count; n++)
-                {
-                    if (n > 0) idLine.Inlines.Add(new System.Windows.Documents.Run("  •  "));
-                    idLine.Inlines.Add(new System.Windows.Documents.Run(ids[n].Label + " : "));
-                    var v = new System.Windows.Documents.Run { Foreground = purple };
-                    v.SetBinding(System.Windows.Documents.Run.TextProperty, new System.Windows.Data.Binding(ids[n].Path) { Mode = System.Windows.Data.BindingMode.OneWay });
-                    idLine.Inlines.Add(v);
-                }
-                info.Children.Add(idLine);
-            }
 
             if (_stock.ColName)
             {
                 var name = new TextBlock
                 {
-                    FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x6F, 0x69, 0x76)),
+                    FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = grey,
                     TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxHeight = (ids.Count > 0 || (_stock.ColCustomer && !_stock.GroupByCustomer)) ? 17 : 34,   // มีบรรทัดรหัสเพิ่ม -> ชื่อ 1 บรรทัด (การ์ดสูงเท่าเดิม)
+                    MaxHeight = (pdLine && custLine) ? 17 : 34,   // มีบรรทัดเพิ่ม 2 บรรทัด -> ชื่อ 1 บรรทัด (การ์ดสูงเท่าเดิม)
                     Margin = new Thickness(0, 1, 0, 0)
                 };
                 name.SetBinding(TextBlock.TextProperty, nameof(StoreProductModel.PartName));

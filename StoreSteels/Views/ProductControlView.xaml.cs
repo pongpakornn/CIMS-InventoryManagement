@@ -42,7 +42,7 @@
 
                 // ⚡ เรียลไทม์: เครื่องอื่นลงทะเบียน / แก้ / ลบสินค้า -> ตารางอัพเดทเอง (คงคำค้น / คลังที่กรอง / ที่ติ๊ก / ตำแหน่งเลื่อน)
                 //    ดูเฉพาะข้อมูลที่หน้านี้แสดง (ยอดคงคลังเปลี่ยนจากการสแกนไม่ทำให้โหลดใหม่)
-                LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+                LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                     () => LiveRefresh.DbToken(
                         @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, PackSize, Bin, QRCode, Category, Supplier, Customer,
                                                                  PartA, PartNumber, Model, ImageFileName, IsActive, IsShowInMaster)) FROM CIMS.Parts",

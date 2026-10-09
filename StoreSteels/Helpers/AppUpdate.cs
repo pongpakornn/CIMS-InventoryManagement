@@ -79,6 +79,15 @@ namespace CIMS.Helpers
             _asking = true;
             try
             {
+                // เปิดโปรแกรม (หน้า Login) = ยังไม่มีงานค้าง -> อัพเดทเลยไม่ต้องถาม
+                if (fromLogin)
+                {
+                    NotificationManager.Show("UPDATE VERSION", $"กำลังอัพเดทเป็นเวอร์ชัน {latest} (เครื่องนี้ {CurrentVersion})\nโปรแกรมจะเปิดใหม่ให้เอง", true);
+                    await Task.Delay(1500);
+                    Process.Start(new ProcessStartInfo(UpdateLocation) { UseShellExecute = true });
+                    Application.Current.Shutdown();
+                    return;
+                }
                 bool yes = DialogHelper.ShowConfirm(
                     $"มีโปรแกรม CIMS เวอร์ชันใหม่ {latest} (เครื่องนี้ {CurrentVersion})\n\n" +
                     (fromLogin ? "" : "• งานที่ยังไม่บันทึกกรุณาบันทึกก่อน\n") +

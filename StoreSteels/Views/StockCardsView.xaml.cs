@@ -31,7 +31,7 @@ namespace CIMS.Views
             RunEntryAnimation();
 
             // ⚡ เรียลไทม์: เครื่องอื่นเพิ่ม / แก้ / ลบคลัง -> การ์ดอัพเดทเอง
-            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                 () => LiveRefresh.DbToken("SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Stocks"),
                 () => LoadStocksAsync(true));
         }

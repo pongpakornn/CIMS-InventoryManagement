@@ -54,7 +54,7 @@ namespace CIMS.Views
             Unloaded += (s, e) => { _cts?.Cancel(); _searchTimer?.Stop(); };
 
             // ⚡ เรียลไทม์: Log ใหม่จากทุกเครื่องขึ้นเอง - เฉพาะตอนดูหน้าแรกอยู่บนสุด (กำลังเลื่อนอ่าน / หน้าอื่น = ไม่ดึงทับ)
-            LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
+            LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                 () => LiveRefresh.DbToken("SELECT MAX(LogID), COUNT_BIG(*) FROM CIMS.SystemLogs"),
                 () => LoadPage(0),
                 () => !_ready || _page != 0 || ScrollOffset(dgLog) > 0.5);

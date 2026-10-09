@@ -783,7 +783,7 @@ namespace CIMS.ViewModels
         {
             if (_liveTimer == null)
             {
-                _liveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                _liveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
                 _liveTimer.Tick += async (s, e) => await LiveRefreshAsync();
             }
             _liveTimer.Start();
