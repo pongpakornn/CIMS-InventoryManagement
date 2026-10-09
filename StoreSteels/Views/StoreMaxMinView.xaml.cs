@@ -763,7 +763,8 @@ namespace CIMS.Views
             double dt = now - _lastFrame;
             _lastFrame = now;
             if (dt <= 0) return;
-            if (dt > 0.1) dt = 0.1; // เครื่องค้างชั่วคราว - ไม่กระโดดไกล
+            // เฟรมช้า (โหลดแถว / ระบบอื่นทำงาน) -> เดินต่อแค่ ~2 เฟรม ไม่กระโดดชดเชยทีเดียว ภาพจึงไหลต่อเนื่อง ไม่กระตุก
+            if (dt > 0.034) dt = 0.034;
 
             try
             {
@@ -1208,11 +1209,24 @@ namespace CIMS.Views
             int start = products.IndexOf(topItem as StoreProductModel);
             if (start < 0) return;
 
-            for (int k = 0; k < cardTrack.Children.Count; k++)
+            // แถวบนเลื่อนพ้นไป 1 แถว -> ย้ายการ์ดใบแรกไปต่อท้าย เปลี่ยนสินค้าแค่ใบนั้นใบเดียว (ใบอื่นไม่ต้องผูกข้อมูล / โหลดรูปใหม่)
+            int n = cardTrack.Children.Count;
+            var firstCard = (FrameworkElement)cardTrack.Children[0];
+            if (n > 1 && !ReferenceEquals(firstCard.DataContext, products[start % products.Count])
+                && ReferenceEquals(((FrameworkElement)cardTrack.Children[1]).DataContext, products[start % products.Count]))
             {
-                var card = (FrameworkElement)cardTrack.Children[k];
-                var item = products[(start + k) % products.Count];
-                if (!ReferenceEquals(card.DataContext, item)) card.DataContext = item;
+                cardTrack.Children.RemoveAt(0);
+                cardTrack.Children.Add(firstCard);
+                firstCard.DataContext = products[(start + n - 1) % products.Count];
+            }
+            else
+            {
+                for (int k = 0; k < n; k++)   // กระโดด (เลื่อนเอง / โหลดใหม่) -> ผูกใหม่เฉพาะใบที่ไม่ตรง
+                {
+                    var card = (FrameworkElement)cardTrack.Children[k];
+                    var item = products[(start + k) % products.Count];
+                    if (!ReferenceEquals(card.DataContext, item)) card.DataContext = item;
+                }
             }
             cardShift.X = -frac * CardSlot;
         }
@@ -1250,8 +1264,8 @@ namespace CIMS.Views
                 Margin = new Thickness(0, 0, CardGap, 0),
                 Padding = new Thickness(12),
                 CornerRadius = new CornerRadius(18),
-                BorderThickness = new Thickness(2),
-                Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 1, Opacity = 0.12, Color = Colors.Black }
+                BorderThickness = new Thickness(2)
+                // ไม่ใส่ DropShadowEffect: การ์ดเลื่อนทุกเฟรม เอฟเฟกต์เงาต้องวาดใหม่ตลอด ทำให้ SHOW PRODUCTION กระตุก
             };
 
             // สีการ์ดตามสถานะ: ต่ำกว่า MIN = แดง / ปกติ - เกิน MAX = เขียว / ยังไม่ตั้ง MAX-MIN = เทา

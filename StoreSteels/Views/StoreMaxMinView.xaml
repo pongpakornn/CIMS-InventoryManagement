@@ -261,25 +261,19 @@
                 </EventTrigger>
             </Style.Triggers>
         </Style>-->
+        <!-- จุดสถานะ: วงแหวนสีโปร่ง (ไม่ใช้ DropShadowEffect - เอฟเฟกต์เบลอทุกแถวทำให้ตาราง / SHOW PRODUCTION กระตุก) -->
         <Style x:Key="CyberGlowEllipse" TargetType="Ellipse">
+            <Setter Property="StrokeThickness" Value="5"/>
             <Setter Property="Width" Value="35"/>
             <Setter Property="Height" Value="35"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
 
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="LimeGreen" BlurRadius="12" ShadowDepth="0" Opacity="0.7"/>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Stroke" Value="#6632CD32"/>
 
             <Style.Triggers>
                 <Trigger Property="Fill" Value="Crimson">
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="Red" BlurRadius="15" ShadowDepth="0" Opacity="0.9"/>
-                        </Setter.Value>
-                    </Setter>
+                    <Setter Property="Stroke" Value="#77FF2020"/>
 
                     <Trigger.EnterActions>
                         <BeginStoryboard Name="RedAlertBlink">
@@ -298,19 +292,11 @@
                 </Trigger>
 
                 <Trigger Property="Fill" Value="#2F8247">
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="DarkGreen" BlurRadius="10" ShadowDepth="0" Opacity="0.6"/>
-                        </Setter.Value>
-                    </Setter>
+                    <Setter Property="Stroke" Value="#662F8247"/>
                 </Trigger>
 
                 <Trigger Property="Fill" Value="LightGray">
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="Gray" BlurRadius="5" ShadowDepth="0" Opacity="0.4"/>
-                        </Setter.Value>
-                    </Setter>
+                    <Setter Property="Stroke" Value="#44808080"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
