@@ -312,6 +312,33 @@ namespace CIMS.Services
             }
         }
 
+        // Coil แม่ (COIL NO = เลข Coil แม่) ในคลังต้นทาง: หักน้ำหนักเท่าที่ตัด / เหลือ 0 = OUT (ใช้หมดแล้ว)
+        private static void ConsumeMotherCoil(SqlConnection conn, SqlTransaction trans, string mother, int stkId, int partId, decimal used, int txId, string userId)
+        {
+            int coilId = 0; decimal w = 0;
+            using (var cmd = new SqlCommand(@"SELECT TOP 1 CoilID, WeightKG FROM CIMS.Coils WITH (UPDLOCK, HOLDLOCK)
+                                              WHERE CoilNo = @m AND StockID = @s AND PartID = @p AND Status = 'IN'", conn, trans))
+            {
+                cmd.Parameters.AddWithValue("@m", mother);
+                cmd.Parameters.AddWithValue("@s", stkId);
+                cmd.Parameters.AddWithValue("@p", partId);
+                using (var r = cmd.ExecuteReader())
+                    if (r.Read()) { coilId = r.GetInt32(0); w = r.GetDecimal(1); }
+            }
+            if (coilId == 0) return;   // ไม่มี Coil แม่ลงทะเบียนเอง (มีแค่ Coil ลูกที่อ้างถึง) -> ไม่ต้องหัก
+            decimal left = Math.Max(0, w - used);
+            string status = left <= 0 ? "OUT" : "IN";
+            using (var cmd = new SqlCommand(@"UPDATE CIMS.Coils SET WeightKG = @w, Status = @st, OutDate = CASE WHEN @st = 'OUT' THEN GETDATE() ELSE OutDate END,
+                                                     UpdatedDate = GETDATE() WHERE CoilID = @id", conn, trans))
+            {
+                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@w", left));
+                cmd.Parameters.AddWithValue("@st", status);
+                cmd.Parameters.AddWithValue("@id", coilId);
+                cmd.ExecuteNonQuery();
+            }
+            AddCoilMove(conn, trans, coilId, "CONSUME", txId, stkId, partId, "IN", w, stkId, partId, status, left, userId);
+        }
+
         // จ่าย Coil ลูกออกทั้งลูก (อยู่ในคลังนี้เท่านั้น)
         private static void CoilOut(SqlConnection conn, SqlTransaction trans, CoilLabel coil, int stkId, int? txId, string userId)
         {
@@ -517,12 +544,7 @@ namespace CIMS.Services
                         }
                         if (result.SourceCode == null) result.SourceCode = $"STK_{sourceStkId}";
 
-                        string bin;
-                        using (var cmd = new SqlCommand("SELECT Bin FROM CIMS.Parts WHERE PartID = @p", conn, trans))
-                        {
-                            cmd.Parameters.AddWithValue("@p", ptId);
-                            bin = BinKey(cmd.ExecuteScalar());
-                        }
+                        // ไม่ใช้ BIN แล้ว (ต.ค. 2026): หาต้นทางจากทะเบียน Coil (Coil ลูก > Coil แม่) ไม่เจอ = สินค้าตัวเดียวกัน
 
                         // 🧲 ทะเบียน Coil: Coil ลูกนี้อยู่ในคลังต้นทาง -> สินค้าของลูกนั้น / ไม่เจอลูก -> สินค้าที่มี Coil แม่เดียวกันในคลังต้นทาง
                         int coilPart = 0; string how = null;
@@ -547,26 +569,15 @@ namespace CIMS.Services
                                     if (v != null && v != DBNull.Value) { coilPart = Convert.ToInt32(v); how = "MOTHER COIL"; }
                                 }
                         }
-                        // Coil แม่ใช้เป็น BIN ได้ด้วย (สินค้าที่กรอก BIN = เลข Coil แม่)
-                        string mbin = BinKey(coil?.MotherCoil);
-
                         int srcPart = 0; int srcCoil = 0;
                         using (var cmd = new SqlCommand(@"
-                            SELECT TOP 1 ps.PartID, ps.Quantity, ps.BoxQuantity, p.PartCode,
-                                   CASE WHEN @bin <> '' AND UPPER(LTRIM(RTRIM(ISNULL(p.Bin, '')))) = @bin THEN 1 ELSE 0 END AS ByBin
+                            SELECT TOP 1 ps.PartID, ps.Quantity, ps.BoxQuantity, p.PartCode
                             FROM CIMS.PartStocks ps WITH (UPDLOCK, HOLDLOCK)
                             JOIN CIMS.Parts p ON p.PartID = ps.PartID
-                            WHERE ps.StockID = @s
-                              AND ((@cp > 0 AND ps.PartID = @cp)
-                                   OR (@cp = 0 AND ((@bin <> '' AND UPPER(LTRIM(RTRIM(ISNULL(p.Bin, '')))) = @bin)
-                                                    OR (@mbin <> '' AND UPPER(LTRIM(RTRIM(ISNULL(p.Bin, '')))) = @mbin)
-                                                    OR ps.PartID = @p)))
-                            ORDER BY CASE WHEN ps.PartID = @p THEN 0 ELSE 1 END, ps.Quantity DESC, ps.PartID", conn, trans))
+                            WHERE ps.StockID = @s AND ps.PartID = CASE WHEN @cp > 0 THEN @cp ELSE @p END", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@s", sourceStkId);
                             cmd.Parameters.AddWithValue("@p", ptId);
-                            cmd.Parameters.AddWithValue("@bin", bin);
-                            cmd.Parameters.AddWithValue("@mbin", mbin);
                             cmd.Parameters.AddWithValue("@cp", coilPart);
                             using (var r = cmd.ExecuteReader())
                                 if (r.Read())
@@ -575,8 +586,8 @@ namespace CIMS.Services
                                     result.SourceBefore = CIMS.Helpers.Qty.Read(r[1]);
                                     srcCoil = Convert.ToInt32(r[2]);
                                     result.SourcePartCode = r.GetString(3);
-                                    result.MatchedByBin = (coilPart > 0 || Convert.ToInt32(r[4]) == 1 || mbin.Length > 0) && srcPart != ptId;
-                                    result.MatchedHow = how ?? (srcPart == ptId ? "SAME PRODUCT" : "BIN");
+                                    result.MatchedByBin = coilPart > 0 && srcPart != ptId;   // ตัดจากคนละรหัส (ผ่านทะเบียน Coil)
+                                    result.MatchedHow = how ?? "SAME PRODUCT";
                                 }
                         }
 
@@ -586,7 +597,8 @@ namespace CIMS.Services
                         if (result.Deducted > 0)
                         {
                             // คลังต้นทางนับ Coil: -1 Coil (ไม่ต่ำกว่า 0) ใน Statement เดียวกับ KG (Trigger จึงไม่คำนวณกล่องใหม่)
-                            bool coilOut = sourceCoil && !remainder && srcCoil > 0;
+                            //   เจอผ่านทะเบียน Coil -> ไม่ลบ 1 ตรงนี้ นับใหม่จากทะเบียนด้านล่างแทน (Coil แม่ 1 ม้วน = Coil ลูกหลายม้วน)
+                            bool coilOut = sourceCoil && !remainder && srcCoil > 0 && how == null;
                             string sql = sourceCoil
                                 ? "UPDATE CIMS.PartStocks SET Quantity = Quantity - @q, BoxQuantity = BoxQuantity - @c, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @sp"
                                 : "UPDATE CIMS.PartStocks SET Quantity = Quantity - @q, UpdatedDate = GETDATE() WHERE StockID = @s AND PartID = @sp";
@@ -621,8 +633,14 @@ namespace CIMS.Services
                             }
                         }
 
+                        // 🧲 Coil แม่ในคลังต้นทาง: หักน้ำหนักที่ตัดออก / เหลือ 0 = Coil แม่หมด (OUT) - บันทึก CoilMoves ผูกรายการสแกน (ยกเลิกแล้วคืนได้)
+                        if (how == "MOTHER COIL" && result.Deducted > 0) ConsumeMotherCoil(conn, trans, coil.MotherCoil.Trim(), sourceStkId, srcPart, result.Deducted, txId, userId);
+
                         // 🧲 ย้าย Coil ลูก (มีอยู่ในคลังต้นทาง) / เพิ่มใหม่ เข้าคลังที่รับ - น้ำหนักตามป้าย
                         if (stock.CountCoil && !remainder) CoilReceive(conn, trans, coil, ptId, stock.StkId, qty, txId, userId);
+
+                        // STOCK (COIL) ของต้นทาง = จำนวน Coil ในทะเบียน (เมื่อหาเจอผ่านทะเบียน Coil)
+                        if (how != null && sourceCoil && srcPart > 0) CoilImportService.RecountCoils(conn, trans, srcPart, sourceStkId, false);
 
                         trans.Commit();
                         result.Saved = true;

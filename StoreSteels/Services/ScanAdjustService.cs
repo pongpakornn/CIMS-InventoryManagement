@@ -229,6 +229,7 @@ namespace CIMS.Services
 
                         // 4) สแกนรับเข้าคลังหลักที่ตัดยอดคลังต้นทางอัตโนมัติ (รูปแบบป้ายที่ตั้ง "ตัดยอดจากคลัง") -> ยกเลิกแล้วคืนยอดคลังต้นทางด้วย
                         string sourceNote = null;
+                        int recountPart = 0, recountStk = 0;   // คลังต้นทางนับ Coil: ใช้นับ STOCK (COIL) ใหม่จากทะเบียนหลังย้อน Coil
                         // รับเข้าได้ทุกคลัง / คลังต้นทางอาจเป็นสินค้าคนละรหัสที่ BIN เดียวกัน (SourcePartID)
                         if (!newQty.HasValue && type == "IN")
                         {
@@ -263,6 +264,7 @@ namespace CIMS.Services
                                     cmd.Parameters.AddWithValue("@s", fromStk);
                                     cmd.Parameters.AddWithValue("@p", srcPt);
                                     if (cmd.ExecuteNonQuery() > 0) sourceNote = $"คืนยอดคลังต้นทาง {fromCode} +{CIMS.Helpers.Qty.Plain(trfQty)}";
+                                    if (srcCoil) { recountPart = srcPt; recountStk = fromStk; }
                                 }
                             }
                         }
@@ -274,7 +276,7 @@ namespace CIMS.Services
                             if (newQty.HasValue)
                             {
                                 using (var cmd = new SqlCommand(@"UPDATE c SET c.WeightKG = @w, c.UpdatedDate = GETDATE() FROM CIMS.Coils c
-                                                                  WHERE c.Status = 'IN' AND c.CoilID IN (SELECT CoilID FROM CIMS.CoilMoves WHERE ScanTransactionID = @tx AND Undone = 0 AND ToStatus = 'IN')", conn, trans))
+                                                                  WHERE c.Status = 'IN' AND c.CoilID IN (SELECT CoilID FROM CIMS.CoilMoves WHERE ScanTransactionID = @tx AND Undone = 0 AND ToStatus = 'IN' AND Action <> 'CONSUME')", conn, trans))
                                 {
                                     cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@w", newQty.Value));
                                     cmd.Parameters.AddWithValue("@tx", txId);
@@ -312,6 +314,8 @@ namespace CIMS.Services
                                     }
                                 }
                                 if (moves.Count > 0) sourceNote = (sourceNote == null ? "" : sourceNote + " | ") + $"ย้อนทะเบียน Coil {moves.Count} รายการ";
+                                // ตัดผ่านทะเบียน Coil (Coil แม่ / Coil ลูก) -> STOCK (COIL) ต้นทาง = นับจากทะเบียน (แทน +1 ด้านบน)
+                                if (moves.Count > 0 && recountPart > 0) CoilImportService.RecountCoils(conn, trans, recountPart, recountStk, false);
                             }
                         }
 

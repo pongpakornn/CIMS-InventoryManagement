@@ -60,6 +60,7 @@ namespace CIMS.Views
                 _viewModel.LoadData();
                 InitializeAutoScroll();
                 InitializeRealTimeRefresh();
+                _ = RefreshCountsAsync();   // จำนวนบนปุ่ม MAX / MIN / SHOW ALL
                 _uiReady = true;
             };
 
@@ -624,11 +625,31 @@ namespace CIMS.Views
             try
             {
                 await _viewModel.UpdateStockFromDbAsync();
+                await RefreshCountsAsync();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in View RefreshTimer_Tick: {ex.Message}");
             }
+        }
+
+        // 🔢 จำนวนรายการบนปุ่ม: MAX Stock (n) / MIN Stock (n) / SHOW ALL (ทั้งหมด) - อัพเดทพร้อมรอบเรียลไทม์
+        private bool _countsBusy;
+        private async Task RefreshCountsAsync()
+        {
+            if (_countsBusy || _stock == null) return;
+            _countsBusy = true;
+            try
+            {
+                var stock = _stock;
+                var c = await Task.Run(() => new StoreProductService().GetStatusCounts(stock));
+                if (c == null) return;
+                btnOverMax.Content = $"📈 MAX Stock  ({c.Value.Max:N0})";
+                btnUnderMin.Content = $"📉 MIN Stock  ({c.Value.Min:N0})";
+                btnShowAll.Content = $"🔄 SHOW ALL  ({c.Value.Total:N0})";
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Store counts: {ex.Message}"); }
+            finally { _countsBusy = false; }
         }
 
         #endregion

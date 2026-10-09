@@ -388,7 +388,7 @@
                             ToolTip="ALL STOCKS" Click="btnBackToStocks_Click"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="📦 STORE ( MAX - MIN )" FontSize="25" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,0"/>
-                        <TextBlock x:Name="txtStockInfo" FontSize="13" FontWeight="Bold" Foreground="#8A8490" Margin="7,2,0,0"/>
+                        <TextBlock x:Name="txtStockInfo" FontSize="13" FontWeight="Bold" Foreground="#8A8490" Margin="7,2,0,0" MaxWidth="360" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -411,15 +411,15 @@
                         Style="{StaticResource ModernHeaderButton}" Visibility="Collapsed"
                         Background="{StaticResource MainPurple}" Foreground="#FFD54F"/>
 
-                    <Button x:Name="btnOverMax" Content="📈 MAX Stock" Width="160" Margin="0,0,8,0" Click="btnOverMax_Click"
+                    <Button x:Name="btnOverMax" Content="📈 MAX Stock" MinWidth="160" Padding="12,0" Margin="0,0,8,0" Click="btnOverMax_Click"
                         Style="{StaticResource ModernHeaderButton}"
                         Background="{StaticResource MainPurple}" Foreground="#FFAB40"/>
 
-                    <Button x:Name="btnUnderMin" Content="📉 MIN Stock" Width="160" Margin="0,0,8,0" Click="btnUnderMin_Click"
+                    <Button x:Name="btnUnderMin" Content="📉 MIN Stock" MinWidth="160" Padding="12,0" Margin="0,0,8,0" Click="btnUnderMin_Click"
                         Style="{StaticResource ModernHeaderButton}"
                         Background="{StaticResource MainPurple}" Foreground="#FF6B6B"/>
 
-                    <Button x:Name="btnShowAll" Content="🔄 SHOW ALL" Width="120" Click="btnShowAll_Click"
+                    <Button x:Name="btnShowAll" Content="🔄 SHOW ALL" MinWidth="120" Padding="12,0" Click="btnShowAll_Click"
                         Style="{StaticResource ModernHeaderButton}"
                         Background="{StaticResource MainPurple}" Foreground="White"/>
                 </StackPanel>

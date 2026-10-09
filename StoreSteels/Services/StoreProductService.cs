@@ -77,6 +77,24 @@ namespace CIMS.Services
             }
         }
 
+        // 🔢 จำนวนรายการทั้งคลัง / อยู่ในสถานะ MAX / MIN (เงื่อนไขเดียวกับปุ่ม MAX Stock / MIN Stock) - null = ระบบเก่า (ไม่มี view)
+        public (int Total, int Max, int Min)? GetStatusCounts(StockModel stock)
+        {
+            if (!UseStockView(stock)) return null;
+            using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+            using (var cmd = new SqlCommand(@"
+                SELECT COUNT(*),
+                       ISNULL(SUM(CASE WHEN StockStatus IN ('OVER_MAX', 'NORMAL_GOOD') AND ISNULL([Max], 0) > 0 THEN 1 ELSE 0 END), 0),
+                       ISNULL(SUM(CASE WHEN StockStatus IN ('UNDER_MIN', 'OUT_OF_STOCK') AND ISNULL([Min], 0) > 0 THEN 1 ELSE 0 END), 0)
+                FROM CIMS.vw_StockMonitoring WHERE StkId = @stk OPTION (MAX_GRANT_PERCENT = 5)", conn))
+            {
+                cmd.Parameters.AddWithValue("@stk", stock.StkId);
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    return r.Read() ? (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2)) : (0, 0, 0);
+            }
+        }
+
         // ตัวเลขล่าสุดของทั้งคลัง (เฉพาะคอลัมน์ที่เปลี่ยนได้) - ใช้ตอน GetChangeToken บอกว่ามีการเปลี่ยน
         public List<StoreProductModel> GetStockNumbers(StockModel stock) =>
             QueryMinimalUpdates("CIMS.vw_StockMonitoring", stock.StkId, null, stock.AllowDecimal, stock.MaxMinDecimal);
