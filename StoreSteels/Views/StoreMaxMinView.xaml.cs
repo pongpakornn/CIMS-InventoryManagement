@@ -1323,12 +1323,16 @@ namespace CIMS.Views
 
             if (_stock.UseMaxMin)
             {
-                var dot = new System.Windows.Shapes.Ellipse { Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center };
+                // 🚦 สัญญาณไฟเล็ก: แสงฟุ้ง + ดวงไฟ (แบบเดียวกับคอลัมน์ STATUS)
+                var dot = new Grid { Width = 26, Height = 26, VerticalAlignment = VerticalAlignment.Center };
                 DockPanel.SetDock(dot, Dock.Right);
-                dot.SetBinding(System.Windows.Shapes.Shape.FillProperty, new System.Windows.Data.Binding(nameof(StoreProductModel.StockStatus))
+                var statusConv = (System.Windows.Data.IValueConverter)FindResource("StatusToColorConverter");
+                foreach (var (size, mode) in new[] { (26.0, "glow"), (12.0, "lamp") })
                 {
-                    Converter = (System.Windows.Data.IValueConverter)FindResource("StatusToColorConverter")
-                });
+                    var e = new System.Windows.Shapes.Ellipse { Width = size, Height = size, IsHitTestVisible = false };
+                    e.SetBinding(System.Windows.Shapes.Shape.FillProperty, new System.Windows.Data.Binding(nameof(StoreProductModel.StockStatus)) { Converter = statusConv, ConverterParameter = mode });
+                    dot.Children.Add(e);
+                }
                 head.Children.Add(dot);
 
                 // ป้ายสถานะ (LOW STOCK / NORMAL / OVER MAX / NO MAX-MIN)

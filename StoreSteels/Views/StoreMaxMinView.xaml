@@ -261,43 +261,26 @@
                 </EventTrigger>
             </Style.Triggers>
         </Style>-->
-        <!-- จุดสถานะ: วงแหวนสีโปร่ง (ไม่ใช้ DropShadowEffect - เอฟเฟกต์เบลอทุกแถวทำให้ตาราง / SHOW PRODUCTION กระตุก) -->
-        <Style x:Key="CyberGlowEllipse" TargetType="Ellipse">
-            <Setter Property="StrokeThickness" Value="5"/>
-            <Setter Property="Width" Value="35"/>
-            <Setter Property="Height" Value="35"/>
+
+        <!-- 🚦 สัญญาณไฟในคอลัมน์ STATUS (ต่ำกว่า MIN กะพริบเหมือนเดิม) -->
+        <Style x:Key="StatusLamp" TargetType="Grid">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-
-            <Setter Property="Stroke" Value="#6632CD32"/>
-
             <Style.Triggers>
-                <Trigger Property="Fill" Value="Crimson">
-                    <Setter Property="Stroke" Value="#77FF2020"/>
-
-                    <Trigger.EnterActions>
-                        <BeginStoryboard Name="RedAlertBlink">
+                <DataTrigger Binding="{Binding StockStatus}" Value="UNDER_MIN">
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard Name="LampBlinkMin">
                             <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity" 
-                                         From="1.0" To="0.2" 
-                                         Duration="0:0:0.5" 
-                                         AutoReverse="True" />
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.25" Duration="0:0:0.6" AutoReverse="True"/>
                             </Storyboard>
                         </BeginStoryboard>
-                    </Trigger.EnterActions>
-
-                    <Trigger.ExitActions>
-                        <StopStoryboard BeginStoryboardName="RedAlertBlink"/>
-                    </Trigger.ExitActions>
-                </Trigger>
-
-                <Trigger Property="Fill" Value="#2F8247">
-                    <Setter Property="Stroke" Value="#662F8247"/>
-                </Trigger>
-
-                <Trigger Property="Fill" Value="LightGray">
-                    <Setter Property="Stroke" Value="#44808080"/>
-                </Trigger>
+                    </DataTrigger.EnterActions>
+                    <DataTrigger.ExitActions>
+                        <StopStoryboard BeginStoryboardName="LampBlinkMin"/>
+                    </DataTrigger.ExitActions>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -747,14 +730,13 @@
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
 
-                                <Ellipse Style="{StaticResource CyberGlowEllipse}">
-
-                                    <Ellipse.Fill>
-                                        <Binding Path="StockStatus"
-                             Converter="{StaticResource StatusToColorConverter}"/>
-                                    </Ellipse.Fill>
-
-                                </Ellipse>
+                                <!-- 🚦 สัญญาณไฟ: แสงฟุ้งจางออกรอบดวงไฟ (แปรงไล่สี ไม่ใช้เอฟเฟกต์เบลอ) / ต่ำกว่า MIN - หมด = กะพริบ -->
+                                <Grid Style="{StaticResource StatusLamp}">
+                                    <Ellipse Width="52" Height="52" IsHitTestVisible="False"
+                                             Fill="{Binding StockStatus, Converter={StaticResource StatusToColorConverter}, ConverterParameter=glow}"/>
+                                    <Ellipse Width="22" Height="22" IsHitTestVisible="False"
+                                             Fill="{Binding StockStatus, Converter={StaticResource StatusToColorConverter}, ConverterParameter=lamp}"/>
+                                </Grid>
 
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>

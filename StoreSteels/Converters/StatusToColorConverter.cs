@@ -62,6 +62,24 @@ namespace CIMS.Converters
             // 🛡️ ป้องกัน null หรือ type ที่ไม่ใช่ string ทุกกรณี
             string status = value?.ToString()?.Trim() ?? "";
 
+            // 🚦 สัญญาณไฟ: "lamp" = ดวงไฟ (สว่างกลาง เข้มขอบ) / "glow" = แสงฟุ้งรอบดวงไฟ (จางออกจนใส)
+            //   ใช้แปรงไล่สีแทน DropShadowEffect - ไม่มีเอฟเฟกต์เบลอ ตารางเลื่อนลื่นเหมือนเดิม
+            string mode = parameter as string;
+            if (mode == "lamp" || mode == "glow")
+            {
+                var key = status + "|" + mode;
+                lock (_cache)
+                {
+                    if (!_cache.TryGetValue(key, out var b))
+                    {
+                        Color c = ((SolidColorBrush)Convert(value, targetType, null, culture)).Color;
+                        b = mode == "lamp" ? Lamp(c) : Glow(c);
+                        _cache[key] = b;
+                    }
+                    return b;
+                }
+            }
+
             switch (status)
             {
                 case "NO_CONFIG":
@@ -101,6 +119,36 @@ namespace CIMS.Converters
             CultureInfo culture)
         {
             throw new NotImplementedException();
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<string, Brush> _cache = new System.Collections.Generic.Dictionary<string, Brush>();
+
+        private static Color Mix(Color a, Color b, double t) =>
+            Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
+
+        // ดวงไฟ: จุดสะท้อนสว่างด้านบนซ้าย -> สีไฟ -> ขอบเข้มขึ้นเล็กน้อย
+        private static Brush Lamp(Color c)
+        {
+            var b = new RadialGradientBrush { GradientOrigin = new System.Windows.Point(0.38, 0.32), Center = new System.Windows.Point(0.45, 0.42), RadiusX = 0.62, RadiusY = 0.62 };
+            b.GradientStops.Add(new GradientStop(Mix(c, Colors.White, 0.75), 0.0));
+            b.GradientStops.Add(new GradientStop(Mix(c, Colors.White, 0.25), 0.35));
+            b.GradientStops.Add(new GradientStop(c, 0.75));
+            b.GradientStops.Add(new GradientStop(Mix(c, Colors.Black, 0.18), 1.0));
+            b.Freeze();
+            return b;
+        }
+
+        // แสงฟุ้ง: สีไฟจางลงเรื่อยๆ จนใสที่ขอบ (ไม่มีเส้นขอบ)
+        private static Brush Glow(Color c)
+        {
+            var b = new RadialGradientBrush();
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0xE0, c.R, c.G, c.B), 0.0));
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0xA0, c.R, c.G, c.B), 0.45));
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x48, c.R, c.G, c.B), 0.68));
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x14, c.R, c.G, c.B), 0.86));
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, c.R, c.G, c.B), 1.0));
+            b.Freeze();
+            return b;
         }
     }
 }

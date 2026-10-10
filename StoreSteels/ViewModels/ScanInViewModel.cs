@@ -1097,7 +1097,18 @@ namespace CIMS.ViewModels
                     }
 
                     // ⚠ ยอดคลังต้นทางไม่พอ: รับเข้าคลังหลักเต็มจำนวนแล้ว แต่ตัดคลังต้นทางได้เท่าที่มี -> แจ้งเตือนให้ตรวจสอบ
-                    if (deductResult != null && deductResult.Short)
+                    if (deductResult != null && deductResult.Short && deductResult.MotherCoil != null)
+                    {
+                        // ตัดตาม Coil แม่: ไม่เจอ Coil แม่ในคลังต้นทาง / Coil แม่เหลือน้อยกว่าป้าย
+                        string why = deductResult.MatchedHow == null
+                            ? $"ไม่พบ Coil แม่ {deductResult.MotherCoil} ใน {deductResult.SourceCode}\n(ยังไม่ได้ลงทะเบียน หรือใช้หมดแล้ว) จึงไม่ได้ตัดยอด"
+                            : $"Coil แม่ {deductResult.MotherCoil} ใน {deductResult.SourceCode} เหลือ {Qty.Plain(deductResult.MotherBefore ?? deductResult.SourceBefore)} KG\nตัดได้ {Qty.Plain(deductResult.Deducted)} KG";
+                        ScanWarning(
+                            $"{why}\n\n{result.PartCode}  Coil {coil?.CoilNo}\nจำนวนบนป้าย: {Qty.Plain(deductResult.RequestedQty)}\n\n" +
+                            $"รับเข้า {stock.Code} เต็มจำนวนแล้ว กรุณาตรวจสอบ {deductResult.SourceCode}",
+                            "MOTHER COIL");
+                    }
+                    else if (deductResult != null && deductResult.Short)
                     {
                         ScanWarning(
                             $"ยอดใน {deductResult.SourceCode} ไม่พอสำหรับรายการนี้\n\n" +
@@ -1194,9 +1205,17 @@ namespace CIMS.ViewModels
         private string _lookupNote;
         private ScanItemModel FindPartByCodes(BarcodeFormatModel fmt, List<string> codes)
         {
-            var part = _scanService.FindPart(fmt, codes, out string note);
+            var part = _scanService.FindPart(fmt, codes, out string note, PreferStocks(SelectedStock));
             _lookupNote = note;
             return part;
+        }
+
+        // คลังที่รับ (ไว้เลือกสินค้าชื่อซ้ำ): คลังที่เลือก / สแกนร่วม = คลังในขอบเขตที่ไม่ใช่คลังต้นทางที่ถูกตัด
+        private List<int> PreferStocks(StockModel stock)
+        {
+            if (stock != null) return new List<int> { stock.StkId };
+            var sources = new HashSet<int>(_allFormats.Where(f => f.SourceStkId.HasValue).Select(f => f.SourceStkId.Value));
+            return ScopeStocks.Where(s => !sources.Contains(s.StkId)).Select(s => s.StkId).ToList();
         }
 
         private string LookupNoteText => string.IsNullOrEmpty(_lookupNote) ? "" : "\n" + _lookupNote;
@@ -1225,7 +1244,8 @@ namespace CIMS.ViewModels
             var pick = hits[0];
             if (hits.Count > 1)
             {
-                var found = hits.Select(h => (Hit: h, Part: _scanService.FindPart(h.Fmt, h.Codes, out _))).Where(x => x.Part != null).ToList();
+                var prefer = PreferStocks(stock);
+                var found = hits.Select(h => (Hit: h, Part: _scanService.FindPart(h.Fmt, h.Codes, out _, prefer))).Where(x => x.Part != null).ToList();
                 if (found.Count > 0)
                 {
                     pick = found[0].Hit;
@@ -1250,7 +1270,8 @@ namespace CIMS.ViewModels
             if (stock == null || fmt == null || stock.FormatIds.Contains(fmt.FmtId)) return;
             var mine = _supplierHits.Where(h => stock.FormatIds.Contains(h.Fmt.FmtId)).ToList();
             if (mine.Count == 0) return;
-            var withPart = mine.Select(h => (Hit: h, Part: _scanService.FindPart(h.Fmt, h.Codes, out _))).Where(x => x.Part != null).ToList();
+            var prefer = new List<int> { stock.StkId };
+            var withPart = mine.Select(h => (Hit: h, Part: _scanService.FindPart(h.Fmt, h.Codes, out _, prefer))).Where(x => x.Part != null).ToList();
             var inStock = withPart.FirstOrDefault(x => _scanService.GetPartStockIds(x.Part.PartId).Contains(stock.StkId));
             var pick = inStock.Hit.Fmt != null ? inStock.Hit : withPart.Count > 0 ? withPart[0].Hit : mine[0];
             fmt = pick.Fmt; codes = pick.Codes; qty = pick.Qty;

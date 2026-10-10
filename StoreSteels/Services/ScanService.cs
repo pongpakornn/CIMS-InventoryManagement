@@ -52,14 +52,15 @@ namespace CIMS.Services
 
         // 🔎 ค้นสินค้าจากป้าย Supplier ตามรูปแบบ: ค้นด้วยชื่อ (MATCH BY PRODUCT NAME) หรือรหัสทีละตัว
         // note = เหตุผลที่ไม่เจอ (เช่น ชื่อนี้ตรงกับสินค้าหลายรายการ) ไว้แจ้งผู้ใช้
-        public ScanItemModel FindPart(BarcodeFormatModel fmt, List<string> codes, out string note)
+        // preferStocks = คลังที่รับ: ชื่อตรงหลายรายการ -> เลือกสินค้าที่อยู่คลังนี้ก่อน
+        public ScanItemModel FindPart(BarcodeFormatModel fmt, List<string> codes, out string note, ICollection<int> preferStocks = null)
         {
             note = null;
             if (codes == null || codes.Count == 0) return null;
             int start = 0;
             if (fmt != null && fmt.MatchByName)
             {
-                var byName = GetPartByName(codes[0], out note);
+                var byName = GetPartByName(codes[0], out note, preferStocks);
                 if (byName != null) return byName;
                 start = 1;   // ไม่เจอชื่อ -> ลองรหัสสำรอง (ALT CODE) ต่อ
             }
@@ -74,38 +75,116 @@ namespace CIMS.Services
         // ชื่อสินค้าจากป้าย -> สินค้าในระบบ (เทียบแบบ NormalizeName)
         //   1) ชื่อตรงกันทั้งหมด  2) ไม่มี -> ชื่อในระบบมีชื่อจากป้ายอยู่ข้างใน หรือกลับกัน
         //   ต้องเจอรายการเดียวเท่านั้น เจอหลายรายการ = ไม่บันทึก (กันลงผิดสินค้า)
-        public ScanItemModel GetPartByName(string labelName, out string note)
+        //   ใกล้เคียงที่สุด (ป้าย Panta: SPCC-SD + 1.000 X 22.00 X COIL):
+        //   1) ชื่อเต็ม (เกรด + ขนาด) ตรงกัน  2) ชื่อในระบบมีชื่อเต็มอยู่ข้างใน  3) ขนาดตรงกัน (1X22XC) แล้วเกรดใกล้สุด
+        //   แต่ละขั้นเจอหลายรายการ -> เลือกตัวที่อยู่คลังที่รับ (preferStocks) / ยังซ้ำ = ไม่บันทึก (กันลงผิดสินค้า)
+        public ScanItemModel GetPartByName(string labelName, out string note, ICollection<int> preferStocks = null)
         {
             note = null;
             string key = BarcodeFormatModel.NormalizeName(labelName);
             if (key.Length == 0) return null;
 
-            var rows = new List<(int Id, string Code, string Name, int Pack, string Norm)>();
+            var rows = new List<NameRow>();
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("SELECT PartID, PartCode, Description, PackSize FROM CIMS.Parts WITH (NOLOCK) WHERE IsActive = 1 AND ISNULL(Description, '') <> ''", conn))
+            using (var cmd = new SqlCommand(@"SELECT p.PartID, p.PartCode, p.Description, p.PackSize,
+                                                     InStocks = STUFF((SELECT ',' + CAST(ps.StockID AS VARCHAR(10)) FROM CIMS.PartStocks ps WHERE ps.PartID = p.PartID FOR XML PATH('')), 1, 1, ''),
+                                                     InMain = CASE WHEN ISNULL(p.IsShowInMaster, 0) = 1 THEN 1 ELSE 0 END
+                                              FROM CIMS.Parts p WITH (NOLOCK) WHERE p.IsActive = 1 AND ISNULL(p.Description, '') <> ''", conn))
             {
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
                     while (r.Read())
                     {
                         string name = r["Description"].ToString();
-                        rows.Add((Convert.ToInt32(r["PartID"]), r["PartCode"].ToString(), name,
-                                  r["PackSize"] == DBNull.Value ? 1 : Convert.ToInt32(r["PackSize"]), BarcodeFormatModel.NormalizeName(name)));
+                        var stocks = new HashSet<int>(r["InStocks"].ToString().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(int.Parse));
+                        rows.Add(new NameRow
+                        {
+                            Id = Convert.ToInt32(r["PartID"]), Code = r["PartCode"].ToString(), Name = name,
+                            Pack = r["PackSize"] == DBNull.Value ? 1 : Convert.ToInt32(r["PackSize"]),
+                            Norm = BarcodeFormatModel.NormalizeName(name), Stocks = stocks, InMain = Convert.ToInt32(r["InMain"]) == 1
+                        });
                     }
             }
+            HashSet<int> mainIds = null;
+            if (preferStocks != null && preferStocks.Count > 0)
+                using (var conn = new SqlConnection(_connectionString))
+                using (var cmd = new SqlCommand("SELECT StockID FROM CIMS.Stocks WHERE IsMain = 1", conn))
+                {
+                    conn.Open();
+                    mainIds = new HashSet<int>();
+                    using (var r = cmd.ExecuteReader()) while (r.Read()) mainIds.Add(r.GetInt32(0));
+                }
+            bool InPrefer(NameRow x) => preferStocks != null && preferStocks.Any(s => x.Stocks.Contains(s) || (x.InMain && mainIds != null && mainIds.Contains(s)));
 
-            var hits = rows.Where(x => x.Norm == key).ToList();
-            if (hits.Count == 0 && key.Length >= 4)
-                hits = rows.Where(x => x.Norm.Length >= 4 && (x.Norm.Contains(key) || key.Contains(x.Norm))).ToList();
-
-            if (hits.Count == 1)
+            // ขั้นที่เจอรายการเดียว (หรือเดียวในคลังที่รับ) = ใช้ / หลายรายการ = จำไว้แจ้งผู้ใช้แล้วลองขั้นถัดไป
+            List<NameRow> ambiguous = null;
+            NameRow Pick(List<NameRow> hits)
             {
-                var h = hits[0];
-                return new ScanItemModel { PartId = h.Id, PartCode = h.Code, PartName = h.Name, PartNo = string.Empty, PartACode = h.Code, Qty = h.Pack, UpdateTime = DateTime.Now };
+                if (hits.Count == 1) return hits[0];
+                if (hits.Count == 0) return null;
+                var mine = hits.Where(InPrefer).ToList();
+                if (mine.Count == 1) return mine[0];
+                if (ambiguous == null) ambiguous = mine.Count > 1 ? mine : hits;
+                return null;
             }
-            if (hits.Count > 1)
-                note = $"ชื่อสินค้าบนป้ายตรงกับสินค้าในระบบ {hits.Count} รายการ ({string.Join(", ", hits.Take(3).Select(x => x.Code))}{(hits.Count > 3 ? " ..." : "")}) กรุณาแก้ชื่อสินค้าให้ไม่ซ้ำ";
+
+            var hit = Pick(rows.Where(x => x.Norm == key).ToList());
+            if (hit == null && key.Length >= 4)
+                hit = Pick(rows.Where(x => x.Norm.Length >= 4 && (ContainsWhole(x.Norm, key) || ContainsWhole(key, x.Norm))).ToList());
+
+            // ขนาดเหล็กบนป้าย (หนา X กว้าง X ยาว/COIL) ตรงกัน -> เกรดที่เหมือนกันมากสุด
+            string size = SizeKey(labelName);
+            if (hit == null && size != null)
+            {
+                var bySize = rows.Where(x => ContainsWhole(x.Norm, size)).ToList();
+                string grade = key.Replace(size, "");
+                if (bySize.Count > 1 && grade.Length > 0)
+                {
+                    int best = bySize.Max(x => CommonPrefix(x.Norm.Replace(size, ""), grade));
+                    if (best > 0) bySize = bySize.Where(x => CommonPrefix(x.Norm.Replace(size, ""), grade) == best).ToList();
+                }
+                hit = Pick(bySize);
+            }
+
+            if (hit != null)
+                return new ScanItemModel { PartId = hit.Id, PartCode = hit.Code, PartName = hit.Name, PartNo = string.Empty, PartACode = hit.Code, Qty = hit.Pack, UpdateTime = DateTime.Now };
+            if (ambiguous != null)
+                note = $"ชื่อสินค้าบนป้ายตรงกับสินค้าในระบบ {ambiguous.Count} รายการ ({string.Join(", ", ambiguous.Take(3).Select(x => x.Code))}{(ambiguous.Count > 3 ? " ..." : "")}) กรุณาแก้ชื่อสินค้าให้ไม่ซ้ำ";
             return null;
+        }
+
+        private class NameRow
+        {
+            public int Id; public string Code; public string Name; public int Pack; public string Norm;
+            public HashSet<int> Stocks; public bool InMain;
+        }
+
+        // ขนาดเหล็ก "1.000 X 175.00 X COIL" / "2.800 X 1285.00 X 810" -> 1X175XC / 2.8X1285X810 (null = ป้ายไม่มีขนาด)
+        internal static string SizeKey(string name)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(name ?? "", @"\d+(?:\.\d+)?\s*[Xx]\s*\d+(?:\.\d+)?\s*[Xx]\s*(?:COIL|C|\d+(?:\.\d+)?)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return m.Success ? BarcodeFormatModel.NormalizeName(m.Value) : null;
+        }
+
+        // มี part อยู่ใน s โดยตัวเลขไม่ติดกัน (1X175XC ไม่นับว่าอยู่ใน 11X175XC / 1X175XC0)
+        internal static bool ContainsWhole(string s, string part)
+        {
+            if (string.IsNullOrEmpty(part)) return false;
+            for (int i = s.IndexOf(part, StringComparison.Ordinal); i >= 0; i = s.IndexOf(part, i + 1, StringComparison.Ordinal))
+            {
+                bool okL = i == 0 || !(char.IsDigit(s[i - 1]) || s[i - 1] == '.') || !(char.IsDigit(part[0]) || part[0] == '.');
+                int e = i + part.Length;
+                bool okR = e == s.Length || !(char.IsDigit(s[e]) || s[e] == '.') || !(char.IsDigit(part[part.Length - 1]) || part[part.Length - 1] == '.');
+                if (okL && okR) return true;
+            }
+            return false;
+        }
+
+        private static int CommonPrefix(string a, string b)
+        {
+            int n = 0;
+            while (n < a.Length && n < b.Length && a[n] == b[n]) n++;
+            return n;
         }
 
         // stock = null -> ทุกคลัง (พฤติกรรมเดิม), ระบุคลัง -> เฉพาะรายการของคลังนั้น
@@ -479,6 +558,8 @@ namespace CIMS.Services
             public bool MatchedByBin { get; set; }
             public string MatchedHow { get; set; }      // COIL / MOTHER COIL / BIN / SAME PRODUCT
             public bool Short => Saved && Deducted < RequestedQty;
+            public decimal? MotherBefore { get; set; }  // น้ำหนัก Coil แม่ก่อนตัด (null = ไม่มี Coil แม่ลงทะเบียน)
+            public string MotherCoil { get; set; }
             public decimal RequestedQty { get; set; }
         }
 
@@ -569,7 +650,11 @@ namespace CIMS.Services
                                     if (v != null && v != DBNull.Value) { coilPart = Convert.ToInt32(v); how = "MOTHER COIL"; }
                                 }
                         }
+                        // ป้ายมีเลข Coil แม่ = ตัดได้เฉพาะ Coil แม่นั้นในคลังต้นทาง (ไม่ตัดสินค้าตัวเดียวกันแทน)
+                        bool byMotherOnly = coil != null && !string.IsNullOrWhiteSpace(coil.MotherCoil) && CIMS.Helpers.DbSchema.HasCoilRegister;
+                        result.MotherCoil = byMotherOnly ? coil.MotherCoil.Trim() : null;
                         int srcPart = 0; int srcCoil = 0;
+                        if (!(byMotherOnly && coilPart == 0))
                         using (var cmd = new SqlCommand(@"
                             SELECT TOP 1 ps.PartID, ps.Quantity, ps.BoxQuantity, p.PartCode
                             FROM CIMS.PartStocks ps WITH (UPDLOCK, HOLDLOCK)
@@ -592,6 +677,17 @@ namespace CIMS.Services
                         }
 
                         result.Deducted = srcPart == 0 ? 0 : Math.Max(0, Math.Min(qty, result.SourceBefore));
+                        // Coil แม่ลงทะเบียนเป็นม้วนของตัวเอง -> ตัดได้ไม่เกินน้ำหนักที่ Coil แม่เหลือ
+                        if (how == "MOTHER COIL" && result.Deducted > 0)
+                            using (var cmd = new SqlCommand("SELECT TOP 1 WeightKG FROM CIMS.Coils WHERE CoilNo = @m AND StockID = @s AND PartID = @p AND Status = 'IN'", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@m", coil.MotherCoil.Trim());
+                                cmd.Parameters.AddWithValue("@s", sourceStkId);
+                                cmd.Parameters.AddWithValue("@p", srcPart);
+                                object v = cmd.ExecuteScalar();
+                                if (v != null && v != DBNull.Value) result.MotherBefore = Convert.ToDecimal(v);
+                                if (result.MotherBefore.HasValue) result.Deducted = Math.Min(result.Deducted, result.MotherBefore.Value);
+                            }
                         result.SourceAfter = result.SourceBefore - result.Deducted;
 
                         if (result.Deducted > 0)
