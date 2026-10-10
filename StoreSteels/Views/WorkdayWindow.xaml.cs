@@ -244,6 +244,8 @@ namespace CIMS.Views
             try
             {
                 await Task.Run(() => _service.SetWorkdays(cust, list, working, uid));
+                LogService.WriteLog(uid, "WORKDAY_SET", $"Customer: {cust} | {(working ? "Working" : "Not working")}: " +
+                    (list.Count <= 3 ? string.Join(", ", list.Select(d => d.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture))) : $"{list.Count} days {list.Min():dd/MM/yyyy} - {list.Max():dd/MM/yyyy}"), cust);
                 Changed = true;
                 txtSaved.Text = "✓ SAVED " + DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
                 return true;

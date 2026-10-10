@@ -1179,6 +1179,9 @@ namespace CIMS.ViewModels
                             $"รับเข้า {stock.Code} เต็มจำนวนแล้ว กรุณาตรวจสอบ {deductResult.SourceCode}" +
                             (DbSchema.HasDeductMisses ? "\nเก็บไว้ที่ปุ่ม NOT DEDUCTED แล้ว" : ""),
                             "MOTHER COIL");
+                        LogService.WriteLog(CurrentUser?.UserId, "NOT_DEDUCTED",
+                            $"{stock.Code} <- {deductResult.SourceCode} | Coil {coil?.CoilNo} | Mother {deductResult.MotherCoil} | Label {Qty.Plain(deductResult.RequestedQty)} | Cut {Qty.Plain(deductResult.Deducted)} | " +
+                            (deductResult.MatchedHow == null ? "mother coil not found" : $"mother coil had {Qty.Plain(deductResult.MotherBefore ?? 0)}"), result.PartCode);
                         _ = RefreshNotDeductedAsync();
                     }
                     else if (deductResult != null && !deductResult.Short && deductResult.Deducted > 0)
@@ -1190,6 +1193,8 @@ namespace CIMS.ViewModels
                             : $"{deductResult.SourcePartCode}";
                         NotificationManager.Show($"OUT {deductResult.SourceCode}  -{Qty.Plain(deductResult.Deducted)} KG",
                             $"{from}\n{deductResult.SourcePartCode}  คงเหลือ {Qty.Plain(deductResult.SourceAfter)}", true);
+                        LogService.WriteLog(CurrentUser?.UserId, "DEDUCT_SOURCE",
+                            $"{stock.Code} <- {deductResult.SourceCode} -{Qty.Plain(deductResult.Deducted)} | Coil {coil?.CoilNo} | {from} | {deductResult.SourcePartCode} balance {Qty.Plain(deductResult.SourceAfter)}", deductResult.SourcePartCode);
                         _ = RefreshDeductedAsync();
                     }
                     else if (deductResult != null && deductResult.Short)

@@ -136,6 +136,7 @@ namespace CIMS.Views
             try
             {
                 await Task.Run(() => _stockService.DeleteStock(stock.StkId, reason, _session.UserId));
+                LogService.WriteLog(_session.UserId, "STOCK_DELETE", $"Deleted stock {stock.Code} ({stock.Name}) | Reason: {reason}", stock.Code);
                 NotificationManager.Show("Stock", $"ลบคลัง {stock.Code} เรียบร้อยแล้ว", true);
                 await LoadStocksAsync();
             }

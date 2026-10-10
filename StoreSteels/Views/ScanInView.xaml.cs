@@ -143,7 +143,11 @@ namespace CIMS.Views
         private void ScanStocks_Click(object sender, RoutedEventArgs e)
         {
             var w = StockPickerWindow.ShowScanStocks(_viewModel.Stocks, _viewModel.ScopeAuto, _viewModel.ScopeIds.ToList(), _viewModel.PriorityStockId);
-            if (w != null) _viewModel.ApplyScope(w.IsAuto, w.CheckedIds, w.PriorityId);
+            if (w != null)
+            {
+                _viewModel.ApplyScope(w.IsAuto, w.CheckedIds, w.PriorityId);
+                CIMS.Services.LogService.WriteLog(_viewModel.CurrentUser?.UserId, "SCAN_SCOPE", $"Scanner stocks: {_viewModel.ScopeText}", "");
+            }
             FocusScanBox();
         }
 

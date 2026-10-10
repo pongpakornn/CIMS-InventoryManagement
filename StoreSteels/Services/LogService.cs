@@ -105,8 +105,9 @@ namespace CIMS.Services
         public static void WriteQRLog(string userId, string partCode, string actionType)
             => Insert(userId, "QR_SYSTEM", $"{actionType} for Part: {partCode}", partCode);
 
+        // ประเภทตามการกระทำจริง (CREATE_PR / APPROVE_PR / DELETE_ALL_PR ...) - หน้า ACTIVITY LOG กรอง / ค้นหาได้
         public static void WritePRLog(string userId, string actionType, string description, string reference)
-            => Insert(userId, "PR_SYSTEM", description, reference);
+            => Insert(userId, string.IsNullOrWhiteSpace(actionType) ? "PR_SYSTEM" : actionType, description, reference);
 
         // ✅ งานแสกน (Scan In / Scan Out)
         // rawBarcode (ไม่บังคับ): บาร์โค้ดดิบทั้งชุด เช่นป้าย Panta - ต่อท้ายใน Description (nvarchar(max)) ให้ย้อนดูได้ครบ
