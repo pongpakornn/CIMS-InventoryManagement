@@ -1,4 +1,4 @@
-using CIMS.Core;
+﻿using CIMS.Core;
 using Microsoft.Data.SqlClient;
 using System;
 
@@ -75,6 +75,10 @@ namespace CIMS.Helpers
                 return _transferScanTx.Value;
             }
         }
+
+        // Update_20261010d.sql: CIMS.Stocks.CardStyle (การ์ดสินค้า มีรูป / ไม่มีรูป / ปิด)
+        private static bool? _cardStyle;
+        public static bool HasCardStyle => _cardStyle ?? (_cardStyle = ColumnExists("CardStyle")) ?? false;
 
         // Update_20261009.sql: CIMS.Stocks.MaxMinDecimal (MAX / MIN แสดง / เก็บทศนิยม แยกจาก DECIMAL QTY)
         private static bool? _maxMinDecimal;

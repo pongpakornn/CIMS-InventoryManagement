@@ -66,6 +66,10 @@ namespace CIMS.Views
             chkColQty.IsChecked = s.ColQty;
             chkColRemark.IsChecked = s.ColRemark;
             InitColumnOrder(s);
+            // 🃏 การ์ดสินค้า: ค่าที่ใช้จริงตอนนี้ (ยังไม่เคยตั้ง = ตามคอลัมน์รูป)
+            cbCardStyle.SelectedIndex = s.CardStyle == "IMAGE" ? 0 : s.CardStyle == "TEXT" ? 1 : 2;
+            chkColImage.Checked += (o, e) => UpdateCardHint();
+            chkColImage.Unchecked += (o, e) => UpdateCardHint();
 
             chkInPickList.IsChecked = s.InPickList;
             chkInSupplier.IsChecked = s.InSupplier;
@@ -79,6 +83,19 @@ namespace CIMS.Views
             UpdateFormatPanel();
 
             Loaded += (o, e) => txtCode.Focus();
+        }
+
+        private void cbCardStyle_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateCardHint();
+
+        // WITH IMAGE แต่ปิดคอลัมน์ IMAGE -> แจ้งว่าจะได้การ์ดแบบไม่มีรูปแทน
+        private void UpdateCardHint()
+        {
+            if (txtCardHint == null || cbCardStyle == null) return;
+            bool warn = cbCardStyle.SelectedIndex == 0 && chkColImage.IsChecked != true;
+            txtCardHint.Foreground = warn ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F)) : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8A, 0x84, 0x90));
+            txtCardHint.Text = warn
+                ? "IMAGE column is off - cards will show as NO IMAGE. Tick IMAGE in TABLE COLUMNS to show pictures on the cards."
+                : "Cards that scroll above the table (switch SHOW CARDS on the Store page). WITH IMAGE = product picture + details. NO IMAGE = big part number and big stock numbers, for stocks without pictures.";
         }
 
         private static readonly string[] MaxMinUnits = { "KG", "PCS", "SHEET", "BOX", "COIL" };
@@ -236,6 +253,7 @@ namespace CIMS.Views
             s.MaxMinDecimalSetting = chkMaxMinDecimal.IsChecked == true;
             s.CountCoil = chkCountCoil.IsChecked == true;
             s.ShowCoilRowsSetting = chkCoilRows.IsChecked == true;
+            s.CardStyleSetting = (cbCardStyle.SelectedItem as ComboBoxItem)?.Tag as string ?? "OFF";
             // ทั้งหมดตามลำดับเริ่มต้น = null (วางตรงกับคอลัมน์ตาราง) / ไม่เลือกเลย = "-" / อื่น ๆ = ลำดับที่ติ๊ก
             var subKeys = _subOrder.ToList();
             s.CoilRowColumns = subKeys.SequenceEqual(StockModel.CoilRowKeys) ? null : subKeys.Count == 0 ? "-" : string.Join(",", subKeys);

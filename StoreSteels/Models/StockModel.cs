@@ -51,6 +51,21 @@ namespace CIMS.Models
         public bool? MaxMinDecimalSetting { get; set; }
         public bool MaxMinDecimal => MaxMinDecimalSetting ?? AllowDecimal;
         public bool ShowCoilRows => CountCoil && (ShowCoilRowsSetting ?? true);
+        // 🃏 การ์ดสินค้า (แถบเลื่อนเหนือตาราง): null = เดิม (คลังที่แสดงรูป = การ์ดมีรูป / ไม่แสดงรูป = ไม่มีการ์ด)
+        //   "IMAGE" = การ์ดมีรูป · "TEXT" = การ์ดไม่มีรูป (ตัวเลขใหญ่ อ่านไกล) · "OFF" = ไม่แสดงการ์ด
+        public string CardStyleSetting { get; set; }
+        public string CardStyle
+        {
+            get
+            {
+                string v = (CardStyleSetting ?? "").Trim().ToUpperInvariant();
+                if (v == "OFF" || v == "TEXT") return v;
+                if (v == "IMAGE") return ColImage ? "IMAGE" : "TEXT";   // ปิดคอลัมน์รูปไปแล้ว -> การ์ดไม่มีรูปแทน
+                return ColImage ? "IMAGE" : "OFF";
+            }
+        }
+        public bool ShowsCards => CardStyle != "OFF";
+        public bool CardHasImage => CardStyle == "IMAGE";
         // คอลัมน์ของแถว Coil ย่อย: COILNO, MOTHER, WEIGHT, COIL, TON, RECEIVED (null = แสดงทั้งหมด)
         public static readonly string[] CoilRowKeys = { "COILNO", "MOTHER", "WEIGHT", "COIL", "TON", "RECEIVED" };
         public string CoilRowColumns { get; set; }

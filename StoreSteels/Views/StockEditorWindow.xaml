@@ -154,6 +154,23 @@
                                 <TextBlock Text="MAX / MIN with decimals (e.g. 5.50). Off = whole numbers (e.g. 6), even when DECIMAL QTY is on."
                                            FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+                            <!-- 🃏 การ์ดสินค้าเหนือตาราง: มีรูป / ไม่มีรูป / ปิด (คลังที่ไม่มีรูปก็มีการ์ดได้) -->
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="230"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="PRODUCT CARDS" Style="{StaticResource StkLabel}"/>
+                                    <ComboBox x:Name="cbCardStyle" Style="{StaticResource StkCombo}" SelectionChanged="cbCardStyle_SelectionChanged">
+                                        <ComboBoxItem Content="WITH IMAGE" Tag="IMAGE"/>
+                                        <ComboBoxItem Content="NO IMAGE" Tag="TEXT"/>
+                                        <ComboBoxItem Content="OFF" Tag="OFF"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <TextBlock x:Name="txtCardHint" Grid.Column="1" FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Bottom" Margin="14,0,0,8" TextWrapping="Wrap"
+                                           Text="Cards that scroll above the table (switch SHOW CARDS on the Store page). WITH IMAGE = product picture + details. NO IMAGE = big part number and big stock numbers, for stocks without pictures."/>
+                            </Grid>
                         </StackPanel>
                     </Border>
 

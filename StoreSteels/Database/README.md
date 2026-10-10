@@ -38,4 +38,5 @@ Run the dated update scripts in order (each one is safe to run more than once):
 | `Update_20261010.sql` | Panta labels into STOCK-MAT use only **Panta-2**: product by name #6 + #7 (closest match), qty #9, child coil #1, mother coil #11, deducts the mother coil's weight from STOCK-PANTA. Deletes Panta-3, switches Panta off. Data only. |
 | `Update_20261010b.sql` | NOT DEDUCTED list: new table `CIMS.DeductMisses` - labels received with SCAN IN whose mother coil could not be cut (not found / not enough weight), saved automatically by the scanner. Adds one table only. |
 | `Update_20261010c.sql` | DEDUCTED list: `StockTransfers.ScanTransactionID` links each source-stock cut to its SCAN IN (older SCAN transfers linked by product / stock / time). Adds one column + index. |
+| `Update_20261010d.sql` | Product cards per stock: `Stocks.CardStyle` (`IMAGE` card with picture, `TEXT` card without picture, `OFF` no cards; NULL = as before: IMAGE when the stock shows the IMAGE column). Adds one column. |
 | `ClearOperationalData.sql` | Clears transactions / logs / stock quantities while keeping users, permissions and setup. Only run it when you really want to reset data. |

@@ -153,6 +153,18 @@ namespace CIMS.Models
             }
             coilNo = F(CoilNoPos);
             motherCoil = F(MotherCoilPos);
+
+            // ✂️ หัวป้ายหาย (สแกนเนอร์ตัดตัวอักษรแรก ๆ เช่น "0774-003" จาก 0790774-003): ป้ายมีเลข Coil เต็มอีกช่อง (Panta #5)
+            // -> ใช้ตัวเต็ม กันระบบมองเป็น Coil ใหม่แล้วรับเข้าซ้ำ
+            if (coilNo == null) return;
+            var others = fields.Where((x, i) => i != CoilNoPos.Value - 1).Select(x => x.Trim().ToUpperInvariant()).ToList();
+            string cut = coilNo;
+            if (!others.Contains(cut))
+            {
+                string full = others.Where(x => x.Length > cut.Length && !x.Contains(' ') && x.EndsWith(cut, StringComparison.Ordinal))
+                                    .OrderByDescending(x => x.Length).FirstOrDefault();
+                if (full != null) coilNo = full;
+            }
         }
 
         private void AddCode(List<string> codes, string[] fields, int pos)

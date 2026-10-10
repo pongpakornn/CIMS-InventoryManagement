@@ -215,13 +215,13 @@ namespace CIMS.Views
             btnTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && !_stock.IsLiveView);
             btnCoilTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && _stock.CountCoil && DbSchema.HasCoilRegister && !_stock.IsLiveView);
 
-            // ความเร็วการเลื่อน + การ์ดสินค้า (เฉพาะคลังที่แสดงรูปภาพ) จำค่าไว้ในเครื่องนี้
+            // ความเร็วการเลื่อน + การ์ดสินค้า (ตาม PRODUCT CARDS ของคลัง: มีรูป / ไม่มีรูป / ปิด) จำค่าไว้ในเครื่องนี้
             // ค่าเดิม (ระดับ 1-5) -> แปลงเป็นตัวเลขความเร็วครั้งแรก
             int oldLevel = Math.Max(1, Math.Min(5, UiPrefs.GetInt("ScrollSpeed", 2)));
             _speed = Math.Max(1, Math.Min(MaxSpeed, UiPrefs.GetInt("ShowSpeed", (int)LevelSpeeds[oldLevel - 1])));
             txtScrollSpeed.Text = _speed.ToString();
-            pnlCardToggle.Visibility = Show(_stock.ColImage);
-            chkShowCards.IsChecked = _stock.ColImage && UiPrefs.GetBool("ShowCards." + _stock.Code, true);
+            pnlCardToggle.Visibility = Show(_stock.ShowsCards);
+            chkShowCards.IsChecked = _stock.ShowsCards && UiPrefs.GetBool("ShowCards." + _stock.Code, true);
             pnlCards.Visibility = Show(chkShowCards.IsChecked == true);
             pnlCoilToggle.Visibility = Show(_stock.ShowCoilRows && DbSchema.HasCoilRegister && !_stock.IsLiveView);
             if (pnlCoilToggle.Visibility == Visibility.Visible) chkShowCoils.IsChecked = UiPrefs.GetBool("ShowCoils." + _stock.Code, false);
@@ -952,13 +952,13 @@ namespace CIMS.Views
             // หัวคอลัมน์ของแถว Coil = รูปแบบเดียวกับหัวตาราง (พื้น MainPurple ตัวขาวหนา กึ่งกลาง)
             var head = new StackPanel { Orientation = Orientation.Horizontal };
             foreach (var col in cols)
-                head.Children.Add(new TextBlock
+                head.Children.Add(FollowWidth(col, new TextBlock
                 {
-                    Text = CoilHeadText(col), Width = Math.Max(0, col.ActualWidth),
+                    Text = CoilHeadText(col),
                     FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White,
                     TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
                     VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0)
-                });
+                }));
             sp.Children.Add(new Border { Height = 44, Background = (Brush)FindResource("MainPurple"), BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Child = head });
 
             int n = 0;
@@ -967,16 +967,23 @@ namespace CIMS.Views
                 n++;
                 var line = new StackPanel { Orientation = Orientation.Horizontal };
                 foreach (var col in cols)
-                    line.Children.Add(new TextBlock
+                    line.Children.Add(FollowWidth(col, new TextBlock
                     {
                         Text = CoilCellText(col, c, n),
-                        Width = Math.Max(0, col.ActualWidth),
                         FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.Black,
                         TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
                         VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0)
-                    });
+                    }));
                 sp.Children.Add(new Border { Height = 60, Background = Brushes.White, BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Child = line });
             }
+        }
+
+        // ความกว้างช่อง = ความกว้างคอลัมน์จริงตลอดเวลา (ผูก ActualWidth) - ตอนเปิดหน้าตารางยังคำนวณคอลัมน์ไม่เสร็จ
+        // ถ้าอ่านค่าครั้งเดียวจะได้ช่องแคบผิด (หัว KG / TON ตัวอักษรเรียงลงทีละตัว)
+        private static TextBlock FollowWidth(DataGridColumn col, TextBlock tb)
+        {
+            tb.SetBinding(FrameworkElement.WidthProperty, new System.Windows.Data.Binding(nameof(DataGridColumn.ActualWidth)) { Source = col });
+            return tb;
         }
 
         // คอลัมน์ของแถว Coil ตามที่คลังตั้งไว้ (EDIT STOCK -> COIL SUB ROW COLUMNS)
@@ -1101,7 +1108,7 @@ namespace CIMS.Views
         // เปิด SHOW PRODUCTION / SHOW CARD ต้องมีข้อมูลครบทุกแถว (วนครบทั้งคลัง) -> โหลดทั้งหมดครั้งเดียว
         private void UpdateLoadMode()
         {
-            _viewModel.LoadAllMode = chkAutoScroll.IsChecked == true || (_stock.ColImage && chkShowCards.IsChecked == true);
+            _viewModel.LoadAllMode = chkAutoScroll.IsChecked == true || (_stock.ShowsCards && chkShowCards.IsChecked == true);
         }
 
         private void ReloadForMode()
@@ -1181,7 +1188,9 @@ namespace CIMS.Views
             get
             {
                 int stats = CardStats().Count;
-                return 330 + Math.Max(0, stats - 3) * 64;
+                // การ์ดไม่มีรูป: ตัวเลขใหญ่กว่า -> กว้างขึ้นต่อช่อง (ยอด KG เช่น 5,064.50 ไม่ถูกตัด)
+                return _stock?.CardHasImage == false ? 330 + Math.Max(0, stats - 3) * 64 + stats * 22
+                                                     : 330 + Math.Max(0, stats - 3) * 64;
             }
         }
 
@@ -1246,7 +1255,7 @@ namespace CIMS.Views
             cardTrack.Children.Clear();
             cardShift.X = 0;
             _nextCard = 0;
-            _cardsActive = _stock.ColImage && chkShowCards.IsChecked == true;
+            _cardsActive = _stock.ShowsCards && chkShowCards.IsChecked == true;
             if (!_cardsActive) return;
 
             _cardItems = _viewModel.Products.ToList();
@@ -1311,6 +1320,7 @@ namespace CIMS.Views
         private FrameworkElement CreateCard()
         {
             var purple = (Brush)FindResource("MainPurple");
+            bool pic = _stock.CardHasImage;   // PRODUCT CARDS = WITH IMAGE / NO IMAGE (หน้า EDIT STOCK)
 
             // หัวข้อหลักของการ์ด: PART NO > PD CODE > PART A (ตามคอลัมน์ที่คลังเปิดไว้)
             string titlePath = _stock.ColPartNo ? nameof(StoreProductModel.PartNo)
@@ -1325,7 +1335,8 @@ namespace CIMS.Views
                 Margin = new Thickness(0, 0, CardGap, 0),
                 Padding = new Thickness(12),
                 CornerRadius = new CornerRadius(18),
-                BorderThickness = new Thickness(2)
+                // การ์ดไม่มีรูป: ขอบซ้ายหนาเป็นแถบสีสถานะ (แดง / เขียว / เทา) มองไกลก็รู้สถานะ
+                BorderThickness = pic ? new Thickness(2) : new Thickness(10, 2, 2, 2)
                 // ไม่ใส่ DropShadowEffect: การ์ดเลื่อนทุกเฟรม เอฟเฟกต์เงาต้องวาดใหม่ตลอด ทำให้ SHOW PRODUCTION กระตุก
             };
 
@@ -1340,7 +1351,7 @@ namespace CIMS.Views
 
             // --- ส่วนบน: รูป + กลุ่ม + รหัส + ชื่อ ---
             var top = new Grid();
-            top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            top.ColumnDefinitions.Add(new ColumnDefinition { Width = pic ? new GridLength(110) : new GridLength(0) });
             top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.Children.Add(top);
 
@@ -1354,9 +1365,9 @@ namespace CIMS.Views
             RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
             img.SetBinding(Image.SourceProperty, new System.Windows.Data.Binding(nameof(StoreProductModel.ProductImage)) { IsAsync = false });
             imgBox.Child = img;
-            top.Children.Add(imgBox);
+            if (pic) top.Children.Add(imgBox);
 
-            var info = new StackPanel { Margin = new Thickness(4, 0, 0, 0) };
+            var info = new StackPanel { Margin = new Thickness(pic ? 4 : 2, 0, 0, 0) };
             Grid.SetColumn(info, 1);
             top.Children.Add(info);
 
@@ -1364,7 +1375,7 @@ namespace CIMS.Views
             var chip = new Border
             {
                 Background = new SolidColorBrush(Color.FromRgb(0xF3, 0xE5, 0xF5)),
-                CornerRadius = new CornerRadius(8), Padding = new Thickness(8, 2, 8, 2), MaxWidth = CardWidth - 230
+                CornerRadius = new CornerRadius(8), Padding = new Thickness(8, 2, 8, 2), MaxWidth = CardWidth - (pic ? 230 : 130)
             };
             var chipText = new TextBlock { FontSize = 11, FontWeight = FontWeights.Bold, Foreground = purple, TextTrimming = TextTrimming.CharacterEllipsis };
             chipText.SetBinding(TextBlock.TextProperty, nameof(StoreProductModel.GroupKey));
@@ -1417,7 +1428,7 @@ namespace CIMS.Views
 
             var title = new TextBlock
             {
-                FontSize = 17, FontWeight = FontWeights.Black, Foreground = new SolidColorBrush(Color.FromRgb(0x2D, 0x2A, 0x32)),
+                FontSize = pic ? 17 : 22, FontWeight = FontWeights.Black, Foreground = new SolidColorBrush(Color.FromRgb(0x2D, 0x2A, 0x32)),
                 Margin = new Thickness(0, pdLine ? 0 : 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
             };
             title.SetBinding(TextBlock.TextProperty, titlePath);
@@ -1429,7 +1440,7 @@ namespace CIMS.Views
                 {
                     FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = grey,
                     TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
-                    MaxHeight = (pdLine && custLine) ? 17 : 34,   // มีบรรทัดเพิ่ม 2 บรรทัด -> ชื่อ 1 บรรทัด (การ์ดสูงเท่าเดิม)
+                    MaxHeight = (pdLine && custLine) || !pic ? 17 : 34,   // มีบรรทัดเพิ่ม 2 บรรทัด / หัวข้อตัวใหญ่ (ไม่มีรูป) -> ชื่อ 1 บรรทัด (การ์ดสูงเท่าเดิม)
                     Margin = new Thickness(0, 1, 0, 0)
                 };
                 name.SetBinding(TextBlock.TextProperty, nameof(StoreProductModel.PartName));
@@ -1447,7 +1458,7 @@ namespace CIMS.Views
                     var cell = new Border
                     {
                         Background = new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF)),
-                        CornerRadius = new CornerRadius(10), Margin = new Thickness(3, 0, 3, 0), Padding = new Thickness(2, 4, 2, 4)
+                        CornerRadius = new CornerRadius(10), Margin = new Thickness(3, 0, 3, 0), Padding = pic ? new Thickness(2, 4, 2, 4) : new Thickness(2, 6, 2, 6)
                     };
                     var sp = new StackPanel();
                     sp.Children.Add(new TextBlock
@@ -1456,7 +1467,7 @@ namespace CIMS.Views
                         Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0x84, 0x90)), HorizontalAlignment = HorizontalAlignment.Center,
                         TextTrimming = TextTrimming.CharacterEllipsis
                     });
-                    var val = new TextBlock { FontSize = 16, FontWeight = FontWeights.Black, Foreground = purple, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+                    var val = new TextBlock { FontSize = pic ? 16 : 22, FontWeight = FontWeights.Black, Foreground = purple, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
                     val.SetBinding(TextBlock.TextProperty, path);
                     sp.Children.Add(val);
                     cell.Child = sp;

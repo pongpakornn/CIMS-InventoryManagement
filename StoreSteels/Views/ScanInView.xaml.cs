@@ -51,7 +51,7 @@ namespace CIMS.Views
             System.Windows.Input.InputMethod.SetIsInputMethodEnabled(txtBarcodeInput, false);
             txtBarcodeInput.PreviewTextInput += txtBarcodeInput_PreviewTextInput;
             txtBarcodeInput.LostKeyboardFocus += ScanBox_LostKeyboardFocus;
-            this.PreviewTextInput += Page_PreviewTextInput;
+            this.PreviewMouseUp += Page_PreviewMouseUp;
 
             this.Loaded += ScanInView_Loaded;
             this.Unloaded += ScanInView_Unloaded;
@@ -69,14 +69,14 @@ namespace CIMS.Views
         {
             // สลับกลับมาที่หน้าต่างโปรแกรม (Alt+Tab / คลิกหน้าต่าง) ก็ให้โฟกัสช่องสแกนให้เอง
             _hostWindow = Window.GetWindow(this);
-            if (_hostWindow != null) _hostWindow.Activated += HostWindow_Activated;
+            if (_hostWindow != null) { _hostWindow.Activated += HostWindow_Activated; _hostWindow.PreviewTextInput += Page_PreviewTextInput; }
             _viewModel.StartLive();
             FocusScanBox();
         }
 
         private void ScanInView_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (_hostWindow != null) _hostWindow.Activated -= HostWindow_Activated;
+            if (_hostWindow != null) { _hostWindow.Activated -= HostWindow_Activated; _hostWindow.PreviewTextInput -= Page_PreviewTextInput; }
             _hostWindow = null;
             _viewModel.StopLive();
         }
@@ -253,9 +253,10 @@ namespace CIMS.Views
             return d as T;
         }
 
+        // ผูกกับหน้าต่างหลัก (ไม่ใช่แค่หน้านี้): กดเมนู Sidebar / ปุ่มด้านนอกแล้วยิงป้ายต่อ ตัวอักษรแรกพาโฟกัสกลับช่องสแกนเอง ป้ายไม่หาย
         private void Page_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            if (e.OriginalSource == txtBarcodeInput || IsTypingControl(e.OriginalSource) || string.IsNullOrEmpty(e.Text)) return;
+            if (!IsVisible || e.OriginalSource == txtBarcodeInput || IsTypingControl(e.OriginalSource) || string.IsNullOrEmpty(e.Text)) return;
             e.Handled = true;
             txtBarcodeInput.Focus();
             Keyboard.Focus(txtBarcodeInput);
@@ -271,7 +272,28 @@ namespace CIMS.Views
             var w = Window.GetWindow(this);
             if (w == null || !w.IsActive) return;
             if (e.NewFocus is DependencyObject nd && Window.GetWindow(nd) != w) return;
+            // โฟกัสไปนอกหน้านี้ (เมนู Sidebar / หัวโปรแกรม) -> ปล่อยให้กดได้ตามปกติ ไม่ดึงกลับ
+            if (!(e.NewFocus is System.Windows.Media.Visual inside) || !IsAncestorOf(inside)) return;
+            // กดเมาส์ค้างอยู่ (คลิกปุ่ม / ตาราง / ช่องเลือก) -> รอปล่อยเมาส์และให้ปุ่มทำงานก่อน ค่อยกลับช่องสแกน
+            if (Mouse.LeftButton == MouseButtonState.Pressed || Mouse.RightButton == MouseButtonState.Pressed) { _refocusOnMouseUp = true; return; }
             FocusScanBox();
+        }
+
+        private bool _refocusOnMouseUp;
+        private void Page_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_refocusOnMouseUp) return;
+            _refocusOnMouseUp = false;
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+            {
+                // ปุ่มเปิดหน้าต่าง / เมนู / Dropdown อยู่ หรือไปพิมพ์ช่องอื่น -> ไม่แย่ง
+                if (!IsLoaded || !IsVisible || IsTypingControl(Keyboard.FocusedElement)) return;
+                var w = Window.GetWindow(this);
+                if (w == null || !w.IsActive) return;
+                if (Keyboard.FocusedElement is System.Windows.Media.Visual f && !IsAncestorOf(f) && f != w) return;
+                if (FindParent<ComboBox>(Keyboard.FocusedElement as DependencyObject)?.IsDropDownOpen == true) return;
+                FocusScanBox();
+            }));
         }
         #endregion
 
