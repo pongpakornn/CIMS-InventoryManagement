@@ -748,6 +748,11 @@
                                 Background="{StaticResource MainPurple}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
                                 Width="130" Height="38" FontSize="13" Margin="10,0,0,6"/>
+                        <!-- ✔ ป้ายที่รับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้ - ตัวเลข = วันนี้ -->
+                        <Button Content="{Binding DeductedText}" Click="Deducted_Click"
+                                Background="#2E7D32" Visibility="{Binding DeductedVisibility}"
+                                Style="{StaticResource AnimatedButton}" Focusable="False" ToolTip="Labels received today that cut the source stock (STOCK-PANTA)"
+                                Width="170" Height="38" FontSize="13" Margin="10,0,0,6"/>
                         <!-- ⚠ ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้ (ระบบเก็บให้เองตอนแสกน) -->
                         <Button Content="{Binding NotDeductedText}" Click="NotDeducted_Click"
                                 Background="#E65100" Visibility="{Binding NotDeductedVisibility}"

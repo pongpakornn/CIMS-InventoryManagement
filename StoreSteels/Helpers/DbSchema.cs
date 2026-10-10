@@ -55,6 +55,27 @@ namespace CIMS.Helpers
             }
         }
 
+        // Update_20261010c.sql: CIMS.StockTransfers.ScanTransactionID (รายการ DEDUCTED ผูกกับรายการแสกน)
+        private static bool? _transferScanTx;
+        public static bool HasTransferScanTx
+        {
+            get
+            {
+                if (_transferScanTx.HasValue) return _transferScanTx.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH('CIMS.StockTransfers', 'ScanTransactionID') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _transferScanTx = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _transferScanTx.Value;
+            }
+        }
+
         // Update_20261009.sql: CIMS.Stocks.MaxMinDecimal (MAX / MIN แสดง / เก็บทศนิยม แยกจาก DECIMAL QTY)
         private static bool? _maxMinDecimal;
         public static bool HasMaxMinDecimal => _maxMinDecimal ?? (_maxMinDecimal = ColumnExists("MaxMinDecimal")) ?? false;

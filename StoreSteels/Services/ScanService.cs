@@ -725,6 +725,12 @@ namespace CIMS.Services
                                 cmd.Parameters.AddWithValue("@u", userId);
                                 cmd.Parameters.AddWithValue("@sp", srcPart);
                                 if (!CIMS.Helpers.DbSchema.HasCountCoil) { cmd.CommandText = cmd.CommandText.Replace(", SourcePartID)", ")").Replace(", @sp)", ")"); }
+                                // รายการ DEDUCTED: ผูกกับรายการแสกนนี้ (Update_20261010c.sql)
+                                if (CIMS.Helpers.DbSchema.HasTransferScanTx)
+                                {
+                                    cmd.CommandText = cmd.CommandText.Replace("UserID, SourcePartID)", "UserID, SourcePartID, ScanTransactionID)").Replace("@u, @sp)", "@u, @sp, @stx)");
+                                    cmd.Parameters.AddWithValue("@stx", txId);
+                                }
                                 cmd.ExecuteNonQuery();
                             }
                         }

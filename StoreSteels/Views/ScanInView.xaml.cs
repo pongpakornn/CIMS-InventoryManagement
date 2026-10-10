@@ -50,6 +50,8 @@ namespace CIMS.Views
             System.Windows.Input.InputLanguageManager.SetRestoreInputLanguage(txtBarcodeInput, true);
             System.Windows.Input.InputMethod.SetIsInputMethodEnabled(txtBarcodeInput, false);
             txtBarcodeInput.PreviewTextInput += txtBarcodeInput_PreviewTextInput;
+            txtBarcodeInput.LostKeyboardFocus += ScanBox_LostKeyboardFocus;
+            this.PreviewTextInput += Page_PreviewTextInput;
 
             this.Loaded += ScanInView_Loaded;
             this.Unloaded += ScanInView_Unloaded;
@@ -88,6 +90,14 @@ namespace CIMS.Views
             try { stocks = new CIMS.Services.StockService().GetStocks().Where(s => _viewModel.CurrentUser == null || _viewModel.CurrentUser.CanViewStock(s)).ToList(); }
             catch { stocks = _viewModel.Stocks.ToList(); }
             new ScanHistoryWindow(_viewModel.CurrentUser, stocks).ShowDialog();
+            FocusScanBox();
+        }
+
+        // ✔ DEDUCTED: ป้ายที่รับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้
+        private async void Deducted_Click(object sender, RoutedEventArgs e)
+        {
+            new DeductMissWindow(_viewModel.CurrentUser, deducted: true).ShowDialog();
+            await _viewModel.RefreshNotDeductedAsync();
             FocusScanBox();
         }
 
@@ -177,6 +187,7 @@ namespace CIMS.Views
 
             // ยังไม่จบ -> รอตัวอักษรถัดไป ถ้าเงียบไปตามเวลานี้ถือว่าจบบาร์โค้ด (TURBO 120 ms / ปกติ 300 ms)
             // สแกนเนอร์ส่งตัวอักษรห่างกันไม่ถึง 10 ms จึงไม่ตัดกลางบาร์โค้ดแม้จะยาวแค่ไหน
+            _lastTextChange = DateTime.Now;
             _fastTimer.Interval = TimeSpan.FromMilliseconds(_viewModel.TurboMode ? 120 : 300);
             _fastTimer.Stop();
             _fastTimer.Start();
@@ -207,14 +218,56 @@ namespace CIMS.Views
             if (!string.IsNullOrWhiteSpace(txtBarcodeInput.Text)) CommitBarcodeAction(txtBarcodeInput.Text);
         }
 
+        // ⌛ ป้ายยังมาไม่ครบ (เช่น ได้แค่ "0" หรือ Panta ได้ช่องไม่ครบ 11 ช่อง) -> รอต่ออีกสูงสุด 1.5 วินาทีนับจากตัวอักษรล่าสุด
+        //    (ต.ค. 2026 สแกนเนอร์เว้นจังหวะกลางป้าย ทำให้ป้ายถูกตัดเป็น 2 รายการ "0" + "790774-003;...")
+        private DateTime _lastTextChange = DateTime.MinValue;
+        private const int MaxWaitIncompleteMs = 1500;
+
         private void FastTimer_Tick(object sender, EventArgs e)
         {
             _fastTimer.Stop();
             string input = txtBarcodeInput.Text;
-            if (!string.IsNullOrWhiteSpace(input))
+            if (string.IsNullOrWhiteSpace(input)) return;
+            if ((DateTime.Now - _lastTextChange).TotalMilliseconds < MaxWaitIncompleteMs && _viewModel.LooksIncomplete(input))
             {
-                CommitBarcodeAction(input);
+                _fastTimer.Interval = TimeSpan.FromMilliseconds(150);
+                _fastTimer.Start();
+                return;
             }
+            CommitBarcodeAction(input);
+        }
+
+        // 🎯 ล็อกช่องสแกน: อยู่หน้านี้แล้วกดปุ่ม / คลิกตาราง โฟกัสกลับช่องสแกนเอง (ช่องพิมพ์อื่นยังพิมพ์ได้ปกติ)
+        //    ตัวอักษรที่พิมพ์ / ยิงเข้ามาตอนโฟกัสไม่อยู่ในช่องพิมพ์ใด ๆ -> ส่งเข้าช่องสแกนแทน (ป้ายไม่ขาดหัว)
+        private static bool IsTypingControl(object o) =>
+            o is System.Windows.Controls.Primitives.TextBoxBase || o is PasswordBox ||
+            (o is DependencyObject d && (FindParent<ComboBox>(d)?.IsEditable == true || FindParent<DatePicker>(d) != null));
+
+        private static T FindParent<T>(DependencyObject d) where T : DependencyObject
+        {
+            while (d != null && !(d is T)) d = (d is System.Windows.Media.Visual || d is System.Windows.Media.Media3D.Visual3D) ? System.Windows.Media.VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+            return d as T;
+        }
+
+        private void Page_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (e.OriginalSource == txtBarcodeInput || IsTypingControl(e.OriginalSource) || string.IsNullOrEmpty(e.Text)) return;
+            e.Handled = true;
+            txtBarcodeInput.Focus();
+            Keyboard.Focus(txtBarcodeInput);
+            txtBarcodeInput.CaretIndex = txtBarcodeInput.Text.Length;
+            txtBarcodeInput.SelectedText = e.Text;
+            txtBarcodeInput.CaretIndex = txtBarcodeInput.Text.Length;
+        }
+
+        private void ScanBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (IsTypingControl(e.NewFocus) || !IsLoaded) return;
+            // หน้าต่างอื่น (Popup / Dialog) เปิดอยู่ -> ไม่แย่งโฟกัส ปิดแล้วค่อยกลับมาเอง (HostWindow_Activated)
+            var w = Window.GetWindow(this);
+            if (w == null || !w.IsActive) return;
+            if (e.NewFocus is DependencyObject nd && Window.GetWindow(nd) != w) return;
+            FocusScanBox();
         }
         #endregion
 

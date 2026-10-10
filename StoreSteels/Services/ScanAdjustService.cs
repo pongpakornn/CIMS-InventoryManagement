@@ -295,8 +295,28 @@ namespace CIMS.Services
                                                        r.IsDBNull(3) ? (int?)null : r.GetInt32(3), r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
                                                        r.IsDBNull(5) ? null : r.GetString(5), r.IsDBNull(6) ? (decimal?)null : r.GetDecimal(6)));
                                 }
+                                var kept = new List<string>();
                                 foreach (var m in moves)
                                 {
+                                    // Coil นี้ถูกรายการอื่นย้าย / ตัดต่อไปแล้ว (เช่น สร้างใน PANTA แล้วแสกนย้ายเข้า MAT)
+                                    // -> ไม่ย้อน / ไม่ลบ Coil (เป็นของรายการหลังแล้ว) แค่ทำเครื่องหมายว่ารายการนี้ยกเลิก
+                                    object later;
+                                    using (var cmd = new SqlCommand("SELECT TOP 1 ScanTransactionID FROM CIMS.CoilMoves WHERE CoilID = @c AND MoveID > @m AND Undone = 0 ORDER BY MoveID", conn, trans))
+                                    {
+                                        cmd.Parameters.AddWithValue("@c", m.CoilId);
+                                        cmd.Parameters.AddWithValue("@m", m.MoveId);
+                                        later = cmd.ExecuteScalar();
+                                    }
+                                    if (later != null)
+                                    {
+                                        using (var cmd = new SqlCommand("UPDATE CIMS.CoilMoves SET Undone = 1 WHERE MoveID = @m; SELECT CoilNo FROM CIMS.Coils WHERE CoilID = @c", conn, trans))
+                                        {
+                                            cmd.Parameters.AddWithValue("@m", m.MoveId);
+                                            cmd.Parameters.AddWithValue("@c", m.CoilId);
+                                            kept.Add($"{cmd.ExecuteScalar()}" + (later == DBNull.Value ? "" : $" (#{later})"));
+                                        }
+                                        continue;
+                                    }
                                     string sql = m.Action == "CREATE"
                                         ? @"DELETE FROM CIMS.CoilMoves WHERE CoilID = @c; DELETE FROM CIMS.Coils WHERE CoilID = @c;"
                                         : @"UPDATE CIMS.Coils SET StockID = @fs, PartID = @fp, Status = @fst, WeightKG = ISNULL(@fw, WeightKG),
@@ -313,7 +333,8 @@ namespace CIMS.Services
                                         cmd.ExecuteNonQuery();
                                     }
                                 }
-                                if (moves.Count > 0) sourceNote = (sourceNote == null ? "" : sourceNote + " | ") + $"ย้อนทะเบียน Coil {moves.Count} รายการ";
+                                if (moves.Count > kept.Count) sourceNote = (sourceNote == null ? "" : sourceNote + " | ") + $"ย้อนทะเบียน Coil {moves.Count - kept.Count} รายการ";
+                                if (kept.Count > 0) sourceNote = (sourceNote == null ? "" : sourceNote + " | ") + $"Coil ถูกรายการหลังย้ายต่อแล้ว ไม่ย้อน: {string.Join(", ", kept)}";
                                 // ตัดผ่านทะเบียน Coil (Coil แม่ / Coil ลูก) -> STOCK (COIL) ต้นทาง = นับจากทะเบียน (แทน +1 ด้านบน)
                                 if (moves.Count > 0 && recountPart > 0) CoilImportService.RecountCoils(conn, trans, recountPart, recountStk, false);
                             }

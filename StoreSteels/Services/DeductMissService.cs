@@ -29,6 +29,16 @@ namespace CIMS.Services
         public string Barcode { get; set; }
         public decimal? MotherNow { get; set; }   // Coil แม่ในคลังต้นทางตอนนี้ (IN) - null = ยังไม่มี
 
+        // รายการ DEDUCTED (ตัดคลังต้นทางได้แล้ว)
+        public string SourcePartCode { get; set; }
+        public decimal SourceAfter { get; set; }
+        public string How { get; set; }            // MOTHER COIL / COIL / PRODUCT
+        public decimal? MotherAfter { get; set; }  // น้ำหนัก Coil แม่หลังตัดครั้งนั้น
+        public string SourceAfterText => CIMS.Helpers.Qty.Plain(SourceAfter);
+        public string MotherNowDoneText => MotherNow.HasValue ? $"IN {CIMS.Helpers.Qty.Plain(MotherNow.Value)} KG" : How == "MOTHER COIL" ? "USED UP" : "-";
+        public string HowText => How == "MOTHER COIL" ? $"MOTHER COIL → {(MotherAfter.HasValue ? CIMS.Helpers.Qty.Plain(MotherAfter.Value) + " KG" : "-")}"
+                               : How == "COIL" ? "COIL MOVED" : "SAME PRODUCT";
+
         public decimal Missing => LabelQty - Deducted;
         public string DateText => ScanDate.ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
         public string LabelQtyText => CIMS.Helpers.Qty.Plain(LabelQty);
@@ -106,6 +116,116 @@ namespace CIMS.Services
                         });
             }
             return list;
+        }
+
+        // ✔ DEDUCTED: จำนวนรายการที่ตัดคลังต้นทางได้ "วันนี้" (ปุ่ม DEDUCTED (n))
+        public int CountDeductedToday()
+        {
+            if (!CIMS.Helpers.DbSchema.HasTransferScanTx) return 0;
+            using (var conn = new SqlConnection(_cs))
+            using (var cmd = new SqlCommand(@"SELECT COUNT(*) FROM CIMS.StockTransfers st JOIN CIMS.ScanTransactions t ON t.TransactionID = st.ScanTransactionID
+                                              WHERE st.TransferMode = 'SCAN' AND ISNULL(t.IsCancelled, 0) = 0 AND st.TransferDate >= CAST(GETDATE() AS date)", conn))
+            {
+                conn.Open();
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        // ✔ DEDUCTED: แต่ละป้ายที่แสกนรับเข้าแล้วตัดคลังต้นทางได้ - ตัดอะไร เท่าไร ต้นทางเหลือเท่าไร (รายการที่ยกเลิกแล้วไม่แสดง)
+        public List<DeductMissRow> GetDeducted(string keyword, DateTime from, DateTime to)
+        {
+            var list = new List<DeductMissRow>();
+            if (!CIMS.Helpers.DbSchema.HasTransferScanTx) return list;
+            using (var conn = new SqlConnection(_cs))
+            using (var cmd = new SqlCommand(@"
+                SELECT st.TransferID, t.TransactionID, t.TransactionDate, t.Quantity AS LabelQty, st.Quantity AS Cut, st.FromBalanceAfter, t.UserID, t.ReferenceNo,
+                       st.FromStockCode, st.ToStockCode, p.PartCode, p.Description, sp.PartCode AS SourcePartCode,
+                       ch.CoilNo, ch.MotherCoil, mo.CoilNo AS MotherNo, mo.MoveWeight AS MotherAfter, mo.NowWeight AS MotherNow, ch.Action AS ChildAction
+                FROM CIMS.StockTransfers st
+                JOIN CIMS.ScanTransactions t ON t.TransactionID = st.ScanTransactionID
+                LEFT JOIN CIMS.Parts p ON p.PartID = st.PartID
+                LEFT JOIN CIMS.Parts sp ON sp.PartID = ISNULL(st.SourcePartID, st.PartID)
+                OUTER APPLY (SELECT TOP 1 c.CoilNo, c.MotherCoil, m.Action FROM CIMS.CoilMoves m JOIN CIMS.Coils c ON c.CoilID = m.CoilID
+                             WHERE m.ScanTransactionID = t.TransactionID AND m.Action IN ('CREATE', 'MOVE') ORDER BY m.MoveID) ch
+                OUTER APPLY (SELECT TOP 1 c.CoilNo, m.WeightKG AS MoveWeight, CASE WHEN c.Status = 'IN' THEN c.WeightKG END AS NowWeight
+                             FROM CIMS.CoilMoves m JOIN CIMS.Coils c ON c.CoilID = m.CoilID
+                             WHERE m.ScanTransactionID = t.TransactionID AND m.Action = 'CONSUME' ORDER BY m.MoveID) mo
+                WHERE st.TransferMode = 'SCAN' AND ISNULL(t.IsCancelled, 0) = 0 AND st.TransferDate >= @from AND st.TransferDate < @to
+                  AND (@k = '' OR ch.CoilNo LIKE '%' + @k + '%' OR ch.MotherCoil LIKE '%' + @k + '%' OR mo.CoilNo LIKE '%' + @k + '%' OR p.PartCode LIKE '%' + @k + '%'
+                       OR sp.PartCode LIKE '%' + @k + '%' OR p.Description LIKE '%' + @k + '%' OR t.UserID LIKE '%' + @k + '%' OR t.ReferenceNo LIKE '%' + @k + '%')
+                ORDER BY st.TransferDate DESC, st.TransferID DESC", conn))
+            {
+                cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = from.Date;
+                cmd.Parameters.Add("@to", SqlDbType.DateTime).Value = to.Date.AddDays(1);
+                cmd.Parameters.Add("@k", SqlDbType.NVarChar, 200).Value = (keyword ?? "").Trim();
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read())
+                    {
+                        string mother = r["MotherNo"] != DBNull.Value ? r["MotherNo"].ToString() : r["MotherCoil"]?.ToString() ?? "";
+                        list.Add(new DeductMissRow
+                        {
+                            MissId = Convert.ToInt32(r["TransferID"]),
+                            TxId = Convert.ToInt32(r["TransactionID"]),
+                            ScanDate = Convert.ToDateTime(r["TransactionDate"]),
+                            CoilNo = r["CoilNo"]?.ToString() ?? "",
+                            MotherCoil = mother,
+                            LabelQty = CIMS.Helpers.Qty.Read(r["LabelQty"]),
+                            Deducted = CIMS.Helpers.Qty.Read(r["Cut"]),
+                            SourceAfter = CIMS.Helpers.Qty.Read(r["FromBalanceAfter"]),
+                            UserId = r["UserID"]?.ToString() ?? "",
+                            Barcode = r["ReferenceNo"]?.ToString() ?? "",
+                            PartCode = r["PartCode"]?.ToString() ?? "",
+                            PartName = r["Description"]?.ToString() ?? "",
+                            SourcePartCode = r["SourcePartCode"]?.ToString() ?? "",
+                            StockCode = r["ToStockCode"]?.ToString() ?? "",
+                            SourceCode = r["FromStockCode"]?.ToString() ?? "",
+                            How = r["MotherNo"] != DBNull.Value ? "MOTHER COIL" : (r["ChildAction"]?.ToString() == "MOVE" ? "COIL" : "PRODUCT"),
+                            MotherAfter = r["MotherAfter"] == DBNull.Value ? (decimal?)null : CIMS.Helpers.Qty.Read(r["MotherAfter"]),
+                            MotherNow = r["MotherNow"] == DBNull.Value ? (decimal?)null : CIMS.Helpers.Qty.Read(r["MotherNow"]),
+                            Reason = "DONE"
+                        });
+                    }
+            }
+            return list;
+        }
+
+        public string ExportDeducted(IList<DeductMissRow> rows)
+        {
+            string path = ImportTemplateService.NewPath("DEDUCTED");
+            System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+            using (var wb = new ClosedXML.Excel.XLWorkbook())
+            {
+                var ws = wb.Worksheets.Add("DEDUCTED");
+                string[] heads = { "NO", "SCAN DATE", "COIL NO", "MOTHER COIL", "PD CODE", "PRODUCT NAME", "STOCK", "LABEL QTY (KG)", "CUT FROM SOURCE (KG)", "SOURCE PD CODE", "SOURCE BALANCE AFTER", "HOW", "MOTHER COIL NOW", "USER", "BARCODE" };
+                ImportTemplateService.Header(ws, heads, new double[] { 6.4, 19, 18, 15, 18, 34, 26, 14, 16, 18, 16, 24, 20, 10, 70 });
+                int row = 2;
+                foreach (var x in rows)
+                {
+                    ws.Cell(row, 1).Value = row - 1;
+                    ws.Cell(row, 2).Value = x.ScanDate;
+                    ws.Cell(row, 2).Style.DateFormat.Format = "dd/MM/yyyy HH:mm:ss";
+                    ws.Cell(row, 3).Value = x.CoilNo;
+                    ws.Cell(row, 4).Value = x.MotherCoil;
+                    ws.Cell(row, 5).Value = x.PartCode;
+                    ws.Cell(row, 6).Value = x.PartName;
+                    ws.Cell(row, 7).Value = $"{x.StockCode} ← {x.SourceCode}";
+                    ws.Cell(row, 8).Value = x.LabelQty;
+                    ws.Cell(row, 9).Value = x.Deducted;
+                    ws.Cell(row, 10).Value = x.SourcePartCode;
+                    ws.Cell(row, 11).Value = x.SourceAfter;
+                    ws.Cell(row, 12).Value = x.HowText;
+                    ws.Cell(row, 13).Value = x.MotherNow.HasValue ? $"IN {CIMS.Helpers.Qty.Plain(x.MotherNow.Value)} KG" : (x.How == "MOTHER COIL" ? "USED UP" : "-");
+                    ws.Cell(row, 14).Value = x.UserId;
+                    ws.Cell(row, 15).Value = x.Barcode;
+                    row++;
+                }
+                ImportTemplateService.Body(ws, row - 1, heads.Length);
+                ImportTemplateService.LeftAlign(ws, row - 1, 6, 15);
+                if (row > 2) { ws.Range(2, 8, row - 1, 9).Style.NumberFormat.Format = "#,##0.00#"; ws.Range(2, 11, row - 1, 11).Style.NumberFormat.Format = "#,##0.00#"; }
+                wb.SaveAs(path);
+            }
+            return path;
         }
 
         // 🗑 ลบออกจากรายการ (ไม่กระทบยอดสต็อก / รายการสแกน)

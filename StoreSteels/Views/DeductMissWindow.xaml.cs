@@ -1,4 +1,4 @@
-using CIMS.Helpers;
+﻿using CIMS.Helpers;
 using CIMS.Models;
 using CIMS.Services;
 using System;
@@ -25,11 +25,27 @@ namespace CIMS.Views
         private bool _ready;
         public bool Changed { get; private set; }
 
-        public DeductMissWindow(UserSession session)
+        // deducted = true -> ✔ DEDUCTED: ป้ายที่แสกนรับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้ (ดูอย่างเดียว ไม่มีปุ่มลบ)
+        private readonly bool _deducted;
+
+        public DeductMissWindow(UserSession session, bool deducted = false)
         {
             _session = session;
+            _deducted = deducted;
             InitializeComponent();
-            btnDelete.Visibility = _session?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
+            btnDelete.Visibility = !deducted && _session?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
+            if (deducted)
+            {
+                Title = "Deducted";
+                hdrBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2E, 0x7D, 0x32));
+                txtTitle.Text = "✔ DEDUCTED";
+                txtSub.Text = "Labels received with SCAN IN that cut the source stock (e.g. STOCK-PANTA) - what was cut, from which mother coil / product, and what is left";
+                txtSub.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC8, 0xE6, 0xC9));
+                txtEmpty.Text = "NO DEDUCTION IN THIS RANGE";
+                colCut.Header = "CUT FROM SOURCE";
+                colMissing.Visibility = colReason.Visibility = colMotherNow.Visibility = Visibility.Collapsed;
+                colSrcPart.Visibility = colSrcAfter.Visibility = colHow.Visibility = colMotherDone.Visibility = Visibility.Visible;
+            }
             var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) { Owner = owner; WindowStartupLocation = WindowStartupLocation.CenterOwner; }
             // จอเล็ก (1366 x 768): ไม่ให้หน้าต่างล้นจอ
@@ -37,7 +53,7 @@ namespace CIMS.Views
             Width = Math.Min(Width, area.Width);
             Height = Math.Min(Height, area.Height);
             dgMiss.ItemsSource = _rows;
-            dpFrom.SelectedDate = DateTime.Today.AddDays(-30);
+            dpFrom.SelectedDate = _deducted ? DateTime.Today : DateTime.Today.AddDays(-30);
             dpTo.SelectedDate = DateTime.Today;
             Loaded += async (s, e) => { _ready = true; await LoadAsync(); txtSearch.Focus(); };
         }
@@ -52,7 +68,7 @@ namespace CIMS.Views
             txtStatus.Text = "⏳ LOADING...";
             try
             {
-                var list = await Task.Run(() => _service.GetRows(key, from, to));
+                var list = await Task.Run(() => _deducted ? _service.GetDeducted(key, from, to) : _service.GetRows(key, from, to));
                 if (ver != _version) return;
                 var picked = new HashSet<int>(_rows.Where(r => r.IsSelected).Select(r => r.MissId));
                 _rows.Clear();
@@ -72,7 +88,9 @@ namespace CIMS.Views
             int sel = _rows.Count(r => r.IsSelected);
             decimal kg = _rows.Sum(r => r.Missing);
             int foundNow = _rows.Count(r => r.MotherNow.HasValue);
-            txtStatus.Text = $"{_rows.Count:N0} LABELS  •  NOT DEDUCTED {Qty.Plain(kg)} KG  •  MOTHER COIL NOW IN SOURCE: {foundNow:N0}  •  {sel:N0} SELECTED";
+            txtStatus.Text = _deducted
+                ? $"{_rows.Count:N0} LABELS  •  CUT FROM SOURCE {Qty.Plain(_rows.Sum(r => r.Deducted))} KG  •  BY MOTHER COIL {_rows.Count(r => r.How == "MOTHER COIL"):N0}  •  COIL MOVED {_rows.Count(r => r.How == "COIL"):N0}  •  {sel:N0} SELECTED"
+                : $"{_rows.Count:N0} LABELS  •  NOT DEDUCTED {Qty.Plain(kg)} KG  •  MOTHER COIL NOW IN SOURCE: {foundNow:N0}  •  {sel:N0} SELECTED";
             txtEmpty.Visibility = _rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             chkAll.IsChecked = _rows.Count > 0 && sel == _rows.Count;
         }
@@ -106,8 +124,8 @@ namespace CIMS.Views
             btnExport.IsEnabled = false;
             try
             {
-                string path = await Task.Run(() => _service.Export(rows));
-                LogService.WriteLog(_session?.UserId, "EXPORT_NOT_DEDUCTED", $"Exported {rows.Count} not-deducted labels", "NOT_DEDUCTED");
+                string path = await Task.Run(() => _deducted ? _service.ExportDeducted(rows) : _service.Export(rows));
+                LogService.WriteLog(_session?.UserId, _deducted ? "EXPORT_DEDUCTED" : "EXPORT_NOT_DEDUCTED", $"Exported {rows.Count} {(_deducted ? "deducted" : "not-deducted")} labels", _deducted ? "DEDUCTED" : "NOT_DEDUCTED");
                 ImportTemplateService.OpenFile(path);
             }
             catch (Exception ex)

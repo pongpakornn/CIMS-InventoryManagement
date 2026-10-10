@@ -351,6 +351,7 @@ namespace CIMS.ViewModels
                 OnPropertyChanged(nameof(ReturnButtonText));
                 OnPropertyChanged(nameof(ReturnButtonBackground));
                 OnPropertyChanged(nameof(ReturnBannerVisibility));
+                RefreshModeFilter();
             }
         }
 
@@ -417,6 +418,7 @@ namespace CIMS.ViewModels
                 OnPropertyChanged(nameof(ScanOutBannerVisibility));
                 OnPropertyChanged(nameof(ScanTitle));
                 OnPropertyChanged(nameof(QtyLabel));
+                RefreshModeFilter();
             }
         }
 
@@ -757,6 +759,20 @@ namespace CIMS.ViewModels
             ToggleRemainderModeCommand = new RelayCommand(p => IsRemainderMode = !IsRemainderMode);
             ToggleScanOutModeCommand = new RelayCommand(p => IsScanOutMode = !IsScanOutMode);
             // ตารางวันนี้โหลดตอนเลือกคลัง (SelectedStock) ใน ApplyPermissions -> LoadStocks
+
+            // 🔀 แสดงเฉพาะรายการของโหมดที่กดอยู่: รับเข้า = IN / สแกนออก = OUT / คืนเหล็ก = RETURN
+            System.Windows.Data.CollectionViewSource.GetDefaultView(ScannedItems).Filter = o => o is ScanItemModel s && s.Status == ModeStatus;
+            System.Windows.Data.CollectionViewSource.GetDefaultView(HistoryItems).Filter = o => o is ScanItemModel s &&
+                (IsScanOutMode ? s.OutCount > 0 : s.InCount > 0);
+        }
+
+        private string ModeStatus => IsScanOutMode ? "OUT" : IsReturnMode ? "RETURN" : "IN";
+
+        // เปลี่ยนโหมด / ยอดในตารางสรุปเปลี่ยน -> กรองใหม่
+        private void RefreshModeFilter()
+        {
+            System.Windows.Data.CollectionViewSource.GetDefaultView(ScannedItems).Refresh();
+            System.Windows.Data.CollectionViewSource.GetDefaultView(HistoryItems).Refresh();
         }
 
         private void ExecuteToggleTestMode()
@@ -800,13 +816,43 @@ namespace CIMS.ViewModels
             finally { _liveBusy = false; }
         }
 
+        // ⌛ ป้ายยังมาไม่ครบ (สแกนเนอร์เว้นจังหวะกลางป้าย): สั้นมาก (< 3 ตัว) หรือมีตัวคั่นของรูปแบบป้ายแต่ช่องยังไม่ครบ
+        //    และยังไม่มีรูปแบบไหนอ่านได้ -> หน้าจอรอตัวอักษรต่อแทนที่จะตัดรอบ (กด Enter เอง = ส่งทันทีเหมือนเดิม)
+        public bool LooksIncomplete(string raw)
+        {
+            string t = (raw ?? "").Trim();
+            if (t.Length < 3) return true;
+            var withDelim = _allFormats.Where(f => f.IsActive && !f.SplitBySpaces && !string.IsNullOrEmpty(f.Delimiter) && t.Contains(f.Delimiter)).ToList();
+            if (withDelim.Count == 0) return false;
+            if (_allFormats.Any(f => f.TryParse(t, out _, out _))) return false;
+            return withDelim.Any(f => f.SplitFields(t).Length < f.MinFields);
+        }
+
         // ⚠ ปุ่ม NOT DEDUCTED (n): ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้ (ยังไม่รัน Update_20261010b.sql = ซ่อนปุ่ม)
         private int _notDeducted;
         public string NotDeductedText => $"⚠ NOT DEDUCTED ({_notDeducted:N0})";
         public Visibility NotDeductedVisibility => DbSchema.HasDeductMisses ? Visibility.Visible : Visibility.Collapsed;
 
+        // ✔ ปุ่ม DEDUCTED (n): ป้ายที่รับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้ "วันนี้"
+        private int _deductedToday;
+        public string DeductedText => $"✔ DEDUCTED ({_deductedToday:N0})";
+        public Visibility DeductedVisibility => DbSchema.HasTransferScanTx ? Visibility.Visible : Visibility.Collapsed;
+
+        public async Task RefreshDeductedAsync()
+        {
+            try
+            {
+                int n = await Task.Run(() => new DeductMissService().CountDeductedToday());
+                if (n == _deductedToday) return;
+                _deductedToday = n;
+                OnPropertyChanged(nameof(DeductedText));
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Deducted count: {ex.Message}"); }
+        }
+
         public async Task RefreshNotDeductedAsync()
         {
+            _ = RefreshDeductedAsync();
             try
             {
                 int n = await Task.Run(() => new DeductMissService().Count());
@@ -860,6 +906,7 @@ namespace CIMS.ViewModels
                         }
                         UpdateSummary(item, balances.TryGetValue((item.StkId, item.PartId), out decimal bal) ? bal : (decimal?)null);
                     }
+                    RefreshModeFilter();
                 });
             }
             catch (Exception ex)
@@ -1000,6 +1047,7 @@ namespace CIMS.ViewModels
             }
 
             ScanService.DeductResult deductResult = null;
+            ScanItemModel zeroQtyPart = null;
             bool remainder = IsRemainderMode;
             bool remainderCancelled = false;
             try
@@ -1026,6 +1074,9 @@ namespace CIMS.ViewModels
                         if (typed == null || typed.Value <= 0) { remainderCancelled = true; return null; }
                         originalQty = typed.Value;
                     }
+
+                    // 🛑 จำนวน 0 (Pack Size = 0 / ป้ายถูกตัดเหลือรหัสสั้น ๆ เช่น "0") -> ไม่บันทึก กันรายการเปล่า + กล่อง / Coil เพิ่มผิด
+                    if (originalQty <= 0) { zeroQtyPart = part; return null; }
 
                     // ⚙️ [เพิ่มเงื่อนไข Test Mode]: ถ้าอยู่ในโหมด Test จะไม่ยิง UpdateStock เข้า DB
                     if (IsTestMode)
@@ -1067,6 +1118,11 @@ namespace CIMS.ViewModels
                 });
 
                 if (remainderCancelled) return;   // กดยกเลิกตอนกรอกจำนวนเศษ -> ไม่บันทึก ไม่แจ้ง error
+                if (zeroQtyPart != null)
+                {
+                    ScanError($"[ไม่บันทึก] จำนวนเป็น 0\n{zeroQtyPart.PartCode}  {zeroQtyPart.PartName}\n(Pack Size = 0 หรือป้ายอ่านได้ไม่ครบ - กรุณาแสกนใหม่)\n\nCode: {rawBarcodeFull}");
+                    return;
+                }
 
                 if (result != null)
                 {
@@ -1106,12 +1162,9 @@ namespace CIMS.ViewModels
                     }
                     else
                     {
-                        ScannedItems.Insert(0, newItem);
-                        if (ScannedItems.Count > 12)
-                        {
-                            ScannedItems.RemoveAt(ScannedItems.Count - 1);
-                        }
+                        ScannedItems.Insert(0, newItem);   // ไม่ตัดที่ 12 แถวแล้ว (ตารางกรองตามโหมด IN / OUT / RETURN)
                         UpdateSummary(newItem);
+                        RefreshModeFilter();
                     }
 
                     // ⚠ ยอดคลังต้นทางไม่พอ: รับเข้าคลังหลักเต็มจำนวนแล้ว แต่ตัดคลังต้นทางได้เท่าที่มี -> แจ้งเตือนให้ตรวจสอบ
@@ -1127,6 +1180,17 @@ namespace CIMS.ViewModels
                             (DbSchema.HasDeductMisses ? "\nเก็บไว้ที่ปุ่ม NOT DEDUCTED แล้ว" : ""),
                             "MOTHER COIL");
                         _ = RefreshNotDeductedAsync();
+                    }
+                    else if (deductResult != null && !deductResult.Short && deductResult.Deducted > 0)
+                    {
+                        // ✅ แจ้งว่าตัดคลังต้นทาง (STOCK-PANTA) ออกไปเท่าไร จากอะไร
+                        string from = deductResult.MatchedHow == "MOTHER COIL" && deductResult.MotherBefore.HasValue
+                            ? $"Coil แม่ {deductResult.MotherCoil}  {Qty.Plain(deductResult.MotherBefore.Value)} → {Qty.Plain(deductResult.MotherBefore.Value - deductResult.Deducted)} KG"
+                            : deductResult.MatchedHow == "COIL" ? $"ย้าย Coil {coil?.CoilNo} ออกจาก {deductResult.SourceCode}"
+                            : $"{deductResult.SourcePartCode}";
+                        NotificationManager.Show($"OUT {deductResult.SourceCode}  -{Qty.Plain(deductResult.Deducted)} KG",
+                            $"{from}\n{deductResult.SourcePartCode}  คงเหลือ {Qty.Plain(deductResult.SourceAfter)}", true);
+                        _ = RefreshDeductedAsync();
                     }
                     else if (deductResult != null && deductResult.Short)
                     {
@@ -1414,12 +1478,9 @@ namespace CIMS.ViewModels
                 }
                 else
                 {
-                    ScannedItems.Insert(0, newItem);
-                    if (ScannedItems.Count > 12)
-                    {
-                        ScannedItems.RemoveAt(ScannedItems.Count - 1);
-                    }
+                    ScannedItems.Insert(0, newItem);   // ไม่ตัดที่ 12 แถวแล้ว (ตารางกรองตามโหมด IN / OUT / RETURN)
                     UpdateSummary(newItem);
+                    RefreshModeFilter();
                 }
             }
             catch (Exception ex)
