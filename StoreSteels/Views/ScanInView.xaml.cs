@@ -91,6 +91,14 @@ namespace CIMS.Views
             FocusScanBox();
         }
 
+        // ⚠ NOT DEDUCTED: ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้
+        private async void NotDeducted_Click(object sender, RoutedEventArgs e)
+        {
+            new DeductMissWindow(_viewModel.CurrentUser).ShowDialog();
+            await _viewModel.RefreshNotDeductedAsync();
+            FocusScanBox();
+        }
+
         // 🏷️ DISPLAY: ค่าที่แสดงในช่อง PRODUCT CODE ต่อคลัง -> บันทึกแล้วใช้กับตารางวันนี้ทันที
         private void ScanDisplay_Click(object sender, RoutedEventArgs e)
         {

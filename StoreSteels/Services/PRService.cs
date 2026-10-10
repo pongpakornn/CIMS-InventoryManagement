@@ -439,6 +439,27 @@ namespace CIMS.Services
             }
         }
 
+        // 🗑 ลบ PR หลายรายการใน Transaction เดียว (ปุ่ม DELETE ALL) -> จำนวน PR ที่ลบได้
+        public int DeletePRs(IList<string> prNos)
+        {
+            int n = 0;
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var tr = conn.BeginTransaction())
+                {
+                    foreach (string pr in prNos)
+                        using (var cmd = new SqlCommand("DELETE FROM CIMS.PRDetails WHERE PRNumber = @p; DELETE FROM CIMS.PRHeaders WHERE PRNumber = @p; SELECT @@ROWCOUNT;", conn, tr))
+                        {
+                            cmd.Parameters.AddWithValue("@p", pr);
+                            n += Convert.ToInt32(cmd.ExecuteScalar()) > 0 ? 1 : 0;
+                        }
+                    tr.Commit();
+                }
+            }
+            return n;
+        }
+
         #endregion
 
         public bool UpdateAfterExport(string prNo, string userId)

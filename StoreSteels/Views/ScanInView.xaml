@@ -748,6 +748,11 @@
                                 Background="{StaticResource MainPurple}"
                                 Style="{StaticResource AnimatedButton}" Focusable="False"
                                 Width="130" Height="38" FontSize="13" Margin="10,0,0,6"/>
+                        <!-- ⚠ ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้ (ระบบเก็บให้เองตอนแสกน) -->
+                        <Button Content="{Binding NotDeductedText}" Click="NotDeducted_Click"
+                                Background="#E65100" Visibility="{Binding NotDeductedVisibility}"
+                                Style="{StaticResource AnimatedButton}" Focusable="False" ToolTip="Labels received whose mother coil could not be cut from the source stock"
+                                Width="190" Height="38" FontSize="13" Margin="10,0,0,6"/>
                         <!-- 🏷️ เลือกค่าที่แสดงแทนรหัสต่อคลัง (PART A / PART NO / Barcode #n ...) -->
                         <Button Content="🏷️ DISPLAY" Click="ScanDisplay_Click"
                                 Background="#49454F" Visibility="{Binding DisplayButtonVisibility}"

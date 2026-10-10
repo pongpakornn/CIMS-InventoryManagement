@@ -111,6 +111,33 @@ namespace CIMS.Views
             btnSubmitPR.Visibility = user?.CanSubmitPR == true ? Visibility.Visible : Visibility.Collapsed;
             btnExport.Visibility = user?.CanViewPR == true ? Visibility.Visible : Visibility.Collapsed;
             btnPrSettings.Visibility = user?.CanManagePrSettings == true ? Visibility.Visible : Visibility.Collapsed;
+            btnDeleteAllPR.Visibility = user?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // 🗑 ลบ PR ทุกรายการที่แสดงในตาราง (ค้นหาไว้ = เฉพาะที่ค้นเจอ) - Admin Level 1 เท่านั้น ยืนยัน 2 ครั้ง
+        private async void DeleteAllPR_Click(object sender, RoutedEventArgs e)
+        {
+            var user = _viewModel.CurrentUser;
+            if (user?.UserLevel != 1) { DialogHelper.ShowWarning("ลบทั้งหมดได้เฉพาะ Admin (Level 1)", "ACCESS DENIED"); return; }
+            var prs = _viewModel.PRHistory.Select(p => p.PRNumber).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList();
+            if (prs.Count == 0) { DialogHelper.ShowWarning("ไม่มี PR ในตารางให้ลบ"); return; }
+            string key = txtSearchPR.Text.Trim();
+            var byStatus = _viewModel.PRHistory.GroupBy(p => p.Status).Select(g => $"{g.Key} {g.Count():N0}");
+            if (!DialogHelper.ShowConfirm($"ลบ PR ทั้งหมดที่แสดงในตาราง {prs.Count:N0} รายการ" + (key.Length > 0 ? $"\n(เฉพาะที่ค้นหา \"{key}\")" : "") +
+                                          $"\n{string.Join("  •  ", byStatus)}\n\nลบแล้วกู้คืนไม่ได้ ยืนยันหรือไม่?", "DELETE ALL PR")) return;
+            if (!DialogHelper.ShowConfirm($"ยืนยันอีกครั้ง: ลบ PR {prs.Count:N0} รายการ", "DELETE ALL PR")) return;
+
+            btnDeleteAllPR.IsEnabled = false;
+            try
+            {
+                int n = await Task.Run(() => _prService.DeletePRs(prs));
+                LogService.WritePRLog(user.UserId, "DELETE_ALL_PR", $"Deleted {n} PR{(key.Length > 0 ? $" (search: {key})" : "")}: {string.Join(", ", prs.Take(30))}{(prs.Count > 30 ? " ..." : "")}", "PR");
+                NotificationManager.Show("Deleted", $"ลบ PR แล้ว {n:N0} รายการ", true);
+                ClearInputs();
+                await _viewModel.LoadAllPR(txtSearchPR.Text.Trim());
+            }
+            catch (Exception ex) { DialogHelper.ShowError("ลบไม่สำเร็จ\n" + ex.Message); }
+            finally { btnDeleteAllPR.IsEnabled = true; }
         }
 
         // ⚙ เลือกคลังที่แสกนออกแล้วสร้าง PR อัตโนมัติ (การ์ดคลัง ติ๊กเปิด/ปิด)

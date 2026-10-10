@@ -384,7 +384,13 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+
+                <!-- 🗑 DELETE ALL: ลบ PR ทุกรายการที่แสดงในตาราง (ตามคำค้น) - Admin Level 1 เท่านั้น -->
+                <Button x:Name="btnDeleteAllPR" Grid.Column="3" Content="🗑 DELETE ALL" Style="{StaticResource AnimatedButton}" Background="#C62828"
+                        Width="160" Height="48" FontSize="13" Margin="12,0,0,0" Click="DeleteAllPR_Click" Visibility="Collapsed"
+                        ToolTip="Delete every PR shown in the table (admin only)"/>
 
                 <!-- Function : TextBox SearchPR -->
                 <!-- ⚙ PR SETTINGS: เลือกคลังที่แสกนออกแล้วสร้าง PR อัตโนมัติ (ผู้ดูแลระบบ / ผู้อนุมัติ PR เท่านั้น) -->

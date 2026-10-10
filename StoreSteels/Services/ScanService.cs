@@ -738,6 +738,26 @@ namespace CIMS.Services
                         // STOCK (COIL) ของต้นทาง = จำนวน Coil ในทะเบียน (เมื่อหาเจอผ่านทะเบียน Coil)
                         if (how != null && sourceCoil && srcPart > 0) CoilImportService.RecountCoils(conn, trans, srcPart, sourceStkId, false);
 
+                        // 📋 ตัดตาม Coil แม่ไม่ได้ / ได้ไม่ครบ -> เก็บไว้ในรายการ NOT DEDUCTED (ปุ่มหน้า Multi-Scanner)
+                        if (result.MotherCoil != null && result.Deducted < qty && !remainder && CIMS.Helpers.DbSchema.HasDeductMisses)
+                            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.DeductMisses (TransactionID, StockID, SourceStockID, PartID, CoilNo, MotherCoil, LabelQty, Deducted, Reason, Barcode, UserID)
+                                                              VALUES (@tx, @s, @src, @p, @c, @m, @q, @d, @why, @b, @u)", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@tx", txId);
+                                cmd.Parameters.AddWithValue("@s", stock.StkId);
+                                cmd.Parameters.AddWithValue("@src", sourceStkId);
+                                cmd.Parameters.AddWithValue("@p", ptId);
+                                cmd.Parameters.AddWithValue("@c", coil?.HasCoilNo == true ? coil.CoilNo.Trim() : (object)DBNull.Value);
+                                cmd.Parameters.AddWithValue("@m", result.MotherCoil);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@q", qty));
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@d", result.Deducted));
+                                cmd.Parameters.AddWithValue("@why", result.MatchedHow == null ? "NOT_FOUND" : "SHORT");
+                                string bc = refNo ?? "";
+                                cmd.Parameters.AddWithValue("@b", bc.Length > 300 ? bc.Substring(0, 300) : bc);
+                                cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                                cmd.ExecuteNonQuery();
+                            }
+
                         trans.Commit();
                         result.Saved = true;
                     }

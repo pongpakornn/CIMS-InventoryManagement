@@ -787,6 +787,7 @@ namespace CIMS.ViewModels
                 _liveTimer.Tick += async (s, e) => await LiveRefreshAsync();
             }
             _liveTimer.Start();
+            _ = RefreshNotDeductedAsync();
         }
 
         public void StopLive() => _liveTimer?.Stop();
@@ -795,8 +796,25 @@ namespace CIMS.ViewModels
         {
             if (_liveBusy || IsTestMode || (DateTime.Now - _lastScanAt).TotalSeconds < 3) return;
             _liveBusy = true;
-            try { await LoadTodayDataAsync(onlyIfChanged: true); }
+            try { await LoadTodayDataAsync(onlyIfChanged: true); await RefreshNotDeductedAsync(); }
             finally { _liveBusy = false; }
+        }
+
+        // ⚠ ปุ่ม NOT DEDUCTED (n): ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้ (ยังไม่รัน Update_20261010b.sql = ซ่อนปุ่ม)
+        private int _notDeducted;
+        public string NotDeductedText => $"⚠ NOT DEDUCTED ({_notDeducted:N0})";
+        public Visibility NotDeductedVisibility => DbSchema.HasDeductMisses ? Visibility.Visible : Visibility.Collapsed;
+
+        public async Task RefreshNotDeductedAsync()
+        {
+            try
+            {
+                int n = await Task.Run(() => new DeductMissService().Count());
+                if (n == _notDeducted) return;
+                _notDeducted = n;
+                OnPropertyChanged(nameof(NotDeductedText));
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"NotDeducted count: {ex.Message}"); }
         }
 
         private async void LoadTodayData() => await LoadTodayDataAsync(onlyIfChanged: false);
@@ -1105,8 +1123,10 @@ namespace CIMS.ViewModels
                             : $"Coil แม่ {deductResult.MotherCoil} ใน {deductResult.SourceCode} เหลือ {Qty.Plain(deductResult.MotherBefore ?? deductResult.SourceBefore)} KG\nตัดได้ {Qty.Plain(deductResult.Deducted)} KG";
                         ScanWarning(
                             $"{why}\n\n{result.PartCode}  Coil {coil?.CoilNo}\nจำนวนบนป้าย: {Qty.Plain(deductResult.RequestedQty)}\n\n" +
-                            $"รับเข้า {stock.Code} เต็มจำนวนแล้ว กรุณาตรวจสอบ {deductResult.SourceCode}",
+                            $"รับเข้า {stock.Code} เต็มจำนวนแล้ว กรุณาตรวจสอบ {deductResult.SourceCode}" +
+                            (DbSchema.HasDeductMisses ? "\nเก็บไว้ที่ปุ่ม NOT DEDUCTED แล้ว" : ""),
                             "MOTHER COIL");
+                        _ = RefreshNotDeductedAsync();
                     }
                     else if (deductResult != null && deductResult.Short)
                     {

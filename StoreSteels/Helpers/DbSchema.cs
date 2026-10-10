@@ -34,6 +34,27 @@ namespace CIMS.Helpers
             }
         }
 
+        // Update_20261010b.sql: CIMS.DeductMisses (ป้ายที่รับเข้าแล้วแต่ตัดคลังต้นทางไม่ได้ / ได้ไม่ครบ)
+        private static bool? _deductMisses;
+        public static bool HasDeductMisses
+        {
+            get
+            {
+                if (_deductMisses.HasValue) return _deductMisses.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('CIMS.DeductMisses', 'U') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _deductMisses = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _deductMisses.Value;
+            }
+        }
+
         // Update_20261009.sql: CIMS.Stocks.MaxMinDecimal (MAX / MIN แสดง / เก็บทศนิยม แยกจาก DECIMAL QTY)
         private static bool? _maxMinDecimal;
         public static bool HasMaxMinDecimal => _maxMinDecimal ?? (_maxMinDecimal = ColumnExists("MaxMinDecimal")) ?? false;
