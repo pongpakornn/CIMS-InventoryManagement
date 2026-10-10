@@ -111,7 +111,9 @@
                                     <CheckBox x:Name="chkSubTon" Content="WEIGHT (TON)" Tag="TON" Style="{StaticResource StkChip}" IsChecked="True"/>
                                     <CheckBox x:Name="chkSubReceived" Content="RECEIVED" Tag="RECEIVED" Style="{StaticResource StkChip}" IsChecked="True"/>
                                 </WrapPanel>
-                                <TextBlock Text="Shown under the product when PD CODE is clicked, lined up with the table: COIL NO. under PD CODE, MOTHER COIL under PRODUCT NAME, WEIGHT under STOCK, TON + RECEIVED under REMARK."
+                                <!-- ลำดับคอลัมน์ของแถว Coil = ลำดับที่ติ๊กเลือก (เหมือนคอลัมน์หลัก) -->
+                                <TextBlock x:Name="txtSubOrder" FontSize="12" Foreground="{StaticResource AccentPurple}" FontWeight="Bold" Margin="2,2,0,4" TextWrapping="Wrap"/>
+                                <TextBlock Text="Shown under the product when PD CODE is clicked. Untick and tick again to change the order: sub columns show left to right in the order you tick them. All ticked in the default order = lined up with the table (COIL NO. under PD CODE, MOTHER COIL under PRODUCT NAME, WEIGHT under STOCK, TON + RECEIVED under REMARK)."
                                            FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" Margin="2,2,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
 

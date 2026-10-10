@@ -54,6 +54,22 @@ namespace CIMS.Models
         // คอลัมน์ของแถว Coil ย่อย: COILNO, MOTHER, WEIGHT, COIL, TON, RECEIVED (null = แสดงทั้งหมด)
         public static readonly string[] CoilRowKeys = { "COILNO", "MOTHER", "WEIGHT", "COIL", "TON", "RECEIVED" };
         public string CoilRowColumns { get; set; }
+        // ลำดับคอลัมน์ของแถว Coil ย่อยตามที่ติ๊กเลือก (ติ๊กก่อน = แสดงก่อน แบบเดียวกับคอลัมน์หลัก)
+        //   null = ค่าเริ่มต้น (ทุกคอลัมน์ วางตรงกับคอลัมน์ของตาราง) / "-" = ไม่แสดง
+        //   ลำดับตามค่าเริ่มต้น (แค่ซ่อนบางคอลัมน์ เช่น STOCK-PANTA ไม่แสดง COIL NO) = ยังวางตรงกับคอลัมน์ของตารางเหมือนเดิม
+        //   ลำดับต่างจากค่าเริ่มต้น = เรียงซ้ายไปขวาตามที่ติ๊ก
+        public bool CoilRowCustomOrder
+        {
+            get
+            {
+                var idx = CoilRowOrder().Select(k => Array.IndexOf(CoilRowKeys, k)).ToList();
+                return idx.Zip(idx.Skip(1), (a, b) => b < a).Any(x => x);
+            }
+        }
+        public List<string> CoilRowOrder() =>
+            string.IsNullOrWhiteSpace(CoilRowColumns) ? CoilRowKeys.ToList()
+            : CoilRowColumns.Split(',').Select(k => k.Trim().ToUpperInvariant()).Where(k => CoilRowKeys.Contains(k)).Distinct().ToList();
+
         public bool CoilRowShows(string key) =>
             string.IsNullOrWhiteSpace(CoilRowColumns) || CoilRowColumns.Split(',').Any(k => string.Equals(k.Trim(), key, StringComparison.OrdinalIgnoreCase));
         public string BoxHeader => CountCoil ? "STOCK (COIL)" : "STOCK (BOX)";

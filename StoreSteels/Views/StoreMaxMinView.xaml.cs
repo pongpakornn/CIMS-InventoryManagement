@@ -982,9 +982,38 @@ namespace CIMS.Views
         // คอลัมน์ของแถว Coil ตามที่คลังตั้งไว้ (EDIT STOCK -> COIL SUB ROW COLUMNS)
         private bool Sub(string key) => _stock?.CoilRowShows(key) ?? true;
 
+        // ลำดับที่ผู้ใช้เลือกเอง (EDIT STOCK -> COIL SUB ROW COLUMNS ติ๊กไม่ตรงลำดับเริ่มต้น):
+        //   ช่องของตาราง (ยกเว้น NO. / IMAGE) ใส่คอลัมน์ย่อยทีละช่องจากซ้ายไปขวาตามลำดับนั้น - ช่องไม่พอ = รวมในช่องสุดท้าย
+        private List<string> CustomSubKeys(DataGridColumn col)
+        {
+            var cols = dgStore.Columns.Where(c => c.Visibility == Visibility.Visible && c != colNo && c != colImage).OrderBy(c => c.DisplayIndex).ToList();
+            int slot = cols.IndexOf(col);
+            if (slot < 0) return new List<string>();
+            var keys = _stock.CoilRowOrder();
+            return slot < cols.Count - 1 ? keys.Skip(slot).Take(1).ToList() : keys.Skip(slot).ToList();
+        }
+
+        private string SubHead(string key) => key switch
+        {
+            "COILNO" => "COIL NO.", "MOTHER" => "MOTHER COIL", "WEIGHT" => $"WEIGHT ({_stock?.Unit ?? "KG"}.)",
+            "COIL" => "STOCK (COIL)", "TON" => "WEIGHT (TON)", "RECEIVED" => "RECEIVED", _ => ""
+        };
+
+        private string SubCell(string key, CoilRowModel c) => key switch
+        {
+            "COILNO" => c.CoilNo,
+            "MOTHER" => string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil,
+            "WEIGHT" => CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true),
+            "COIL" => "1",
+            "TON" => c.WeightTonText + " TON",
+            "RECEIVED" => c.ReceivedDate?.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "-",
+            _ => ""
+        };
+
         private string CoilHeadText(DataGridColumn col)
         {
             if (col == colNo) return "NO.";
+            if (_stock?.CoilRowCustomOrder == true) return string.Join("  •  ", CustomSubKeys(col).Select(SubHead));
             if (col == colCode) return Sub("COILNO") ? "COIL NO." : "";
             if (col == colName) return Sub("MOTHER") ? "MOTHER COIL" : "";
             if (col == colQty) return Sub("WEIGHT") ? "WEIGHT (KG.)" : "";
@@ -996,6 +1025,7 @@ namespace CIMS.Views
         private string CoilCellText(DataGridColumn col, CoilRowModel c, int n)
         {
             if (col == colNo) return n.ToString();
+            if (_stock?.CoilRowCustomOrder == true) return string.Join("  •  ", CustomSubKeys(col).Select(k => SubCell(k, c)));
             if (col == colCode) return Sub("COILNO") ? c.CoilNo : "";
             if (col == colName) return Sub("MOTHER") ? (string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil) : "";
             if (col == colQty) return Sub("WEIGHT") ? CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true) : "";

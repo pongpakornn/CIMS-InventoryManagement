@@ -53,6 +53,7 @@ namespace CIMS.Views
             chkCountCoil.IsChecked = s.CountCoil;
             chkCoilRows.IsChecked = s.ShowCoilRowsSetting ?? true;
             foreach (var cb in SubRowChips()) cb.IsChecked = s.CoilRowShows((string)cb.Tag);
+            InitSubOrder(s);
             chkColCustomer.IsChecked = s.ColCustomer;
             chkColPartA.IsChecked = s.ColPartA;
             chkColPartNo.IsChecked = s.ColPartNo;
@@ -94,6 +95,32 @@ namespace CIMS.Views
 
         // ช่องเลือกคอลัมน์ของแถว Coil ย่อย (Tag = COILNO / MOTHER / WEIGHT / COIL / TON / RECEIVED)
         private CheckBox[] SubRowChips() => new[] { chkSubCoilNo, chkSubMother, chkSubWeight, chkSubCoil, chkSubTon, chkSubReceived };
+
+        // 📋 ลำดับคอลัมน์ของแถว Coil ย่อย: ติ๊กก่อน = แสดงก่อน (แบบเดียวกับคอลัมน์หลัก)
+        private readonly List<string> _subOrder = new List<string>();
+
+        private void InitSubOrder(StockModel s)
+        {
+            var chips = SubRowChips();
+            foreach (string key in s.CoilRowOrder())
+                if (chips.Any(c => (string)c.Tag == key && c.IsChecked == true)) _subOrder.Add(key);
+            foreach (var cb in chips)
+            {
+                string key = (string)cb.Tag;
+                cb.Checked += (o, e) => { if (!_subOrder.Contains(key)) _subOrder.Add(key); ShowSubOrder(); };
+                cb.Unchecked += (o, e) => { _subOrder.Remove(key); ShowSubOrder(); };
+            }
+            ShowSubOrder();
+        }
+
+        private void ShowSubOrder()
+        {
+            var chips = SubRowChips();
+            var names = _subOrder.Select((k, i) => $"{i + 1}. {chips.First(c => (string)c.Tag == k).Content}");
+            var idx = _subOrder.Select(k => Array.IndexOf(StockModel.CoilRowKeys, k)).ToList();
+            bool aligned = !idx.Zip(idx.Skip(1), (a, b) => b < a).Any(x => x);
+            txtSubOrder.Text = _subOrder.Count == 0 ? "ORDER: - (no sub rows)" : "ORDER:  " + string.Join("   →   ", names) + (aligned ? "   (lined up with the table)" : "");
+        }
 
         private void InitColumnOrder(StockModel s)
         {
@@ -209,8 +236,9 @@ namespace CIMS.Views
             s.MaxMinDecimalSetting = chkMaxMinDecimal.IsChecked == true;
             s.CountCoil = chkCountCoil.IsChecked == true;
             s.ShowCoilRowsSetting = chkCoilRows.IsChecked == true;
-            var subKeys = SubRowChips().Where(cb => cb.IsChecked == true).Select(cb => (string)cb.Tag).ToList();
-            s.CoilRowColumns = subKeys.Count == StockModel.CoilRowKeys.Length ? null : subKeys.Count == 0 ? "-" : string.Join(",", subKeys);   // ทั้งหมด = null / ไม่เลือกเลย = "-"
+            // ทั้งหมดตามลำดับเริ่มต้น = null (วางตรงกับคอลัมน์ตาราง) / ไม่เลือกเลย = "-" / อื่น ๆ = ลำดับที่ติ๊ก
+            var subKeys = _subOrder.ToList();
+            s.CoilRowColumns = subKeys.SequenceEqual(StockModel.CoilRowKeys) ? null : subKeys.Count == 0 ? "-" : string.Join(",", subKeys);
             s.ColumnOrder = string.Join(",", _colOrder);
             s.ColCustomer = chkColCustomer.IsChecked == true;
             s.ColPartA = chkColPartA.IsChecked == true;
