@@ -20,15 +20,10 @@ namespace CIMS.Services
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
-        public void GenerateA4Pdf(List<ProductControlModel> items)
+        // คืน path ของไฟล์ PDF: Desktop\CIMS_Export\Product Control\QR_<วัน-เดือน-ปี-เวลา>.pdf
+        public string GenerateA4Pdf(List<ProductControlModel> items)
         {
-            // กำหนด Path ไปยัง Desktop (Dynamic สำหรับทุกเครื่อง)
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string folderPath = Path.Combine(desktopPath, "CIMS_Export");
-            string fileName = $"Export_QR_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
-            string fullPath = Path.Combine(folderPath, fileName);
-
-            if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+            string fullPath = ImportTemplateService.NewPath(ImportTemplateService.Systems.Product, "QR", ".pdf");
 
             using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
             {
@@ -70,6 +65,7 @@ namespace CIMS.Services
                     });
                 }).GeneratePdf(fullPath);
             }
+            return fullPath;
         }
 
 

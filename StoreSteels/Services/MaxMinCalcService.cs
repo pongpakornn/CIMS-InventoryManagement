@@ -776,6 +776,53 @@ namespace CIMS.Services
         }
 
         // 📅 วันทำงาน: CUSTOMER + DATE (1 แถว = 1 วันทำงาน) -> เดือนที่อยู่ในไฟล์ของลูกค้านั้นถูกแทนที่ทั้งเดือน
+        // 📄 TEMPLATE ของ IMPORT WORKDAYS: CUSTOMER / DATE 1 แถว = 1 วันทำงาน + วันทำงานของปีนี้ที่มีอยู่แล้วใส่ไว้ให้
+        //    customer = null -> ทุกลูกค้า / ลูกค้ายังไม่มีวันทำงาน -> ใส่ จ.-ศ. ของเดือนนี้เป็นตัวอย่าง
+        public string WriteWorkdayTemplate(int year, string customer)
+        {
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.MaxMinCalc, $"Workdays_{(customer ?? "ALL")}_{year}_Template");
+            var custs = customer != null ? new List<string> { customer } : GetWorkdayCustomers(year).Select(c => c.Customer).ToList();
+            using (var wb = new XLWorkbook())
+            {
+                var ws = wb.AddWorksheet("WORKDAYS");
+                string[] heads = { "NO", "CUSTOMER", "DATE", "DAY" };
+                ImportTemplateService.Header(ws, heads, new double[] { 6.4, 20, 14, 12 });
+                int r = 2;
+                foreach (var c in custs)
+                {
+                    var days = GetWorkdays(c, year).OrderBy(d => d).ToList();
+                    if (days.Count == 0)
+                    {
+                        var m = new DateTime(DateTime.Today.Year == year ? DateTime.Today.Year : year, DateTime.Today.Year == year ? DateTime.Today.Month : 1, 1);
+                        days = Enumerable.Range(0, DateTime.DaysInMonth(m.Year, m.Month)).Select(i => m.AddDays(i))
+                                         .Where(d => d.DayOfWeek != DayOfWeek.Saturday && d.DayOfWeek != DayOfWeek.Sunday).ToList();
+                    }
+                    foreach (var d in days)
+                    {
+                        ws.Cell(r, 1).Value = r - 1;
+                        ws.Cell(r, 2).Value = c;
+                        ws.Cell(r, 3).Value = d;
+                        ws.Cell(r, 3).Style.DateFormat.Format = "dd/MM/yyyy";
+                        ws.Cell(r, 4).Value = d.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant();
+                        r++;
+                    }
+                }
+                int last = Math.Max(r - 1, 31);
+                ImportTemplateService.Body(ws, last, heads.Length);
+                ImportTemplateService.Guide(wb, "CIMS - Import Customer Workdays (Max-Min Calculator)", new[]
+                {
+                    ("CUSTOMER *", "รหัสลูกค้า (บังคับ) - ตรงกับ CUSTOMER ของสินค้าในระบบ"),
+                    ("DATE *", "วันทำงาน 1 แถว = 1 วัน เช่น 01/10/2026 (วัน/เดือน/ปี ค.ศ.)"),
+                    ("DAY", "ไว้ดูเท่านั้น - ระบบไม่ได้อ่าน"),
+                    ("", "ลูกค้า + เดือนที่อยู่ในไฟล์ จะถูกแทนที่ด้วยวันในไฟล์ทั้งเดือน (เดือนที่ไม่อยู่ในไฟล์ไม่เปลี่ยน)"),
+                    ("", "ไฟล์นี้มีวันทำงานของปีที่เลือกใส่ไว้ให้แล้ว (ลูกค้าที่ยังไม่มี = จ.-ศ. ของเดือนนี้เป็นตัวอย่าง) แก้แล้วกด IMPORT WORKDAYS"),
+                });
+                wb.Worksheet(1).SetTabActive();
+                wb.SaveAs(path);
+            }
+            return path;
+        }
+
         public List<CalcImportRow> ReadWorkdayExcel(string path)
         {
             var rows = new List<CalcImportRow>();

@@ -39,6 +39,8 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <TextBlock x:Name="txtSaved" FontSize="12" FontWeight="Bold" Foreground="#2E7D32" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                    <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource StkButton}" Background="#6750A4" Click="Template_Click" Margin="0,0,8,0"
+                            ToolTip="Excel template for IMPORT WORKDAYS (this year's workdays filled in)"/>
                     <Button x:Name="btnImport" Content="📥 IMPORT WORKDAYS" Style="{StaticResource StkButton}" Background="{StaticResource AccentPurple}" Click="Import_Click"/>
                 </StackPanel>
             </Grid>

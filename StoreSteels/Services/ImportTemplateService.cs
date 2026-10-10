@@ -24,8 +24,49 @@ namespace CIMS.Services
             }
         }
 
-        public static string NewPath(string name) =>
-            Path.Combine(ExportFolder, $"{name}_{DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)}.xlsx");
+        // 📁 ทุก Export / Template แยกโฟลเดอร์ตามหน้าระบบ: Desktop\CIMS_Export\<หน้า>\<ชื่อที่เลือก>_<วัน-เดือน-ปี-เวลา>.xlsx
+        //    เช่น Desktop\CIMS_Export\Store Max-Min\STOCK-MAT_10-10-2026-11.11.00.xlsx
+        public static class Systems
+        {
+            public const string Store = "Store Max-Min";
+            public const string Product = "Product Control";
+            public const string Scanner = "Multi-Scanner";
+            public const string PickList = "Pick List";
+            public const string MaxMinCalc = "Max-Min Calculator";
+            public const string Forecast = "Forecast Order";
+            public const string PR = "PR Management";
+            public const string ActivityLog = "Activity Log";
+            public const string Users = "User Management";
+        }
+
+        public static string FolderFor(string system)
+        {
+            string dir = Path.Combine(ExportFolder, SafeName(system));
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        public static string Stamp() => DateTime.Now.ToString("dd-MM-yyyy-HH.mm.ss", CultureInfo.InvariantCulture);
+
+        // ชื่อไฟล์ใหม่ (สร้างโฟลเดอร์ให้เลย) - ext = ".xlsx" / ".pdf"
+        public static string NewPath(string system, string name, string ext = ".xlsx")
+        {
+            string dir = FolderFor(system);
+            string file = $"{SafeName(name)}_{Stamp()}";
+            string path = Path.Combine(dir, file + ext);
+            for (int i = 2; File.Exists(path); i++) path = Path.Combine(dir, $"{file}_{i}{ext}");   // กดซ้ำในวินาทีเดียวกัน
+            return path;
+        }
+
+        // ข้อความแจ้งผู้ใช้: Desktop\CIMS_Export\Store Max-Min\STOCK-MAT_10-10-2026-11.11.00.xlsx
+        public static string ShortPath(string path) =>
+            "Desktop\\CIMS_Export\\" + (path.StartsWith(ExportFolder, StringComparison.OrdinalIgnoreCase) ? path.Substring(ExportFolder.Length).TrimStart('\\') : Path.GetFileName(path));
+
+        private static string SafeName(string s)
+        {
+            foreach (char c in Path.GetInvalidFileNameChars()) s = (s ?? "").Replace(c, '-');
+            return s.Trim();
+        }
 
         // หัวตารางแบบเดียวกับไฟล์ Template ของบริษัท (#002060 ตัวขาวหนา กึ่งกลาง)
         public static void Header(IXLWorksheet ws, string[] heads, double[] widths)
@@ -111,6 +152,9 @@ namespace CIMS.Services
         // หัวคอลัมน์ของ Template ตามคลังที่เลือก: คอลัมน์ที่คลังนั้นแสดงใน Store (Max-Min) เรียงตามที่ตั้งไว้ (TABLE COLUMNS)
         //   + ข้อมูลที่ต้องใช้ลงทะเบียน (SUPPLIER / CATEGORY / PACK SIZE / BIN / QR CODE / STOCK1 / SHOW/HIDE)
         //   คลังที่นับ Coil มี COIL NO / MOTHER COIL ถัดจาก BIN / หัวยอดใช้หน่วยของคลัง เช่น STOCK (KG.) / MAX (COIL)
+        private static bool SameHead(string a, string b) =>
+            string.Equals(new string((a ?? "").Where(char.IsLetterOrDigit).ToArray()), new string((b ?? "").Where(char.IsLetterOrDigit).ToArray()), StringComparison.OrdinalIgnoreCase);
+
         public static string[] PartHeadsFor(StockModel s)
         {
             if (s == null) return PartHeads;
@@ -130,7 +174,8 @@ namespace CIMS.Services
                     case "QTY": if (s.ColQty) heads.Add(s.QtyHeader); break;
                     case "BOX": if (s.ColStockBox && !s.CountCoil) heads.Add("STOCK (BOX)"); break;
                     case "COIL": if (s.CountCoil) heads.Add("STOCK (COIL)"); break;
-                    case "PCS": if (s.ColStockPcs) heads.Add("STOCK (PCS)"); break;
+                    // คลังหน่วย PCS: ยอดคงคลังคือ STOCK (PCS.) อยู่แล้ว ไม่ใส่ STOCK (PCS) ซ้ำอีกคอลัมน์
+                    case "PCS": if (s.ColStockPcs && !SameHead(s.QtyHeader, "STOCK (PCS)")) heads.Add("STOCK (PCS)"); break;
                     case "REMARK": if (s.ColRemark) heads.Add("REMARK"); break;
                 }
             }

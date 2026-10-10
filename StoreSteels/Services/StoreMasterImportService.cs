@@ -95,6 +95,65 @@ namespace CIMS.Services
             ["STOCK9"] = new[] { "STOCK9" }, ["STOCK10"] = new[] { "STOCK10" }
         };
 
+        // 📄 TEMPLATE ของหน้า Store (Max-Min): หัวคอลัมน์แบบเดียวกับ Template ของ Inventory Registration ตามคลังนี้
+        //    + ใส่ข้อมูลสินค้าปัจจุบันของคลังไว้ให้แล้ว (แก้ตัวเลข / ข้อมูล แล้ว IMPORT EXCEL กลับได้เลย)
+        //    คลังที่นับ Coil: 1 แถว = 1 Coil (แถวแรกของสินค้ามีข้อมูลครบ แถวถัดไปมีแค่ COIL NO / MOTHER COIL / น้ำหนัก)
+        public string WriteTemplate(StockModel stock, IList<StoreProductModel> products, List<StockModel> stocks)
+        {
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Store, $"{stock.Code}_Template");
+            new ImportTemplateService().CreatePartTemplate(path, stocks, stock);
+            var coils = stock.CountCoil && CIMS.Helpers.DbSchema.HasCoilRegister
+                ? new CoilService().GetCoils(stock.StkId, 0).ToLookup(c => c.PartId) : null;
+            using (var wb = new XLWorkbook(path))
+            {
+                var ws = wb.Worksheet(1);
+                var heads = ImportTemplateService.PartHeadsFor(stock);
+                int Col(string h) => Array.IndexOf(heads, h) + 1;
+                string D(string v) => v == "-" ? "" : v ?? "";
+                int r = 2;
+                ws.Range(2, 1, Math.Max(2, ws.LastRowUsed()?.RowNumber() ?? 2), heads.Length).Clear(XLClearOptions.Contents);
+                foreach (var p in products)
+                {
+                    var list = coils != null ? coils[p.PartId].ToList() : new List<CoilRowModel>();
+                    void Set(string h, object v) { int c = Col(h); if (c > 0 && v != null && !(v is string s && s.Length == 0)) ws.Cell(r, c).Value = XLCellValue.FromObject(v); }
+                    object Num(string v) => CIMS.Helpers.Qty.TryParse(D(v), out decimal d) ? (object)d : D(v);
+                    Set("NO", r - 1);
+                    Set("PRODUCT CODE", p.PartCode); Set("PRODUCT NAME", p.PartName); Set("CUSTOMER", p.Customer);
+                    Set("PART A", p.PartA); Set("PART NO", p.PartNo); Set("MODEL", p.Model); Set("IMAGE", p.ImageFileName);
+                    Set(stock.MaxHeader, Num(p.Max)); Set(stock.MinHeader, Num(p.Min));
+                    Set(stock.QtyHeader, list.Count > 0 ? (object)list[0].WeightKG : Num(p.Qty));
+                    if (!stock.CountCoil) { Set("STOCK (BOX)", Num(p.StockBox)); Set("STOCK (PCS)", Num(p.StockPcs)); }
+                    Set("REMARK", p.Remark); Set("SUPPLIER", p.Supplier); Set("CATEGORY", p.Category);
+                    Set("PACK SIZE", Num(p.PackSize)); Set("BIN", D(p.Bin) == "N/A" ? "" : p.Bin);
+                    Set("STOCK1", stock.Code); Set("SHOW/HIDE", p.IsShow ? 1 : 0);
+                    if (list.Count > 0) { Set("COIL NO", list[0].CoilNo); Set("MOTHER COIL", list[0].MotherCoil); }
+                    r++;
+                    foreach (var c in list.Skip(1))   // Coil ถัดไปของสินค้าเดียวกัน
+                    {
+                        Set("NO", r - 1); Set("BIN", D(p.Bin) == "N/A" ? "" : p.Bin);
+                        Set("COIL NO", c.CoilNo); Set("MOTHER COIL", c.MotherCoil); Set(stock.QtyHeader, c.WeightKG); Set("STOCK1", stock.Code);
+                        r++;
+                    }
+                }
+                int last = Math.Max(r - 1, 2) + 20;   // แถวว่างไว้เพิ่มสินค้าใหม่
+                ImportTemplateService.Body(ws, last, heads.Length);
+                foreach (var h in new[] { "PRODUCT CODE", "BIN", "COIL NO", "MOTHER COIL", "QR CODE", "PART A", "PART NO" })
+                {
+                    int c = Col(h);
+                    if (c > 0) ws.Range(2, c, last, c).Style.NumberFormat.Format = "@";
+                }
+                int q = Col(stock.QtyHeader);
+                if (q > 0) ws.Range(2, q, last, q).Style.NumberFormat.Format = ImportTemplateService.QtyFormat(stock.AllowDecimal);
+                var g = wb.Worksheet("HOW TO");
+                int gr = (g.LastRowUsed()?.RowNumber() ?? 1) + 2;
+                g.Cell(gr, 1).Value = $"ไฟล์นี้มีข้อมูลปัจจุบันของ {stock.Code} ใส่ไว้ให้แล้ว: แก้ตัวเลข / ข้อมูล แล้วกด IMPORT EXCEL ในหน้า Store (Max-Min) ของ {stock.Code} - ช่องว่าง = ไม่เปลี่ยน / ยอดคงคลัง = ตั้งตามไฟล์ (ไม่ใช่บวกเพิ่ม)";
+                g.Cell(gr, 1).Style.Font.Bold = true;
+                g.Cell(gr, 1).Style.Font.FontColor = XLColor.FromHtml("#C62828");
+                wb.Save();
+            }
+            return path;
+        }
+
         private static string Norm(string h) =>
             new string((h ?? "").Where(c => !char.IsWhiteSpace(c) && c != '.' && c != '(' && c != ')' && c != '_' && c != '-').ToArray()).ToUpperInvariant();
 

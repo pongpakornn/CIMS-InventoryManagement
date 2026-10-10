@@ -212,6 +212,7 @@ namespace CIMS.Views
             btnOverMax.Visibility = Show(_stock.UseMaxMin);
             btnUnderMin.Visibility = Show(_stock.UseMaxMin);
             btnImport.Visibility = Show(_session != null && _session.CanImportStock(_stock));
+            btnTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && !_stock.IsLiveView);
             btnCoilTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && _stock.CountCoil && DbSchema.HasCoilRegister && !_stock.IsLiveView);
 
             // ความเร็วการเลื่อน + การ์ดสินค้า (เฉพาะคลังที่แสดงรูปภาพ) จำค่าไว้ในเครื่องนี้
@@ -416,7 +417,31 @@ namespace CIMS.Views
             catch (Exception ex) { DialogHelper.ShowError("นำเข้าข้อมูลไม่สำเร็จ (ยกเลิกทั้งไฟล์ ไม่มีรายการใดถูกบันทึก)\n" + ex.Message); }
         }
 
-        // 📄 Template COIL LIST (YES / NO -> Desktop\CIMS_Export -> เปิดไฟล์)
+        // 📄 TEMPLATE ของ IMPORT EXCEL (YES / NO -> Desktop\CIMS_Export\Store Max-Min\<คลัง>_Template_<เวลา>.xlsx -> เปิดไฟล์)
+        private async void btnTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            if (!DialogHelper.ShowConfirm($"ต้องการสร้างไฟล์ Template สำหรับ IMPORT EXCEL ของคลัง {_stock.Code} ใช่หรือไม่?\n\n" +
+                    $"• คอลัมน์ตามที่ {_stock.Code} แสดงในหน้านี้ + ข้อมูลสินค้าปัจจุบันใส่ไว้ให้แล้ว\n" +
+                    (_stock.CountCoil ? "• คลังนับ Coil: 1 แถว = 1 Coil (เลข Coil / Coil แม่ / น้ำหนัก)\n" : "") +
+                    "• แก้ตัวเลข / เพิ่มสินค้าใหม่ แล้วนำเข้ากลับด้วยปุ่ม IMPORT EXCEL\n\n" +
+                    "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
+            btnTemplate.IsEnabled = false;
+            try
+            {
+                var stock = _stock;
+                var products = await Task.Run(() => _viewModel.GetAllForExport(""));
+                var stocks = await Task.Run(() => new StockService().GetStocks());
+                string path = await Task.Run(() => new StoreMasterImportService().WriteTemplate(stock, products, stocks));
+                LogService.WriteLog(_session?.UserId, "STORE_TEMPLATE", $"Stock: {stock.Code} | Rows: {products.Count} | File: {System.IO.Path.GetFileName(path)}", stock.Code);
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({products.Count:N0} รายการ)\n{ImportTemplateService.ShortPath(path)}", true);
+                ImportTemplateService.OpenFile(path);
+            }
+            catch (System.IO.IOException) { DialogHelper.ShowError("บันทึกไฟล์ไม่สำเร็จ กรุณาปิดไฟล์ Excel ที่เปิดอยู่ก่อนแล้วลองใหม่"); }
+            catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ\n" + ex.Message); }
+            finally { btnTemplate.IsEnabled = true; }
+        }
+
+        // 📄 Template COIL LIST (YES / NO -> Desktop\CIMS_Export\Store Max-Min -> เปิดไฟล์)
         private async void btnCoilTemplate_Click(object sender, RoutedEventArgs e)
         {
             if (!DialogHelper.ShowConfirm($"ต้องการสร้างไฟล์ Template สำหรับนำเข้า COIL LIST ของคลัง {_stock.Code} ใช่หรือไม่?\n\n" +
@@ -479,10 +504,7 @@ namespace CIMS.Views
         // 📤 Export Excel: PD CODE / PRODUCT NAME / QTY ตามตารางที่แสดงอยู่ (ไม่มีรูปภาพ) - รูปแบบไฟล์จริงรอผู้ใช้ส่งมา
         private async void btnExportExcel_Click(object sender, RoutedEventArgs e)
         {
-            // บันทึกที่ Desktop\CIMS_Export (โฟลเดอร์เดียวกับ Export QR ของหน้า Inventory Registration)
-            string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CIMS_Export");
-            // ปี ค.ศ. เสมอ (เครื่องตั้งปฏิทินไทยไว้ จะได้ 2569 ถ้าใช้รูปแบบของเครื่อง)
-            string fileName = $"{_stock.Code}_{DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture)}.xlsx";
+            // บันทึกที่ Desktop\CIMS_Export\Store Max-Min\STOCK-MAT_10-10-2026-11.11.00.xlsx (ปี ค.ศ. เสมอ)
 
             try
             {
@@ -493,9 +515,7 @@ namespace CIMS.Views
                     DialogHelper.ShowWarning("ไม่มีข้อมูลในตารางให้ Export");
                     return;
                 }
-
-                System.IO.Directory.CreateDirectory(folder);
-                string path = System.IO.Path.Combine(folder, fileName);
+                string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Store, _stock.Code);
                 string qtyHeader = _stock.QtyHeader;
                 string groupLabel = _viewModel.GroupLabel;
                 bool dec = _stock.AllowDecimal;
@@ -604,7 +624,7 @@ namespace CIMS.Views
                 });
 
                 LogService.WriteLog(_session?.UserId, "EXPORT_STORE_EXCEL", $"Exported {rows.Count} rows | Stock: {_stock.Code} | File: {System.IO.Path.GetFileName(path)}", _stock.Code);
-                NotificationManager.Show("Export complete", $"Export {_stock.Code} {rows.Count:N0} รายการ\nDesktop\\CIMS_Export\\{fileName}", true);
+                NotificationManager.Show("Export complete", $"Export {_stock.Code} {rows.Count:N0} รายการ\n{ImportTemplateService.ShortPath(path)}", true);
                 ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (System.IO.IOException)

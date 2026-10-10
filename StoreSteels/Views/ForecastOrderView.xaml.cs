@@ -228,7 +228,7 @@ namespace CIMS.Views
                 int count = 0;
                 string path = await Task.Run(() => _service.Export(month.Value, key, out count));
                 LogService.WriteLog(_session?.UserId, "FORECAST_EXPORT", $"Month: {month.Value.ToString("yyyy-MM", CultureInfo.InvariantCulture)} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
-                NotificationManager.Show("Export", $"Export แล้ว {count:N0} รายการ\n{path}", true);
+                NotificationManager.Show("Export", $"Export แล้ว {count:N0} รายการ\n{ImportTemplateService.ShortPath(path)}", true);
                 ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (Exception ex)
@@ -253,17 +253,16 @@ namespace CIMS.Views
             btnTemplate.IsEnabled = false;
             try
             {
-                string path = ImportTemplateService.NewPath("ForecastOrder_Template_" + month.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+                string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Forecast, "ForecastOrder_" + month.ToString("yyyy-MM", CultureInfo.InvariantCulture) + "_Template");
                 int count = 0;
                 await Task.Run(() =>
                 {
                     var rows = _service.GetRows(month, "", 0, 1000000);
                     count = rows.Count;
-                    System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
                     new ImportTemplateService().CreateForecastTemplate(path, month, rows);
                 });
                 LogService.WriteLog(_session?.UserId, "FORECAST_TEMPLATE", $"Month: {month.ToString("yyyy-MM", CultureInfo.InvariantCulture)} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
-                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\n{path}", true);
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\n{ImportTemplateService.ShortPath(path)}", true);
                 ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
             }
             catch (Exception ex)

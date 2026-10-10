@@ -247,8 +247,7 @@ namespace CIMS.Services
         // 📄 Template COIL LIST (แบบเดียวกับ Template ทั้งระบบ: แผ่นข้อมูล -> HOW TO + ตัวอย่าง -> PRODUCT CODES)
         public string WriteTemplate(StockModel stock)
         {
-            Directory.CreateDirectory(ImportTemplateService.ExportFolder);
-            string path = ImportTemplateService.NewPath($"COIL_LIST_{stock.Code}");
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Store, $"{stock.Code}_COIL_LIST_Template");
 
             var parts = new List<(string Code, string Name)>();
             using (var conn = new SqlConnection(GlobalConfig.ConnStr))

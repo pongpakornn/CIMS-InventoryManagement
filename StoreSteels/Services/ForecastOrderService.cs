@@ -167,7 +167,7 @@ namespace CIMS.Services
             Delivery = Convert.ToDecimal(r[6])
         };
 
-        // 📤 Export ทุกรายการของเดือน (ตามคำค้นหา) -> Desktop\CIMS_Export\ForecastOrder_yyyy-MM_xxx.xlsx
+        // 📤 Export ทุกรายการของเดือน (ตามคำค้นหา) -> Desktop\CIMS_Export\Forecast Order\ForecastOrder_yyyy-MM_<วัน-เดือน-ปี-เวลา>.xlsx
         //   ใช้แม่แบบบน Shared Folder: หาคอลัมน์จากหัวตาราง (NO / PART A / PART NO / PRODUCT NAME / FORECAST / ORDER / DELIVERY)
         //   แม่แบบไม่มีคอลัมน์ครบ -> สร้างหัวตาราง 7 คอลัมน์ใหม่ด้วยรูปแบบเดียวกับแม่แบบ
         //   ข้อมูลเกินแถวในแม่แบบ -> สร้างแถวเพิ่มด้วยรูปแบบแถวแรกของแม่แบบ / ค่าเป็น Value จัดกึ่งกลาง / คั่นกลุ่มด้วยแถวชื่อลูกค้า
@@ -175,9 +175,7 @@ namespace CIMS.Services
         {
             var rows = GetRows(month, keyword, 0, int.MaxValue / 2);
             count = rows.Count;
-            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "CIMS_Export");
-            Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, "ForecastOrder_" + month.ToString("yyyy-MM", CultureInfo.InvariantCulture) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".xlsx");
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Forecast, "ForecastOrder_" + month.ToString("yyyy-MM", CultureInfo.InvariantCulture));
 
             string[] heads = { "NO", "PART A", "PART NO", "PRODUCT NAME", "FORECAST", "ORDER", "DELIVERY" };
             XLWorkbook wb = null;

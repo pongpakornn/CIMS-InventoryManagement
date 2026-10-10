@@ -1,4 +1,4 @@
-using CIMS.Core;
+﻿using CIMS.Core;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
@@ -192,8 +192,7 @@ namespace CIMS.Services
 
         public string ExportDeducted(IList<DeductMissRow> rows)
         {
-            string path = ImportTemplateService.NewPath("DEDUCTED");
-            System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Scanner, "DEDUCTED");
             using (var wb = new ClosedXML.Excel.XLWorkbook())
             {
                 var ws = wb.Worksheets.Add("DEDUCTED");
@@ -251,8 +250,7 @@ namespace CIMS.Services
         // 📤 Excel (รูปแบบเดียวกับไฟล์ Export ทั้งระบบ) -> path ของไฟล์
         public string Export(IList<DeductMissRow> rows)
         {
-            string path = ImportTemplateService.NewPath("NOT_DEDUCTED");
-            System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Scanner, "NOT_DEDUCTED");
             using (var wb = new ClosedXML.Excel.XLWorkbook())
             {
                 var ws = wb.Worksheets.Add("NOT DEDUCTED");

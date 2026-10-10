@@ -168,16 +168,15 @@ namespace CIMS.Views
         private async void Export_Click(object sender, RoutedEventArgs e)
         {
             var filter = BuildFilter();
-            string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CIMS_Export");
-            string file = $"ScanHistory_{DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture)}.xlsx";
+            string path = CIMS.Services.ImportTemplateService.NewPath(CIMS.Services.ImportTemplateService.Systems.Scanner, "ScanHistory");
+            string file = System.IO.Path.GetFileName(path);
             btnExport.IsEnabled = false;
             try
             {
-                System.IO.Directory.CreateDirectory(folder);
-                string path = System.IO.Path.Combine(folder, file);
+                
                 int n = await Task.Run(() => _service.Export(filter, path));
                 LogService.WriteLog(_session?.UserId, "SCAN_HISTORY_EXPORT", $"Rows: {n} | {filter.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} - {filter.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} | Key: {filter.Keyword} | File: {file}", "");
-                NotificationManager.Show("Export complete", $"Export ประวัติการสแกน {n:N0} รายการ\nDesktop\\CIMS_Export\\{file}", true);
+                NotificationManager.Show("Export complete", $"Export ประวัติการสแกน {n:N0} รายการ\n{CIMS.Services.ImportTemplateService.ShortPath(path)}", true);
                 CIMS.Services.ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (System.IO.IOException) { DialogHelper.ShowError("บันทึกไฟล์ไม่สำเร็จ กรุณาปิดไฟล์ Excel ที่เปิดอยู่ก่อนแล้วลองใหม่"); }

@@ -214,14 +214,13 @@ namespace CIMS.Views
             btnTemplate.IsEnabled = false;
             try
             {
-                string path = ImportTemplateService.NewPath("User_Permission_Template");
+                string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Users, "User_Permission_Template");
                 await System.Threading.Tasks.Task.Run(() =>
                 {
-                    System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
                     _service.CreateImportTemplate(path);
                 });
                 LogService.WriteLog(_session?.UserId, "USER_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)}", "");
-                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\n{ImportTemplateService.ShortPath(path)}", true);
                 ImportTemplateService.OpenFile(path);
             }
             catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ (ปิดไฟล์ Excel เดิมก่อน)\n" + ex.Message); }

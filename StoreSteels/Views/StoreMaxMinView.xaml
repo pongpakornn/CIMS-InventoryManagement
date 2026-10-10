@@ -375,6 +375,11 @@
                         Style="{StaticResource ModernHeaderButton}" Visibility="Collapsed"
                         Background="{StaticResource MainPurple}" Foreground="#81C784"/>
 
+                    <!-- 📄 TEMPLATE ของ IMPORT EXCEL: คอลัมน์ตามคลังนี้ + ข้อมูลสินค้าปัจจุบันใส่ไว้ให้ (แก้แล้ว Import กลับ) -->
+                    <Button x:Name="btnTemplate" Content="📄 TEMPLATE" MinWidth="120" Padding="12,0" Margin="0,3,8,3" Click="btnTemplate_Click"
+                        Style="{StaticResource ModernHeaderButton}" Visibility="Collapsed"
+                        Background="{StaticResource MainPurple}" Foreground="#90CAF9"/>
+
                     <!-- คลังที่นับ Coil: Template COIL LIST (Import ผ่านปุ่ม IMPORT EXCEL - ระบบดูจากหัวคอลัมน์ COIL NO) -->
                     <Button x:Name="btnCoilTemplate" Content="📄 COIL TEMPLATE" MinWidth="140" Padding="12,0" Margin="0,3,8,3" Click="btnCoilTemplate_Click"
                         Style="{StaticResource ModernHeaderButton}" Visibility="Collapsed"

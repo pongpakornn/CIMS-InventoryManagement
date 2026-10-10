@@ -231,15 +231,11 @@
                 btnTemplate.IsEnabled = false;
                 try
                 {
-                    string path = ImportTemplateService.NewPath(forStock == null ? "Inventory_Registration_Template" : $"Inventory_Registration_{ImagePaths.SafeCode(forStock.Code)}");
+                    string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Product, forStock == null ? "ALL_STOCKS_Template" : $"{forStock.Code}_Template");
                     var stocks = _stocks;
-                    await Task.Run(() =>
-                    {
-                        System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
-                        new ImportTemplateService().CreatePartTemplate(path, stocks, forStock);
-                    });
+                    await Task.Run(() => new ImportTemplateService().CreatePartTemplate(path, stocks, forStock));
                     LogService.WriteLog(_viewModel.CurrentUser?.UserId, "PART_TEMPLATE", $"File: {System.IO.Path.GetFileName(path)} | Stock: {forStock?.Code ?? "ALL"}", "");
-                    NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
+                    NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\n{ImportTemplateService.ShortPath(path)}", true);
                     ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
                 }
                 catch (Exception ex)
@@ -675,18 +671,15 @@
                 {
                     string currentUserId = _viewModel.CurrentUser?.UserId ?? "Unknown";
 
-                    await Task.Run(() =>
-                    {
-                        var exportService = new ExportService();
-                        exportService.GenerateA4Pdf(selectedItems);
-                    });
+                    string pdf = await Task.Run(() => new ExportService().GenerateA4Pdf(selectedItems));
 
                     foreach (var item in selectedItems)
                     {
                         LogService.WriteLog(currentUserId, "EXPORT_QR_PDF", $"Exported QR Code to PDF for Part: {item.PartName}", item.PartCode);
                     }
 
-                    DialogHelper.ShowSuccess("ส่งออกไฟล์ QR ไปที่โฟลเดอร์ Desktop\\CIMS_Export เรียบร้อยแล้ว!");
+                    DialogHelper.ShowSuccess($"ส่งออกไฟล์ QR เรียบร้อยแล้ว!\n{ImportTemplateService.ShortPath(pdf)}");
+                    ImportTemplateService.OpenFile(pdf);
                 }
                 catch (Exception ex)
                 {

@@ -261,11 +261,10 @@ namespace CIMS.Views
             if (!DialogHelper.ShowConfirm(confirm, days ? "TEMPLATE • SET MAX MIN" : "TEMPLATE • FORECAST")) return;
 
             var stock = _stock;
-            string path = ImportTemplateService.NewPath(days ? $"{stock.Code}_Max-MinCal_Template" : "ForecastOrder_Template_" + DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.MaxMinCalc, days ? $"{stock.Code}_Max-MinCal_Template" : "ForecastOrder_" + DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture) + "_Template");
             btnExport.IsEnabled = false;
             try
             {
-                System.IO.Directory.CreateDirectory(ImportTemplateService.ExportFolder);
                 int count = 0;
                 if (days)
                 {
@@ -284,7 +283,7 @@ namespace CIMS.Views
                 }
                 LogService.WriteLog(_session?.UserId, days ? "MAXMIN_TEMPLATE" : "FORECAST_TEMPLATE",
                     $"Stock: {stock.Code} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", stock.Code);
-                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\nDesktop\\CIMS_Export\\{System.IO.Path.GetFileName(path)}", true);
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว ({count:N0} รายการ)\n{ImportTemplateService.ShortPath(path)}", true);
                 ImportTemplateService.OpenFile(path);   // เปิดไฟล์ Template ขึ้นมาเลย
             }
             catch (System.IO.IOException) { DialogHelper.ShowError("บันทึกไฟล์ไม่สำเร็จ กรุณาปิดไฟล์ Excel ที่เปิดอยู่ก่อนแล้วลองใหม่"); }

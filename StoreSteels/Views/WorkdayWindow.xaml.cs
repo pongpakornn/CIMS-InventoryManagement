@@ -40,6 +40,7 @@ namespace CIMS.Views
             var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) Owner = owner; else WindowStartupLocation = WindowStartupLocation.CenterScreen;
             btnImport.Visibility = canEdit ? Visibility.Visible : Visibility.Collapsed;
+            btnTemplate.Visibility = btnImport.Visibility;
             Loaded += async (s, e) => await ShowCustomers();
         }
 
@@ -265,6 +266,26 @@ namespace CIMS.Views
         #endregion
 
         #region === [ Events ] ===
+
+        // 📄 TEMPLATE: ลูกค้าที่เปิดอยู่ (หรือทุกลูกค้า) + วันทำงานของปีที่เลือกใส่ไว้ให้ -> Desktop\CIMS_Export\Max-Min Calculator
+        private async void Template_Click(object sender, RoutedEventArgs e)
+        {
+            string who = _customer ?? "ทุกลูกค้า";
+            if (!DialogHelper.ShowConfirm($"ต้องการสร้างไฟล์ Template สำหรับ IMPORT WORKDAYS ({who} ปี {_year}) ใช่หรือไม่?\n\n" +
+                    "• 1 แถว = 1 วันทำงาน (CUSTOMER / DATE) - วันทำงานที่มีอยู่แล้วใส่ไว้ให้\n" +
+                    "• แก้แล้วนำเข้ากลับด้วยปุ่ม IMPORT WORKDAYS\n\nกด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก", "TEMPLATE EXCEL")) return;
+            btnTemplate.IsEnabled = false;
+            try
+            {
+                int y = _year; string c = _customer;
+                string path = await Task.Run(() => _service.WriteWorkdayTemplate(y, c));
+                LogService.WriteLog(_session?.UserId, "WORKDAY_TEMPLATE", $"Customer: {c ?? "ALL"} | Year: {y} | File: {System.IO.Path.GetFileName(path)}", "");
+                NotificationManager.Show("Template", $"สร้างไฟล์ Template แล้ว\n{ImportTemplateService.ShortPath(path)}", true);
+                ImportTemplateService.OpenFile(path);
+            }
+            catch (Exception ex) { DialogHelper.ShowError("สร้างไฟล์ Template ไม่สำเร็จ (ปิดไฟล์ Excel เดิมก่อน)\n" + ex.Message); }
+            finally { btnTemplate.IsEnabled = true; }
+        }
 
         private async void Import_Click(object sender, RoutedEventArgs e)
         {
