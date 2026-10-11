@@ -26,7 +26,8 @@ namespace CIMS.Models
         // ⏳ ชั่วคราว: คลังนี้แสดงข้อมูลสดจากโปรแกรมเดิม (เช่น 'StorePC') - ดูอย่างเดียว ห้ามแก้ / สแกน / Import ใน CIMS
         public string LiveSource { get; set; }
         // 🔌 ปิดไว้ก่อน (12/10/2026): STORE-PC ใช้ข้อมูลที่ Clone จาก StorePC เข้า CIMS แล้ว ทดสอบระบบ StorePC ใน CIMS
-        //    โค้ด / View CIMS.vw_StorePcLive / ค่า LiveSource ในฐานข้อมูลยังอยู่ครบ - เปิดกลับ = เปลี่ยนเป็น true
+        //    โค้ด / View CIMS.vw_StorePcLive ยังอยู่ครบ · ฐานข้อมูลตั้ง Stocks.LiveSource = NULL แล้ว (View vw_StockMonitoring ดูค่านี้)
+        //    เปิดกลับ = เปลี่ยนเป็น true + UPDATE CIMS.Stocks SET LiveSource = N'StorePC' WHERE StockCode = 'STORE-PC'
         public const bool LiveViewEnabled = false;
         public bool IsLiveView => LiveViewEnabled && !string.IsNullOrWhiteSpace(LiveSource);
         public const string LiveViewMessage = "คลังนี้แสดงข้อมูลสดจากโปรแกรมเดิม (StorePC) ชั่วคราว - ดูได้อย่างเดียว\nการแก้ไข / สแกน / Import ให้ทำในโปรแกรม StorePC";
