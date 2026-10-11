@@ -242,8 +242,8 @@ namespace CIMS.Views
                 new TemplateChoiceWindow.Option
                 {
                     Key = "FORECAST", Title = "FORECAST / ORDER / DELIVERY",
-                    Detail = $"One row per customer + part + month ({mon} rows already filled in). For forecast / order / delivery of any customer and month.",
-                    UseWith = "USE WITH:  📊 IMPORT FORECAST & ORDER"
+                    Detail = $"One row per customer + PART A + PART NO + month ({mon} rows already filled in). Import: choose IMPORT + calculate MAX / MIN AUTO (CUSTOMER required) or IMPORT only (CUSTOMER may be blank, found from PART NO / PRODUCT NAME / PART A).",
+                    UseWith = "USE WITH:  📊 IMPORT FORECAST & ORDER (both choices)"
                 });
             if (pick == null) return;
 
@@ -256,7 +256,8 @@ namespace CIMS.Views
                   "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก"
                 : "ต้องการสร้างไฟล์ Template สำหรับนำเข้า Forecast / Order / Delivery ใช่หรือไม่?\n\n" +
                   $"• ไฟล์จะมีรายการของเดือน {mon} ที่มีอยู่แล้วให้ (ไม่มีจะเป็นตารางว่าง)\n" +
-                  "• กรอกหรือแก้ตัวเลขในไฟล์ แล้วนำเข้ากลับด้วยปุ่ม IMPORT FORECAST & ORDER\n\n" +
+                  "• กรอกหรือแก้ตัวเลขในไฟล์ แล้วนำเข้ากลับด้วยปุ่ม IMPORT FORECAST & ORDER\n" +
+                  "• ตอนนำเข้าเลือกได้: IMPORT + คำนวณ MAX / MIN AUTO หรือ IMPORT อย่างเดียว (CUSTOMER ว่างได้)\n\n" +
                   "กด YES เพื่อสร้างไฟล์  •  กด NO เพื่อยกเลิก";
             if (!DialogHelper.ShowConfirm(confirm, days ? "TEMPLATE • SET MAX MIN" : "TEMPLATE • FORECAST")) return;
 
@@ -487,30 +488,47 @@ namespace CIMS.Views
             return true;
         }
 
-        // 📊 IMPORT FORECAST & ORDER (+ DELIVERY): เก็บต่อเดือน (ซ้ำ = แทนที่) -> คำนวณคลังที่เปิด AUTO CALC -> กราฟ Dashboard
+        // 📊 IMPORT FORECAST & ORDER (+ DELIVERY): เก็บต่อเดือน (ซ้ำ = แทนที่) - กดแล้วเลือก 2 แบบ (เหมือนหน้า Forecast / Order)
+        //   1) IMPORT + คำนวณ MAX / MIN AUTO = แบบเดิม: ไฟล์ Max-MinCal ของคลัง (DAY / BOX) หรือไฟล์ Forecast (ต้องมี CUSTOMER) แล้วคำนวณคลังที่เปิด AUTO CALC
+        //   2) IMPORT อย่างเดียว = เก็บ FORECAST / ORDER / DELIVERY ไม่คำนวณ / CUSTOMER ว่างได้ (หาจาก PART NO -> PRODUCT NAME -> PART A)
         private async void ImportForecast_Click(object sender, RoutedEventArgs e)
         {
+            int mode = DialogHelper.ShowChoice(MaxMinCalcService.ImportChoiceText, MaxMinCalcService.ImportChoiceTitle,
+                                               MaxMinCalcService.ImportChoiceCalc, MaxMinCalcService.ImportChoiceOnly);
+            if (mode == 0) return;
+            bool withCalc = mode == 1;
             var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Import Forecast & Order & Delivery", Filter = "Excel Files (*.xlsx)|*.xlsx" };
             if (dlg.ShowDialog() != true) return;
-            if (await TryImportTemplate(dlg.FileName)) return;
+            if (withCalc && await TryImportTemplate(dlg.FileName)) return;
 
             List<CalcImportRow> rows;
-            try { rows = await Task.Run(() => _service.ReadForecastExcel(dlg.FileName)); }
+            try { rows = await Task.Run(() => _service.ReadForecastExcel(dlg.FileName, findCustomer: !withCalc)); }
             catch (Exception ex) { DialogHelper.ShowError("อ่านไฟล์ Excel ไม่สำเร็จ\n" + ex.Message); return; }
 
             var valid = rows.Where(r => r.IsValid).ToList();
             var bad = rows.Where(r => !r.IsValid).ToList();
             if (valid.Count == 0) { DialogHelper.ShowError("ไม่พบรายการที่นำเข้าได้ในไฟล์นี้\n\n" + ErrorList(bad)); return; }
             var months = string.Join(", ", valid.Select(v => v.Month).Distinct().OrderBy(m => m).Select(m => m.ToString("MMM yyyy", CultureInfo.InvariantCulture)));
+            int auto = valid.Count(v => !string.IsNullOrEmpty(v.Note));
             if (!DialogHelper.ShowConfirm($"ไฟล์: {System.IO.Path.GetFileName(dlg.FileName)}\n\nนำเข้า {valid.Count:N0} แถว  (เดือน: {months})\n" +
                                           $"Forecast {valid.Sum(v => v.Forecast):N0}  •  Order {valid.Sum(v => v.Order):N0}  •  Delivery {valid.Sum(v => v.Delivery):N0}\n" +
                                           "ลูกค้า/สินค้า/เดือนเดียวกันที่เคยนำเข้าจะถูกแทนที่" +
-                                          (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{ErrorList(bad)}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?", "IMPORT FORECAST & ORDER")) return;
+                                          (withCalc ? "\n\nแล้วคำนวณ MAX / MIN ของคลังที่เปิด AUTO CALC" : "\n\nนำเข้าอย่างเดียว ไม่คำนวณ MAX / MIN") +
+                                          (auto > 0 ? $"\n\nℹ ระบบหา CUSTOMER / PART NO จากสินค้าในระบบให้ {auto:N0} แถว (แถวที่ไม่ได้กรอก)" : "") +
+                                          (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{ErrorList(bad)}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?",
+                                          withCalc ? "IMPORT + คำนวณ MAX / MIN AUTO" : "IMPORT อย่างเดียว")) return;
             try
             {
                 string uid = _session?.UserId;
                 int n = await Task.Run(() => _service.ApplyForecast(rows, uid));
-                LogService.WriteLog(uid, "FORECAST_IMPORT", $"File: {System.IO.Path.GetFileName(dlg.FileName)} | Rows: {n} | Months: {months} | Skipped rows: {bad.Count}", "");
+                LogService.WriteLog(uid, "FORECAST_IMPORT", $"File: {System.IO.Path.GetFileName(dlg.FileName)} | Rows: {n} | Months: {months} | Skipped rows: {bad.Count}" +
+                                                        (withCalc ? "" : $" | Import only (no MAX / MIN calculate) | Customer / part found by system: {auto}"), "");
+                if (!withCalc)
+                {
+                    NotificationManager.Show("Forecast imported", $"นำเข้า Forecast / Order / Delivery แล้ว {n:N0} แถว (ไม่คำนวณ MAX / MIN)", true);
+                    await ReloadAsync();
+                    return;
+                }
                 NotificationManager.Show("Forecast imported", $"นำเข้า Forecast / Order / Delivery แล้ว {n:N0} แถว", true);
                 await RunCalc(null, null, "Auto calculate after forecast import");
             }

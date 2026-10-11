@@ -74,11 +74,24 @@ namespace CIMS.Views
 
         private DateTime? SelectedMonth => (cbMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?;
 
+        // เดือนของตาราง: ALL MONTHS (Tag = null) หรือเดือนเดียว / เปลี่ยน MONTH ด้านบน = ตารางตามไปด้วย แต่เลือกเดือนตารางแยกได้
+        private bool TableAll => (cbTableMonth.SelectedItem as ComboBoxItem)?.Tag == null && cbTableMonth.SelectedItem != null;
+        private DateTime? TableMonth => TableAll ? null : ((cbTableMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?) ?? SelectedMonth;
+        private static string MonText(DateTime m) => m.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
+
+        private void SelectTableMonth(DateTime? month, bool all)
+        {
+            var items = cbTableMonth.Items.OfType<ComboBoxItem>();
+            cbTableMonth.SelectedItem = all ? items.FirstOrDefault(i => i.Tag == null)
+                                            : items.FirstOrDefault(i => i.Tag is DateTime d && month.HasValue && d == month.Value) ?? items.FirstOrDefault(i => i.Tag != null);
+        }
+
         private async Task LoadMonthsAsync(DateTime? select = null)
         {
             try
             {
                 var months = await Task.Run(() => _service.GetMonths());
+                bool keepAll = TableAll; var keepTable = TableMonth;
                 _ready = false;
                 cbMonth.Items.Clear();
                 foreach (var m in months)
@@ -90,6 +103,10 @@ namespace CIMS.Views
                 }
                 var pick = cbMonth.Items.OfType<ComboBoxItem>().FirstOrDefault(i => select.HasValue && (DateTime)i.Tag == select.Value) ?? cbMonth.Items.OfType<ComboBoxItem>().First();
                 cbMonth.SelectedItem = pick;
+                cbTableMonth.Items.Clear();
+                cbTableMonth.Items.Add(new ComboBoxItem { Content = "ALL MONTHS", Tag = null });
+                foreach (var i in cbMonth.Items.OfType<ComboBoxItem>()) cbTableMonth.Items.Add(new ComboBoxItem { Content = i.Content, Tag = i.Tag });
+                SelectTableMonth(keepAll ? null : (keepTable ?? (DateTime)pick.Tag), keepAll);
                 _ready = true;
                 await ReloadAllAsync();
             }
@@ -98,7 +115,14 @@ namespace CIMS.Views
 
         private async void cbMonth_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_ready) await ReloadAllAsync();
+            if (!_ready) return;
+            _ready = false; SelectTableMonth(SelectedMonth, false); _ready = true;   // ตารางตามเดือนด้านบน
+            await ReloadAllAsync();
+        }
+
+        private async void cbTableMonth_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_ready) await LoadRowsAsync(false);
         }
 
         private async Task ReloadAllAsync()
@@ -151,15 +175,16 @@ namespace CIMS.Views
         // ตาราง: หน้าแรก 50 แถว / เลื่อนใกล้ล่างสุดโหลดเพิ่มทีละ 30 (เหมือน Store Max-Min) - ค้นหาซ้อนกันใช้ผลล่าสุด
         private async Task LoadRowsAsync(bool more)
         {
-            var month = SelectedMonth;
-            if (month == null || (more && (_loading || !_hasMore))) return;
+            bool all = TableAll;
+            var month = TableMonth;
+            if ((month == null && !all) || (more && (_loading || !_hasMore))) return;
             int ver = more ? _version : ++_version;
             int skip = more ? _offset : 0, take = more ? MorePage : FirstPage;
             string key = txtSearch.Text;
             _loading = true;
             try
             {
-                var data = await Task.Run(() => _service.GetRows(month.Value, key, skip, take));
+                var data = await Task.Run(() => _service.GetRows(all ? null : month, key, skip, take));
                 if (ver != _version) return;
                 if (!more) { _rows.Clear(); _offset = 0; }
                 foreach (var r in data) _rows.Add(r);
@@ -167,7 +192,8 @@ namespace CIMS.Views
                 _hasMore = data.Count == take;
                 Renumber();
                 txtEmpty.Visibility = _rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                txtSub.Text = $"{month.Value.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}  •  showing {_rows.Count:N0} item(s){(_hasMore ? " - scroll down for more" : "")}";
+                if (!more && (colMonth.Visibility == Visibility.Visible) != all) { colMonth.Visibility = all ? Visibility.Visible : Visibility.Collapsed; RefitColumns(); }
+                txtSub.Text = $"{(all ? "All months" : month.Value.ToString("MMMM yyyy", CultureInfo.InvariantCulture))}  •  showing {_rows.Count:N0} item(s){(_hasMore ? " - scroll down for more" : "")}";
             }
             catch (Exception ex) { if (ver == _version) DialogHelper.ShowError("โหลดรายการไม่สำเร็จ\n" + ex.Message); }
             finally { if (ver == _version) _loading = false; }
@@ -190,13 +216,14 @@ namespace CIMS.Views
         {
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
             {
-                // แบ่งความกว้างจริงตามสัดส่วน (NO. 70 / PART A 1 / PART NO 1.2 / NAME 2 / ตัวเลข 0.9 x 3)
+                // แบ่งความกว้างจริงตามสัดส่วน (NO. 70 / MONTH 0.7 (ALL MONTHS) / PART A 1 / PART NO 1.2 / NAME 2 / ตัวเลข 0.9 x 3)
                 double avail = dgRows.ActualWidth - 24;
                 if (avail <= 300) return;
-                double[] weight = { 0, 1, 1.2, 2, 0.9, 0.9, 0.9 };
-                double rest = avail - 70, sum = weight.Sum();
-                for (int i = 0; i < dgRows.Columns.Count && i < weight.Length; i++)
-                    dgRows.Columns[i].Width = new DataGridLength(i == 0 ? 70 : Math.Max(dgRows.Columns[i].MinWidth, rest * weight[i] / sum));
+                var weight = new Dictionary<string, double> { ["MONTH"] = 0.7, ["PART A"] = 1, ["PART NO"] = 1.2, ["PRODUCT NAME"] = 2, ["FORECAST"] = 0.9, ["ORDER"] = 0.9, ["DELIVERY"] = 0.9 };
+                var cols = dgRows.Columns.Where(c => c.Visibility == Visibility.Visible && c.Header is string h && weight.ContainsKey(h)).ToList();
+                double rest = avail - 70, sum = cols.Sum(c => weight[(string)c.Header]);
+                dgRows.Columns[0].Width = new DataGridLength(70);
+                foreach (var c in cols) c.Width = new DataGridLength(Math.Max(c.MinWidth, rest * weight[(string)c.Header] / sum));
             }));
         }
 
@@ -217,19 +244,24 @@ namespace CIMS.Views
             _searchTimer.Start();
         }
 
-        // 📤 Export ตามตาราง (ทุกแถวของเดือน + คำค้นหา) -> Desktop\CIMS_Export แล้วเปิดไฟล์
+        // 📤 Export: เลือก ALL MONTHS หรือเฉพาะเดือนที่ต้องการ -> 1 เดือน = 1 ชีท (ตามคำค้นหา) -> Desktop\CIMS_Export แล้วเปิดไฟล์
         private async void Export_Click(object sender, RoutedEventArgs e)
         {
-            var month = SelectedMonth;
-            if (month == null) return;
+            var all = cbMonth.Items.OfType<ComboBoxItem>().Select(i => i.Tag).OfType<DateTime>().ToList();
+            if (all.Count == 0) return;
+            var pre = TableAll ? all : new List<DateTime> { TableMonth ?? all[0] };
             string key = txtSearch.Text;
+            var months = MonthPickWindow.Choose("📤 EXPORT FORECAST / ORDER / DELIVERY",
+                "Tick ALL MONTHS or the months you want  •  one sheet per month" + (string.IsNullOrWhiteSpace(key) ? "" : $"  •  search: {key.Trim()}"),
+                "📤 EXPORT", all, pre);
+            if (months == null) return;
             btnExport.IsEnabled = false;
             try
             {
                 int count = 0;
-                string path = await Task.Run(() => _service.Export(month.Value, key, out count));
-                LogService.WriteLog(_session?.UserId, "FORECAST_EXPORT", $"Month: {month.Value.ToString("yyyy-MM", CultureInfo.InvariantCulture)} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
-                NotificationManager.Show("Export", $"Export แล้ว {count:N0} รายการ\n{ImportTemplateService.ShortPath(path)}", true);
+                string path = await Task.Run(() => _service.Export(months, key, out count));
+                LogService.WriteLog(_session?.UserId, "FORECAST_EXPORT", $"Months: {string.Join(", ", months.Select(m => m.ToString("yyyy-MM", CultureInfo.InvariantCulture)))} | Sheets: {months.Count} | Rows: {count} | File: {System.IO.Path.GetFileName(path)}", "");
+                NotificationManager.Show("Export", $"Export แล้ว {count:N0} รายการ  •  {months.Count:N0} ชีท\n{ImportTemplateService.ShortPath(path)}", true);
                 ImportTemplateService.OpenFile(path);   // เปิดไฟล์ขึ้นมาเลย (เหมือนทุกหน้า)
             }
             catch (Exception ex)
@@ -280,10 +312,8 @@ namespace CIMS.Views
         private async void Import_Click(object sender, RoutedEventArgs e)
         {
             if (_session?.CanImportForecastOrder != true) return;
-            int mode = DialogHelper.ShowChoice("เลือกรูปแบบการนำเข้า Forecast / Order / Delivery\n\n" +
-                "• คำนวณ MAX / MIN AUTO: แบบเดิม ต้องมี CUSTOMER ทุกแถว นำเข้าแล้วคำนวณคลังที่เปิด AUTO CALC ทันที\n\n" +
-                "• IMPORT อย่างเดียว: ไม่คำนวณ MAX / MIN / CUSTOMER ว่างได้ ระบบหาจาก PART NO → PRODUCT NAME → PART A ของสินค้าในระบบ / ช่องตัวเลขว่าง = 0",
-                "IMPORT FORECAST", "📥 IMPORT + คำนวณ MAX / MIN AUTO", "📥 IMPORT อย่างเดียว (ไม่คำนวณ)");
+            int mode = DialogHelper.ShowChoice(MaxMinCalcService.ImportChoiceText, MaxMinCalcService.ImportChoiceTitle,
+                                               MaxMinCalcService.ImportChoiceCalc, MaxMinCalcService.ImportChoiceOnly);
             if (mode == 0) return;
             bool withCalc = mode == 1;
             var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Import Forecast & Order & Delivery", Filter = "Excel Files (*.xlsx)|*.xlsx" };

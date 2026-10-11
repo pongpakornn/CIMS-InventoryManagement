@@ -21,6 +21,8 @@ namespace CIMS.Services
         public decimal Forecast { get; set; }
         public decimal Order { get; set; }
         public decimal Delivery { get; set; }
+        public DateTime Month { get; set; }        // เดือนของแถว (ตาราง ALL MONTHS แสดงแยกเดือน)
+        public string MonthText => Month.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
         public string GroupKey => string.IsNullOrWhiteSpace(Customer) ? "-" : Customer;
     }
 
@@ -89,16 +91,17 @@ namespace CIMS.Services
             return list;
         }
 
-        // แถวรวมต่อ ลูกค้า + สินค้า ของเดือน (ค้นหาได้) - จับคู่ข้อมูลสินค้าจาก CIMS.Parts
+        // แถวรวมต่อ ลูกค้า + สินค้า + เดือน (ค้นหาได้) - จับคู่ข้อมูลสินค้าจาก CIMS.Parts
         private const string RowsSql = @"
             WITH agg AS (
                 SELECT LTRIM(RTRIM(ISNULL(CustomerCode, ''))) AS Customer, LTRIM(RTRIM(ISNULL(PartACode, ''))) AS PartKey,
+                       DATEFROMPARTS(YEAR(TargetDate), MONTH(TargetDate), 1) AS M,
                        SUM(ISNULL(ForecastQuantity, 0)) AS F, SUM(ISNULL(OrderQuantity, 0)) AS O, SUM(ISNULL(DeliveryQuantity, 0)) AS D
                 FROM CIMS.ForecastOrderImports
                 WHERE TargetDate >= @from AND TargetDate < @to
-                GROUP BY LTRIM(RTRIM(ISNULL(CustomerCode, ''))), LTRIM(RTRIM(ISNULL(PartACode, '')))
+                GROUP BY LTRIM(RTRIM(ISNULL(CustomerCode, ''))), LTRIM(RTRIM(ISNULL(PartACode, ''))), DATEFROMPARTS(YEAR(TargetDate), MONTH(TargetDate), 1)
             )
-            SELECT a.Customer, ISNULL(p.PartA, '') AS PartA, COALESCE(NULLIF(LTRIM(RTRIM(p.PartNumber)), ''), a.PartKey) AS PartNo, ISNULL(p.Description, '') AS ProductName, a.F, a.O, a.D
+            SELECT a.Customer, ISNULL(p.PartA, '') AS PartA, COALESCE(NULLIF(LTRIM(RTRIM(p.PartNumber)), ''), a.PartKey) AS PartNo, ISNULL(p.Description, '') AS ProductName, a.F, a.O, a.D, a.M
             FROM agg a
             OUTER APPLY (SELECT TOP 1 x.PartA, x.PartNumber, x.Description FROM CIMS.Parts x
                          WHERE a.PartKey <> '' AND LTRIM(RTRIM(ISNULL(x.Customer, ''))) = a.Customer
@@ -107,11 +110,12 @@ namespace CIMS.Services
             WHERE @key = '' OR a.Customer LIKE '%' + @key + '%' OR a.PartKey LIKE '%' + @key + '%'
                OR ISNULL(p.PartA, '') LIKE '%' + @key + '%' OR ISNULL(p.PartNumber, '') LIKE '%' + @key + '%' OR ISNULL(p.Description, '') LIKE '%' + @key + '%'";
 
-        public List<ForecastOrderRow> GetRows(DateTime month, string keyword, int skip, int take)
+        // month = null -> ทุกเดือน (แถวแยกเดือน เรียง ลูกค้า / สินค้า / เดือน)
+        public List<ForecastOrderRow> GetRows(DateTime? month, string keyword, int skip, int take)
         {
             var list = new List<ForecastOrderRow>();
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(RowsSql + " ORDER BY a.Customer, a.PartKey OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY OPTION (MAX_GRANT_PERCENT = 5)", conn))
+            using (var cmd = new SqlCommand(RowsSql + " ORDER BY a.Customer, a.PartKey, a.M OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY OPTION (MAX_GRANT_PERCENT = 5)", conn))
             {
                 AddMonth(cmd, month, keyword);
                 cmd.Parameters.AddWithValue("@skip", skip);
@@ -148,11 +152,11 @@ namespace CIMS.Services
             }).ToList();
         }
 
-        private static void AddMonth(SqlCommand cmd, DateTime month, string keyword)
+        private static void AddMonth(SqlCommand cmd, DateTime? month, string keyword)
         {
-            var m = new DateTime(month.Year, month.Month, 1);
+            var m = month.HasValue ? new DateTime(month.Value.Year, month.Value.Month, 1) : new DateTime(1900, 1, 1);
             cmd.Parameters.Add("@from", SqlDbType.Date).Value = m;
-            cmd.Parameters.Add("@to", SqlDbType.Date).Value = m.AddMonths(1);
+            cmd.Parameters.Add("@to", SqlDbType.Date).Value = month.HasValue ? m.AddMonths(1) : new DateTime(9999, 12, 1);
             cmd.Parameters.Add("@key", SqlDbType.NVarChar, 200).Value = (keyword ?? "").Trim();
         }
 
@@ -164,18 +168,22 @@ namespace CIMS.Services
             ProductName = r.GetString(3),
             Forecast = Convert.ToDecimal(r[4]),
             Order = Convert.ToDecimal(r[5]),
-            Delivery = Convert.ToDecimal(r[6])
+            Delivery = Convert.ToDecimal(r[6]),
+            Month = r.GetDateTime(7)
         };
 
-        // 📤 Export ทุกรายการของเดือน (ตามคำค้นหา) -> Desktop\CIMS_Export\Forecast Order\ForecastOrder_yyyy-MM_<วัน-เดือน-ปี-เวลา>.xlsx
+        // 📤 Export เดือนที่เลือก (ตามคำค้นหา) 1 เดือน = 1 ชีท (ชื่อชีท JAN 2026) -> Desktop\CIMS_Export\Forecast Order\ForecastOrder_<เดือน>_<วัน-เดือน-ปี-เวลา>.xlsx
         //   ใช้แม่แบบบน Shared Folder: หาคอลัมน์จากหัวตาราง (NO / PART A / PART NO / PRODUCT NAME / FORECAST / ORDER / DELIVERY)
         //   แม่แบบไม่มีคอลัมน์ครบ -> สร้างหัวตาราง 7 คอลัมน์ใหม่ด้วยรูปแบบเดียวกับแม่แบบ
         //   ข้อมูลเกินแถวในแม่แบบ -> สร้างแถวเพิ่มด้วยรูปแบบแถวแรกของแม่แบบ / ค่าเป็น Value จัดกึ่งกลาง / คั่นกลุ่มด้วยแถวชื่อลูกค้า
-        public string Export(DateTime month, string keyword, out int count)
+        public string Export(IList<DateTime> months, string keyword, out int count)
         {
-            var rows = GetRows(month, keyword, 0, int.MaxValue / 2);
-            count = rows.Count;
-            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Forecast, "ForecastOrder_" + month.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+            months = months.Select(m => new DateTime(m.Year, m.Month, 1)).Distinct().OrderBy(m => m).ToList();
+            var byMonth = months.Select(m => (Month: m, Rows: GetRows(m, keyword, 0, int.MaxValue / 2))).ToList();
+            count = byMonth.Sum(x => x.Rows.Count);
+            string Ym(DateTime m) => m.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+            string name = months.Count == 1 ? Ym(months[0]) : $"{Ym(months[0])}_to_{Ym(months[months.Count - 1])}_{months.Count}months";
+            string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.Forecast, "ForecastOrder_" + name);
 
             string[] heads = { "NO", "PART A", "PART NO", "PRODUCT NAME", "FORECAST", "ORDER", "DELIVERY" };
             XLWorkbook wb = null;
@@ -258,6 +266,22 @@ namespace CIMS.Services
             }
 
             int firstCol = col.Values.Min(), lastCol = col.Values.Max();
+            // ชีทหัวตารางว่างที่เตรียมไว้ -> คัดลอกเป็นชีทของเดือนอื่น ๆ ก่อนใส่ข้อมูล (รูปแบบเดียวกันทุกชีท)
+            string SheetName(DateTime m) => m.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
+            var sheets = new List<IXLWorksheet> { ws };
+            for (int i = 1; i < byMonth.Count; i++) sheets.Add(ws.CopyTo(SheetName(byMonth[i].Month)));
+            ws.Name = SheetName(byMonth[0].Month);
+            for (int i = 0; i < byMonth.Count; i++) { FillSheet(sheets[i], byMonth[i].Rows, col, headerRow, cellStyle, rowHeight); sheets[i].SheetView.FreezeRows(headerRow); }
+            if (original != null) { ws.Position = 1; original.Delete(); }   // ลบชีทแม่แบบเดิมหลังใส่ข้อมูลครบ (รูปแบบที่ยืมมายังอ้างอิงชีทนี้อยู่)
+            ws.SetTabActive();
+            wb.SaveAs(path);
+            wb.Dispose();
+            return path;
+        }
+
+        private static void FillSheet(IXLWorksheet ws, List<ForecastOrderRow> rows, Dictionary<string, int> col, int headerRow, IXLStyle cellStyle, double rowHeight)
+        {
+            int firstCol = col.Values.Min(), lastCol = col.Values.Max();
             int rowNo = headerRow + 1;
             foreach (var g in rows.GroupBy(x => x.GroupKey))
             {
@@ -301,11 +325,6 @@ namespace CIMS.Services
                     rowNo++;
                 }
             }
-            ws.SheetView.FreezeRows(headerRow);
-            if (original != null) { ws.Position = 1; original.Delete(); }
-            wb.SaveAs(path);
-            wb.Dispose();
-            return path;
         }
 
         private static string Norm(string s) => new string((s ?? "").Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();

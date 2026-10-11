@@ -502,6 +502,14 @@ namespace CIMS.Services
             return DateTime.TryParseExact(c.GetString().Trim(), fmts, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
         }
 
+        // หน้าต่างเลือกรูปแบบ Import Forecast (หน้า Forecast / Order และหน้า Max-Min Calculator ใช้ข้อความเดียวกัน)
+        public const string ImportChoiceTitle = "IMPORT FORECAST";
+        public const string ImportChoiceCalc = "📥 IMPORT + คำนวณ MAX / MIN AUTO";
+        public const string ImportChoiceOnly = "📥 IMPORT อย่างเดียว (ไม่คำนวณ)";
+        public const string ImportChoiceText = "เลือกรูปแบบการนำเข้า Forecast / Order / Delivery\n\n" +
+            "• คำนวณ MAX / MIN AUTO: แบบเดิม ต้องมี CUSTOMER ทุกแถว นำเข้าแล้วคำนวณคลังที่เปิด AUTO CALC ทันที\n\n" +
+            "• IMPORT อย่างเดียว: ไม่คำนวณ MAX / MIN / CUSTOMER ว่างได้ ระบบหาจาก PART NO → PRODUCT NAME → PART A ของสินค้าในระบบ / ช่องตัวเลขว่าง = 0";
+
         // 📊 FORECAST / ORDER / DELIVERY: (CUSTOMER) + PART A / PART NO / PRODUCT NAME + MONTH + FORECAST / ORDER / DELIVERY (+ WORK DAYS)
         //    findCustomer = false (Import + คำนวณ MAX / MIN): ต้องมี CUSTOMER ทุกแถว (แบบเดิม) / PART NO ว่าง = ใช้ PART A
         //    findCustomer = true  (Import อย่างเดียว): CUSTOMER ว่าง -> หาสินค้าจาก PART NO -> PRODUCT NAME -> PART A แล้วใช้ CUSTOMER ของสินค้านั้น / เจอหลายลูกค้า = ข้ามแถว (ไม่เดา)
@@ -772,7 +780,7 @@ namespace CIMS.Services
                     ["CUST"] = CustH,
                     ["DMAX"] = new[] { "MAXDAY", "MAXDAYS" }, ["DMIN"] = new[] { "MINDAY", "MINDAYS" },
                     ["BMAX"] = new[] { "MAXBOX" }, ["BMIN"] = new[] { "MINBOX" },
-                    ["FC"] = FcH, ["ORD"] = OrdH, ["DLV"] = DelH
+                    ["FC"] = FcH, ["ORD"] = OrdH, ["DLV"] = DelH, ["MON"] = MonthH
                 };
                 string[] dataKeys = { "DMAX", "DMIN", "BMAX", "BMIN", "FC", "ORD", "DLV" };
                 foreach (var row in ws.RowsUsed().Take(10))
@@ -787,6 +795,8 @@ namespace CIMS.Services
                     if ((cols.ContainsKey("PART") || cols.ContainsKey("NAME")) && dataKeys.Any(cols.ContainsKey)) { header = row.RowNumber(); break; }
                 }
                 if (header == 0) return null;
+                // มีคอลัมน์ MONTH = ไฟล์ Template FORECAST / ORDER / DELIVERY -> ใช้ตัวอ่าน Forecast (อ่านเดือน + WORK DAYS ในไฟล์)
+                if (cols.ContainsKey("MON") && !new[] { "DMAX", "DMIN", "BMAX", "BMIN" }.Any(cols.ContainsKey)) return null;
 
                 var rows = new List<CalcImportRow>();
                 int last = ws.LastRowUsed()?.RowNumber() ?? header;
