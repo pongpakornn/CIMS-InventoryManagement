@@ -110,6 +110,7 @@ namespace CIMS.Models
         public int PtId { get; set; }
         public string Error { get; set; }
         public bool IsValid => string.IsNullOrEmpty(Error);
+        public string PartA { get; set; }  // Forecast: คอลัมน์ PART A (ตัวช่วยหาสินค้า เมื่อ PART NO / PRODUCT NAME หาไม่เจอ)
         public string Note { get; set; }   // Forecast: CUSTOMER / PART NO ที่ระบบหาให้จากสินค้าในระบบ
 
         // ไฟล์รูปแบบ Max-MinCal (NO / PART NO / PRODUCT NAME / MAX(DAY) / MIN(DAY) / MAX(BOX) / MIN(BOX) / FORECAST / ORDER / DELIVERY)

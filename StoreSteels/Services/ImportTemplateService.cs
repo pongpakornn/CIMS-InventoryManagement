@@ -268,7 +268,7 @@ namespace CIMS.Services
         }
 
         // ---------------------------------------------------------------- Forecast / Order / Delivery
-        public static readonly string[] ForecastHeads = { "NO", "CUSTOMER", "PART NO", "PRODUCT NAME", "MONTH", "FORECAST", "ORDER", "DELIVERY", "WORK DAYS" };
+        public static readonly string[] ForecastHeads = { "NO", "CUSTOMER", "PART A", "PART NO", "PRODUCT NAME", "MONTH", "FORECAST", "ORDER", "DELIVERY", "WORK DAYS" };
 
         // rows = ข้อมูลเดือนนั้นที่มีอยู่แล้ว (แก้ตัวเลขแล้ว Import กลับได้เลย) / ไม่มี = แถวว่าง
         public void CreateForecastTemplate(string path, DateTime month, IList<ForecastOrderRow> rows)
@@ -276,29 +276,32 @@ namespace CIMS.Services
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.AddWorksheet("FORECAST ORDER");
-                Header(ws, ForecastHeads, new double[] { 6.4, 16, 22, 36, 12, 14, 14, 14, 12 });
+                Header(ws, ForecastHeads, new double[] { 6.4, 16, 20, 22, 36, 12, 14, 14, 14, 12 });
                 string mon = month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
                 int r = 2;
                 foreach (var x in rows ?? new List<ForecastOrderRow>())
                 {
                     ws.Cell(r, 1).Value = r - 1;
                     ws.Cell(r, 2).Value = x.Customer;
-                    ws.Cell(r, 3).Value = x.PartNo;
-                    ws.Cell(r, 4).Value = x.ProductName;
-                    ws.Cell(r, 5).Value = mon;
-                    ws.Cell(r, 6).Value = x.Forecast;
-                    ws.Cell(r, 7).Value = x.Order;
-                    ws.Cell(r, 8).Value = x.Delivery;
+                    ws.Cell(r, 3).Value = x.PartA;
+                    ws.Cell(r, 4).Value = x.PartNo;
+                    ws.Cell(r, 5).Value = x.ProductName;
+                    ws.Cell(r, 6).Value = mon;
+                    ws.Cell(r, 7).Value = x.Forecast;
+                    ws.Cell(r, 8).Value = x.Order;
+                    ws.Cell(r, 9).Value = x.Delivery;
                     r++;
                 }
                 int last = Math.Max(r - 1, 31);   // แถวว่างพร้อมเส้นตารางให้กรอกต่อ (ไม่ใส่เลข NO ในแถวว่าง)
                 Body(ws, last, ForecastHeads.Length);
-                ws.Range(2, 5, last, 5).Style.NumberFormat.Format = "@";   // MONTH เป็นข้อความ 2026-10 (Excel ไม่แปลงเป็นวันที่)
-                ws.Range(2, 6, last, 8).Style.NumberFormat.Format = "#,##0";
+                ws.Range(2, 3, last, 4).Style.NumberFormat.Format = "@";   // PART A / PART NO เป็นข้อความ (เลขนำหน้า 0 ไม่หาย)
+                ws.Range(2, 6, last, 6).Style.NumberFormat.Format = "@";   // MONTH เป็นข้อความ 2026-10 (Excel ไม่แปลงเป็นวันที่)
+                ws.Range(2, 7, last, 9).Style.NumberFormat.Format = "#,##0";
 
                 Guide(wb, "CIMS - Import Forecast / Order / Delivery", new[]
                 {
-                    ("CUSTOMER", "รหัสลูกค้า - IMPORT + คำนวณ MAX / MIN AUTO: บังคับทุกแถว / IMPORT อย่างเดียว: ว่างได้ ระบบหาจาก PART NO (หรือ PRODUCT NAME) ของสินค้าในระบบ (PART NO มีหลายลูกค้า = ต้องใส่)"),
+                    ("CUSTOMER", "รหัสลูกค้า - IMPORT + คำนวณ MAX / MIN AUTO: บังคับทุกแถว / IMPORT อย่างเดียว: ว่างได้ ระบบหาสินค้าตามลำดับ PART NO -> PRODUCT NAME -> PART A แล้วใช้ CUSTOMER ของสินค้านั้น (หาแล้วยังมีหลายลูกค้า = ต้องใส่)"),
+                    ("PART A", "PART A ของสินค้า - ตัวช่วยหาสินค้าอีกชั้น เมื่อ PART NO / PRODUCT NAME หาไม่เจอหรือเจอหลายลูกค้า / PART NO ว่าง = ใช้ PART A เป็นรหัสสินค้า"),
                     ("PART NO", "รหัสสินค้าของลูกค้า: PART A / PART NO / PRODUCT CODE อย่างใดอย่างหนึ่ง (ว่าง + มี CUSTOMER = ยอดรวมของลูกค้า)"),
                     ("PRODUCT NAME", "ชื่อสินค้า - IMPORT อย่างเดียว: ใช้หาสินค้าเมื่อไม่ได้ใส่ PART NO (ชื่อต้องตรงกับในระบบทั้งคำ)"),
                     ("MONTH", $"เดือนของยอด เช่น {mon} (หรือ 10/2026, Oct 2026) - ว่าง = เดือนปัจจุบัน"),

@@ -281,7 +281,7 @@ namespace CIMS.Views
             if (_session?.CanImportForecastOrder != true) return;
             int mode = DialogHelper.ShowChoice("เลือกรูปแบบการนำเข้า Forecast / Order / Delivery\n\n" +
                 "• คำนวณ MAX / MIN AUTO: แบบเดิม ต้องมี CUSTOMER ทุกแถว นำเข้าแล้วคำนวณคลังที่เปิด AUTO CALC ทันที\n\n" +
-                "• IMPORT อย่างเดียว: ไม่คำนวณ MAX / MIN / CUSTOMER ว่างได้ ระบบหาจาก PART NO (หรือ PRODUCT NAME) ของสินค้าในระบบ / ช่องตัวเลขว่าง = 0",
+                "• IMPORT อย่างเดียว: ไม่คำนวณ MAX / MIN / CUSTOMER ว่างได้ ระบบหาจาก PART NO → PRODUCT NAME → PART A ของสินค้าในระบบ / ช่องตัวเลขว่าง = 0",
                 "IMPORT FORECAST", "📥 IMPORT + คำนวณ MAX / MIN AUTO", "📥 IMPORT อย่างเดียว (ไม่คำนวณ)");
             if (mode == 0) return;
             bool withCalc = mode == 1;
