@@ -507,43 +507,39 @@ namespace CIMS.Services
         public const string ImportChoiceCalc = "📥 IMPORT + คำนวณ MAX / MIN AUTO";
         public const string ImportChoiceOnly = "📥 IMPORT อย่างเดียว (ไม่คำนวณ)";
         public const string ImportChoiceText = "เลือกรูปแบบการนำเข้า Forecast / Order / Delivery\n\n" +
-            "• คำนวณ MAX / MIN AUTO: แบบเดิม ต้องมี CUSTOMER ทุกแถว นำเข้าแล้วคำนวณคลังที่เปิด AUTO CALC ทันที\n\n" +
-            "• IMPORT อย่างเดียว: ไม่คำนวณ MAX / MIN / CUSTOMER ว่างได้ ระบบหาจาก PART NO → PRODUCT NAME → PART A ของสินค้าในระบบ / ช่องตัวเลขว่าง = 0";
+            "• คำนวณ MAX / MIN AUTO: นำเข้าแล้วคำนวณคลังที่เปิด AUTO CALC ทันที\n\n" +
+            "• IMPORT อย่างเดียว: นำเข้าอย่างเดียว ไม่คำนวณ MAX / MIN\n\n" +
+            "ทั้งสองแบบ: ระบบตรวจสอบสินค้าด้วย PART A อย่างเดียว · CUSTOMER / PART NO / ชื่อสินค้า ใช้ข้อมูลในระบบ · ช่องตัวเลขว่าง = 0";
 
-        // 📊 FORECAST / ORDER / DELIVERY: (CUSTOMER) + PART A / PART NO / PRODUCT NAME + MONTH + FORECAST / ORDER / DELIVERY (+ WORK DAYS)
-        //    findCustomer = false (Import + คำนวณ MAX / MIN): ต้องมี CUSTOMER ทุกแถว (แบบเดิม) / PART NO ว่าง = ใช้ PART A
-        //    findCustomer = true  (Import อย่างเดียว): CUSTOMER ว่าง -> หาสินค้าจาก PART NO -> PRODUCT NAME -> PART A แล้วใช้ CUSTOMER ของสินค้านั้น / เจอหลายลูกค้า = ข้ามแถว (ไม่เดา)
-        public List<CalcImportRow> ReadForecastExcel(string path, bool findCustomer = false)
+        // 📊 FORECAST / ORDER / DELIVERY: PART A + MONTH + FORECAST / ORDER / DELIVERY (+ WORK DAYS)
+        //    PART A เป็นเลขเฉพาะของสินค้า -> ตรวจสอบด้วย PART A อย่างเดียว แล้วใช้ CUSTOMER / PART A ของสินค้าในระบบ
+        //    ช่อง CUSTOMER / PART NO / PRODUCT NAME ในไฟล์ไม่ใช้จับคู่ (ไว้ดูเท่านั้น) / ไม่มี PART A หรือหาไม่เจอ = ข้ามแถวพร้อมเหตุผล
+        public List<CalcImportRow> ReadForecastExcel(string path)
         {
             var rows = new List<CalcImportRow>();
             using (var wb = OpenBook(path))
             {
-                // PA ก่อน PART: หัว "PART A" ลงคอลัมน์ PA / ไฟล์เก่าที่มีแค่ PART A ก็ยังอ่านได้ (ใช้เป็นรหัสสินค้า)
+                // PA ก่อน PART: หัว "PART A" ลงคอลัมน์ PA
                 var want = new Dictionary<string, string[]> { ["CUST"] = CustH, ["PA"] = new[] { "PARTA" }, ["PART"] = PartH, ["NAME"] = NameH, ["MONTH"] = MonthH, ["YEAR"] = YearH, ["FC"] = FcH, ["ORD"] = OrdH, ["DLV"] = DelH, ["WD"] = WdH };
-                var (ws, header, cols) = findCustomer
-                    ? OpenSheet(path, want, new[] { "CUSTOMER / PART A / PART NO / PRODUCT NAME", "FORECAST / ORDER / DELIVERY" }, wb,
-                                c => (c.ContainsKey("CUST") || c.ContainsKey("PA") || c.ContainsKey("PART") || c.ContainsKey("NAME")) && (c.ContainsKey("FC") || c.ContainsKey("ORD") || c.ContainsKey("DLV")))
-                    : OpenSheet(path, want, new[] { "CUST" }, wb);
-                if (!cols.ContainsKey("FC") && !cols.ContainsKey("ORD") && !cols.ContainsKey("DLV"))
-                    throw new InvalidDataException("ไม่พบคอลัมน์ FORECAST / ORDER / DELIVERY ในไฟล์ Excel");
+                IXLWorksheet ws; int header; Dictionary<string, int> cols;
+                try { (ws, header, cols) = OpenSheet(path, want, new[] { "PART A", "FORECAST / ORDER / DELIVERY" }, wb, c => c.ContainsKey("PA") && (c.ContainsKey("FC") || c.ContainsKey("ORD") || c.ContainsKey("DLV"))); }
+                catch (InvalidDataException) { throw new InvalidDataException("ไม่พบคอลัมน์ PART A ในไฟล์ Excel\nระบบตรวจสอบสินค้าด้วย PART A อย่างเดียว (ใช้ไฟล์จากปุ่ม TEMPLATE EXCEL)"); }
 
                 int last = ws.LastRowUsed()?.RowNumber() ?? header;
                 for (int r = header + 1; r <= last; r++)
                 {
                     IXLCell Cell(string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c) : null;
                     string Text(string k) => Cell(k)?.GetString().Trim() ?? "";
-                    string cust = Text("CUST"), pa = Text("PA"), part = Text("PART"), name = Text("NAME");
                     if (ws.Row(r).IsEmpty()) continue;
+                    string pa = Text("PA");
                     // แถวว่างที่มีแค่เลข NO (ไฟล์ Template) -> ข้าม ไม่นับเป็นแถวผิด
-                    if (cust.Length == 0 && pa.Length == 0 && part.Length == 0 && name.Length == 0 && new[] { "FC", "ORD", "DLV" }.All(k => Cell(k) == null || Cell(k).IsEmpty())) continue;
+                    if (pa.Length == 0 && new[] { "CUST", "PART", "NAME", "FC", "ORD", "DLV" }.All(k => Cell(k) == null || Cell(k).IsEmpty())) continue;
 
-                    var item = new CalcImportRow { RowNumber = r, Customer = cust, PartA = pa, Part = part, PartName = name };
-                    if (!findCustomer && part.Length == 0) item.Part = pa;   // แบบเดิม: PART NO ว่าง = ใช้ PART A เป็นรหัสสินค้า
+                    var item = new CalcImportRow { RowNumber = r, Customer = Text("CUST"), PartA = pa, Part = pa, PartName = Text("NAME") };
                     int? year = null;
                     if (Cell("YEAR") != null && int.TryParse(Cell("YEAR").GetString().Trim(), out int y)) year = y;
 
-                    if (!findCustomer && cust.Length == 0) item.Error = "ไม่มีชื่อลูกค้า";
-                    else if (cust.Length == 0 && pa.Length == 0 && part.Length == 0 && name.Length == 0) item.Error = "ไม่มี CUSTOMER / PART A / PART NO / PRODUCT NAME";
+                    if (pa.Length == 0) item.Error = "ไม่มี PART A";
                     else if (!TryMonth(Cell("MONTH"), year, out DateTime mon)) item.Error = $"เดือนไม่ถูกต้อง ({Cell("MONTH")?.GetString()})";
                     else
                     {
@@ -559,110 +555,37 @@ namespace CIMS.Services
                     rows.Add(item);
                 }
             }
-            FixForecastRows(rows, findCustomer);
+            MatchByPartA(rows);
             return rows;
         }
 
-        // หา CUSTOMER / รหัสสินค้า จากสินค้าในระบบ (CIMS.Parts) ให้แถวที่ไม่ได้กรอก - ลำดับ: PART NO -> PRODUCT NAME -> PART A
-        //   PART NO เทียบกับ PART A / PART NO / PRODUCT CODE · PRODUCT NAME เทียบกับชื่อสินค้า · PART A เทียบกับ PART A (ตรงทั้งคำ ไม่สนตัวพิมพ์)
-        //   ขั้นไหนเจอหลายลูกค้า: ใช้ช่องอื่น (ชื่อ / PART A) กรองก่อน ยังไม่ชัด -> ไปขั้นถัดไป / ทุกขั้นไม่ชัด = ข้ามแถว (ไม่เดา)
-        //   + CUSTOMER ที่เป็น PART A (Template เก่าที่ไม่มีคอลัมน์ PART A) / รหัสสินค้าเก็บแบบเดียวกันเสมอ
-        private void FixForecastRows(List<CalcImportRow> rows, bool findCustomer)
+        // จับคู่สินค้าด้วย PART A (ตรงทั้งคำ ไม่สนตัวพิมพ์) -> CUSTOMER + PART A ของสินค้าในระบบ
+        //   Note = CUSTOMER ในไฟล์ไม่ตรงกับระบบ (ใช้ของระบบ)
+        private void MatchByPartA(List<CalcImportRow> rows)
         {
             if (!rows.Any(x => x.IsValid)) return;
-
-            var parts = new List<(string Cust, string A, string No, string Code, string Name)>();
+            var parts = new Dictionary<string, List<(string Cust, string A)>>(StringComparer.OrdinalIgnoreCase);
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(@"SELECT LTRIM(RTRIM(ISNULL(Customer, ''))), LTRIM(RTRIM(ISNULL(PartA, ''))), LTRIM(RTRIM(ISNULL(PartNumber, ''))),
-                                                     LTRIM(RTRIM(ISNULL(PartCode, ''))), LTRIM(RTRIM(ISNULL(Description, ''))) FROM CIMS.Parts", conn))
+            using (var cmd = new SqlCommand("SELECT LTRIM(RTRIM(ISNULL(Customer, ''))), LTRIM(RTRIM(PartA)) FROM CIMS.Parts WHERE ISNULL(LTRIM(RTRIM(PartA)), '') <> ''", conn))
             {
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
-                    while (r.Read()) parts.Add((r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4)));
+                    while (r.Read())
+                    {
+                        string a = r.GetString(1);
+                        if (!parts.TryGetValue(a, out var l)) parts[a] = l = new List<(string, string)>();
+                        l.Add((r.GetString(0), a));
+                    }
             }
-            bool Same(string a, string b) => !string.IsNullOrEmpty(a) && string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
-            string Key(string a, string no, string code) => a.Length > 0 ? a : no.Length > 0 ? no : code;   // รหัสที่ใช้เก็บ (จับคู่ตอนคำนวณได้)
-
-            // CUSTOMER ที่กรอกไม่ใช่ลูกค้าในระบบ แต่เป็น PART A ของสินค้า (เช่น Template เก่าที่ไม่มีคอลัมน์ PART A แล้วใส่ PART A ในช่อง CUSTOMER)
-            //   IMPORT อย่างเดียว = ย้ายไปเป็น PART A แล้วหาลูกค้าให้ / IMPORT + คำนวณ = ข้ามแถว (ต้องมี CUSTOMER จริง)
-            var custSet = new HashSet<string>(parts.Select(p => p.Cust).Where(c => c.Length > 0), StringComparer.OrdinalIgnoreCase);
-            foreach (var x in rows.Where(x => x.IsValid && x.Customer.Length > 0 && !custSet.Contains(x.Customer) && parts.Any(p => Same(x.Customer, p.A))))
+            foreach (var x in rows.Where(v => v.IsValid))
             {
-                if (!findCustomer) { x.Error = $"CUSTOMER {x.Customer} ไม่ใช่ลูกค้าในระบบ (เป็น PART A) - ใส่ CUSTOMER ให้ถูก หรือเลือก IMPORT อย่างเดียว"; continue; }
-                if (string.IsNullOrEmpty(x.PartA)) x.PartA = x.Customer;
-                x.Customer = "";
-            }
-
-            var need = findCustomer ? rows.Where(x => x.IsValid && (x.Customer.Length == 0 || x.Part.Length == 0)).ToList() : new List<CalcImportRow>();
-            foreach (var x in need)
-            {
-                bool custGiven = x.Customer.Length > 0;
-                var pool = custGiven ? parts.Where(p => Same(p.Cust, x.Customer)).ToList() : parts;
-                // สินค้าที่เจอ -> (ลูกค้า, รหัส) ไม่ซ้ำ / เจอหลายตัว: กรองด้วยชื่อ แล้วด้วย PART A
-                // PART A ที่กรอกมามีในระบบ = ตัวสินค้าชัดที่สุด: ขั้น PART NO / PRODUCT NAME ต้องได้สินค้าตัวนั้น (ไม่ตรง = ไปใช้ขั้น PART A)
-                bool paKnown = !string.IsNullOrEmpty(x.PartA) && pool.Any(p => Same(x.PartA, p.A));
-                List<(string Cust, string Key)> Narrow(List<(string Cust, string A, string No, string Code, string Name)> hit, string keep)
-                {
-                    if (paKnown) hit = hit.Where(p => Same(x.PartA, p.A)).ToList();
-                    List<(string Cust, string Key)> K(IEnumerable<(string Cust, string A, string No, string Code, string Name)> h) =>
-                        h.Where(p => p.Cust.Length > 0).Select(p => (p.Cust, Key: keep ?? Key(p.A, p.No, p.Code))).Where(k => k.Key.Length > 0)
-                         .GroupBy(k => (k.Cust.ToUpperInvariant(), k.Key.ToUpperInvariant())).Select(g => g.First()).ToList();
-                    var keys = K(hit);
-                    if (keys.Count > 1 && !string.IsNullOrEmpty(x.PartName) && hit.Any(p => Same(x.PartName, p.Name))) { hit = hit.Where(p => Same(x.PartName, p.Name)).ToList(); keys = K(hit); }
-                    if (keys.Count > 1 && !string.IsNullOrEmpty(x.PartA) && hit.Any(p => Same(x.PartA, p.A))) { hit = hit.Where(p => Same(x.PartA, p.A)).ToList(); keys = K(hit); }
-                    return keys;
-                }
-                string Custs(List<(string Cust, string Key)> k) => string.Join(", ", k.Select(v => v.Cust).Distinct(StringComparer.OrdinalIgnoreCase).Take(3));
-                bool Done(List<(string Cust, string Key)> k, string from)
-                {
-                    if (k.Count != 1) return false;
-                    x.Note = (custGiven ? "PART NO" : "CUSTOMER") + " จาก " + from;
-                    x.Customer = k[0].Cust; x.Part = k[0].Key;
-                    return true;
-                }
-                var why = new List<string>();
-
-                // 1) PART NO (เก็บรหัสตามที่กรอก)
-                if (x.Part.Length > 0)
-                {
-                    var hit = pool.Where(p => Same(x.Part, p.A) || Same(x.Part, p.No) || Same(x.Part, p.Code)).ToList();
-                    var k = Narrow(hit, x.Part);
-                    if (Done(k, "PART NO")) continue;
-                    why.Add(k.Count > 1 ? $"PART NO {x.Part} มี {k.Count} ลูกค้า ({Custs(k)})" : hit.Count > 0 ? $"สินค้า {x.Part} ในระบบไม่มี CUSTOMER" : $"ไม่พบ PART NO {x.Part}");
-                }
-                // 2) PRODUCT NAME
-                if (!string.IsNullOrEmpty(x.PartName))
-                {
-                    var k = Narrow(pool.Where(p => Same(x.PartName, p.Name)).ToList(), null);
-                    if (Done(k, "PRODUCT NAME")) continue;
-                    why.Add(k.Count > 1 ? $"PRODUCT NAME ตรงกับสินค้า {k.Count} รายการ" : $"ไม่พบ PRODUCT NAME \"{x.PartName}\"");
-                }
-                // 3) PART A
-                if (!string.IsNullOrEmpty(x.PartA))
-                {
-                    var k = Narrow(pool.Where(p => Same(x.PartA, p.A)).ToList(), null);
-                    if (Done(k, "PART A")) continue;
-                    why.Add(k.Count > 1 ? $"PART A {x.PartA} มี {k.Count} ลูกค้า ({Custs(k)})" : $"ไม่พบ PART A {x.PartA}");
-                }
-
-                if (custGiven)
-                {
-                    // มี CUSTOMER แต่หาสินค้าไม่เจอ: มี PART A = ใช้เป็นรหัสสินค้า / ไม่มี = ยอดรวมของลูกค้า (เหมือนเดิม)
-                    if (x.Part.Length == 0 && !string.IsNullOrEmpty(x.PartA)) x.Part = x.PartA;
-                    continue;
-                }
-                x.Error = string.Join(" / ", why) + " - กรุณาใส่ CUSTOMER";
-            }
-
-            // รหัสสินค้าเก็บแบบเดียวกันเสมอ (PART A ของสินค้า > PART NO > PRODUCT CODE): Import ซ้ำด้วย PART NO หรือ PART A ก็แทนที่แถวเดิม ไม่เกิดแถวซ้ำ
-            foreach (var x in rows.Where(x => x.IsValid && x.Customer.Length > 0 && x.Part.Length > 0))
-            {
-                // PART A ที่กรอกมาเป็นสินค้าของลูกค้านี้ = ใช้ PART A นั้น (PART NO เดียวกันอาจมีหลายสินค้า)
-                var own = parts.FirstOrDefault(p => Same(p.Cust, x.Customer) && Same(x.PartA, p.A));
-                if (own.A != null) { x.Part = own.A; continue; }
-                var keys = parts.Where(p => Same(p.Cust, x.Customer) && (Same(x.Part, p.A) || Same(x.Part, p.No) || Same(x.Part, p.Code)))
-                                .Select(p => Key(p.A, p.No, p.Code)).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (keys.Count == 1) x.Part = keys[0];
+                if (!parts.TryGetValue(x.PartA, out var hit)) { x.Error = $"ไม่พบ PART A {x.PartA} ในระบบ"; continue; }
+                var custs = hit.Select(h => h.Cust).Where(c => c.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (custs.Count == 0) { x.Error = $"สินค้า PART A {x.PartA} ในระบบไม่มี CUSTOMER"; continue; }
+                if (custs.Count > 1) { x.Error = $"PART A {x.PartA} มีหลายสินค้าในระบบ ({string.Join(", ", custs.Take(3))})"; continue; }
+                if (x.Customer.Length > 0 && !string.Equals(x.Customer, custs[0], StringComparison.OrdinalIgnoreCase)) x.Note = $"CUSTOMER {x.Customer} -> {custs[0]}";
+                x.Customer = custs[0];
+                x.Part = hit[0].A;   // รหัสที่เก็บ = PART A ของระบบ
             }
         }
 
