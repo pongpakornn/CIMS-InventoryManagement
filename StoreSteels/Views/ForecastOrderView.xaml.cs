@@ -273,15 +273,23 @@ namespace CIMS.Views
             finally { btnTemplate.IsEnabled = true; }
         }
 
-        // 📥 Import (แบบเดียวกับหน้า Max-Min Calculator): เดือน / ลูกค้า / สินค้าเดิมถูกแทนที่ แล้วคำนวณคลังที่เปิด AUTO CALC
+        // 📥 Import: เดือน / ลูกค้า / สินค้าเดิมถูกแทนที่ - กดแล้วเลือก 2 แบบ
+        //   1) IMPORT + คำนวณ MAX / MIN AUTO = แบบเดิม (ต้องมี CUSTOMER ทุกแถว แล้วคำนวณคลังที่เปิด AUTO CALC)
+        //   2) IMPORT อย่างเดียว = ไม่คำนวณ / CUSTOMER ว่างได้ (ระบบหาจาก PART NO หรือ PRODUCT NAME ของสินค้าในระบบ)
         private async void Import_Click(object sender, RoutedEventArgs e)
         {
             if (_session?.CanImportForecastOrder != true) return;
+            int mode = DialogHelper.ShowChoice("เลือกรูปแบบการนำเข้า Forecast / Order / Delivery\n\n" +
+                "• คำนวณ MAX / MIN AUTO: แบบเดิม ต้องมี CUSTOMER ทุกแถว นำเข้าแล้วคำนวณคลังที่เปิด AUTO CALC ทันที\n\n" +
+                "• IMPORT อย่างเดียว: ไม่คำนวณ MAX / MIN / CUSTOMER ว่างได้ ระบบหาจาก PART NO (หรือ PRODUCT NAME) ของสินค้าในระบบ / ช่องตัวเลขว่าง = 0",
+                "IMPORT FORECAST", "📥 IMPORT + คำนวณ MAX / MIN AUTO", "📥 IMPORT อย่างเดียว (ไม่คำนวณ)");
+            if (mode == 0) return;
+            bool withCalc = mode == 1;
             var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Import Forecast & Order & Delivery", Filter = "Excel Files (*.xlsx)|*.xlsx" };
             if (dlg.ShowDialog() != true) return;
             var calc = new MaxMinCalcService();
             List<CalcImportRow> rows;
-            try { rows = await Task.Run(() => calc.ReadForecastExcel(dlg.FileName)); }
+            try { rows = await Task.Run(() => calc.ReadForecastExcel(dlg.FileName, findCustomer: !withCalc)); }
             catch (Exception ex) { DialogHelper.ShowError("อ่านไฟล์ Excel ไม่สำเร็จ\n" + ex.Message); return; }
 
             var valid = rows.Where(r => r.IsValid).ToList();
@@ -289,16 +297,26 @@ namespace CIMS.Views
             string errs = string.Join("\n", bad.Take(8).Select(r => $"• แถว {r.RowNumber}: {r.Error}")) + (bad.Count > 8 ? $"\n• ... และอีก {bad.Count - 8:N0} แถว" : "");
             if (valid.Count == 0) { DialogHelper.ShowError("ไม่พบรายการที่นำเข้าได้ในไฟล์นี้\n\n" + errs); return; }
             var months = valid.Select(v => v.Month).Distinct().OrderBy(m => m).ToList();
+            int auto = valid.Count(v => !string.IsNullOrEmpty(v.Note));
             string monthText = string.Join(", ", months.Select(m => m.ToString("MMM yyyy", CultureInfo.InvariantCulture)));
             if (!DialogHelper.ShowConfirm($"ไฟล์: {System.IO.Path.GetFileName(dlg.FileName)}\n\nนำเข้า {valid.Count:N0} แถว  (เดือน: {monthText})\n" +
                                           $"Forecast {valid.Sum(v => v.Forecast):N0}  •  Order {valid.Sum(v => v.Order):N0}  •  Delivery {valid.Sum(v => v.Delivery):N0}\n" +
                                           "ลูกค้า / สินค้า / เดือนเดียวกันที่เคยนำเข้าจะถูกแทนที่" +
-                                          (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{errs}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?", "IMPORT FORECAST / ORDER / DELIVERY")) return;
+                                          (withCalc ? "\n\nแล้วคำนวณ MAX / MIN ของคลังที่เปิด AUTO CALC" : "\n\nนำเข้าอย่างเดียว ไม่คำนวณ MAX / MIN") +
+                                          (auto > 0 ? $"\n\nℹ ระบบหา CUSTOMER / PART NO จากสินค้าในระบบให้ {auto:N0} แถว (แถวที่ไม่ได้กรอก)" : "") +
+                                          (bad.Count > 0 ? $"\n\n⚠ ข้ามแถวที่มีปัญหา {bad.Count:N0} แถว:\n{errs}" : "") + "\n\nยืนยันการนำเข้าหรือไม่?", withCalc ? "IMPORT + คำนวณ MAX / MIN AUTO" : "IMPORT อย่างเดียว")) return;
             try
             {
                 string uid = _session?.UserId;
                 int n = await Task.Run(() => calc.ApplyForecast(rows, uid));
-                LogService.WriteLog(uid, "FORECAST_IMPORT", $"File: {System.IO.Path.GetFileName(dlg.FileName)} | Rows: {n} | Months: {monthText} | Skipped rows: {bad.Count}", "");
+                LogService.WriteLog(uid, "FORECAST_IMPORT", $"File: {System.IO.Path.GetFileName(dlg.FileName)} | Rows: {n} | Months: {monthText} | Skipped rows: {bad.Count}" +
+                                                        (withCalc ? "" : $" | Import only (no MAX / MIN calculate) | Customer / part found by system: {auto}"), "");
+                if (!withCalc)
+                {
+                    NotificationManager.Show("Forecast imported", $"นำเข้าแล้ว {n:N0} แถว (ไม่คำนวณ MAX / MIN)", true);
+                    await LoadMonthsAsync(months.Last());
+                    return;
+                }
                 var r = await Task.Run(() => calc.Calculate(null, null, uid));
                 if (r.Stocks > 0)
                     LogService.WriteLog(uid, "MAXMIN_CALCULATE", $"Auto calculate after forecast import | Stocks: {r.Stocks} | Updated: {r.Updated} | Skipped (no order): {r.Skipped}", "");

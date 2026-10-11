@@ -429,6 +429,7 @@ namespace CIMS.Services
 
         private static readonly string[] CustH = { "CUSTOMER", "CUST", "CUSTOMERCODE", "CUSTCODE", "ลูกค้า" };
         private static readonly string[] PartH = { "PARTA", "PARTNO", "PARTNUMBER", "PDCODE", "PARTCODE", "PRODUCTCODE", "CODE", "ITEMCODE", "รหัสสินค้า" };
+        private static readonly string[] NameH = { "PRODUCTNAME", "PARTNAME", "NAME", "DESCRIPTION", "ชื่อสินค้า" };
         private static readonly string[] MonthH = { "MONTH", "TARGETDATE", "PERIOD", "DATE", "เดือน" };
         private static readonly string[] YearH = { "YEAR", "ปี" };
         private static readonly string[] FcH = { "FORECAST", "FORECASTQTY", "FC" };
@@ -443,7 +444,7 @@ namespace CIMS.Services
             new string((h ?? "").Where(c => !char.IsWhiteSpace(c) && c != '.' && c != '(' && c != ')' && c != '_' && c != '-' && c != '/').ToArray()).ToUpperInvariant();
 
         // หาแถวหัวตาราง: ต้องมีคอลัมน์ที่บังคับครบ
-        private static (IXLWorksheet ws, int header, Dictionary<string, int> cols) OpenSheet(string path, Dictionary<string, string[]> want, string[] required, XLWorkbook wb)
+        private static (IXLWorksheet ws, int header, Dictionary<string, int> cols) OpenSheet(string path, Dictionary<string, string[]> want, string[] required, XLWorkbook wb, Func<Dictionary<string, int>, bool> found = null)
         {
             var ws = wb.Worksheet(1);
             foreach (var row in ws.RowsUsed().Take(10))
@@ -455,7 +456,7 @@ namespace CIMS.Services
                     foreach (var kv in want)
                         if (!cols.ContainsKey(kv.Key) && kv.Value.Contains(h)) { cols[kv.Key] = cell.Address.ColumnNumber; break; }
                 }
-                if (required.All(cols.ContainsKey)) return (ws, row.RowNumber(), cols);
+                if (found != null ? found(cols) : required.All(cols.ContainsKey)) return (ws, row.RowNumber(), cols);
             }
             throw new InvalidDataException("ไม่พบหัวคอลัมน์ในไฟล์ Excel\nต้องมีคอลัมน์: " + string.Join(", ", required) + " (อยู่ใน 10 แถวแรกของชีทแรก)");
         }
@@ -501,14 +502,19 @@ namespace CIMS.Services
             return DateTime.TryParseExact(c.GetString().Trim(), fmts, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
         }
 
-        // 📊 FORECAST / ORDER / DELIVERY: CUSTOMER + (PART) + MONTH + FORECAST / ORDER / DELIVERY (+ WORK DAYS)
-        public List<CalcImportRow> ReadForecastExcel(string path)
+        // 📊 FORECAST / ORDER / DELIVERY: (CUSTOMER) + PART NO / PRODUCT NAME + MONTH + FORECAST / ORDER / DELIVERY (+ WORK DAYS)
+        //    findCustomer = false (Import + คำนวณ MAX / MIN): ต้องมี CUSTOMER ทุกแถว (แบบเดิม)
+        //    findCustomer = true  (Import อย่างเดียว): CUSTOMER ว่าง -> หาสินค้าจาก PART NO (หรือ PRODUCT NAME) แล้วใช้ CUSTOMER ของสินค้านั้น / เจอหลายลูกค้า = ข้ามแถว (ไม่เดา)
+        public List<CalcImportRow> ReadForecastExcel(string path, bool findCustomer = false)
         {
             var rows = new List<CalcImportRow>();
             using (var wb = OpenBook(path))
             {
-                var want = new Dictionary<string, string[]> { ["CUST"] = CustH, ["PART"] = PartH, ["MONTH"] = MonthH, ["YEAR"] = YearH, ["FC"] = FcH, ["ORD"] = OrdH, ["DLV"] = DelH, ["WD"] = WdH };
-                var (ws, header, cols) = OpenSheet(path, want, new[] { "CUST" }, wb);
+                var want = new Dictionary<string, string[]> { ["CUST"] = CustH, ["PART"] = PartH, ["NAME"] = NameH, ["MONTH"] = MonthH, ["YEAR"] = YearH, ["FC"] = FcH, ["ORD"] = OrdH, ["DLV"] = DelH, ["WD"] = WdH };
+                var (ws, header, cols) = findCustomer
+                    ? OpenSheet(path, want, new[] { "CUSTOMER / PART NO / PRODUCT NAME", "FORECAST / ORDER / DELIVERY" }, wb,
+                                c => (c.ContainsKey("CUST") || c.ContainsKey("PART") || c.ContainsKey("NAME")) && (c.ContainsKey("FC") || c.ContainsKey("ORD") || c.ContainsKey("DLV")))
+                    : OpenSheet(path, want, new[] { "CUST" }, wb);
                 if (!cols.ContainsKey("FC") && !cols.ContainsKey("ORD") && !cols.ContainsKey("DLV"))
                     throw new InvalidDataException("ไม่พบคอลัมน์ FORECAST / ORDER / DELIVERY ในไฟล์ Excel");
 
@@ -516,16 +522,18 @@ namespace CIMS.Services
                 for (int r = header + 1; r <= last; r++)
                 {
                     IXLCell Cell(string k) => cols.TryGetValue(k, out int c) ? ws.Cell(r, c) : null;
-                    string cust = Cell("CUST")?.GetString().Trim() ?? "";
-                    if (cust.Length == 0 && ws.Row(r).IsEmpty()) continue;
+                    string Text(string k) => Cell(k)?.GetString().Trim() ?? "";
+                    string cust = Text("CUST"), part = Text("PART"), name = Text("NAME");
+                    if (ws.Row(r).IsEmpty()) continue;
                     // แถวว่างที่มีแค่เลข NO (ไฟล์ Template) -> ข้าม ไม่นับเป็นแถวผิด
-                    if (cust.Length == 0 && new[] { "PART", "FC", "ORD", "DLV" }.All(k => Cell(k) == null || Cell(k).IsEmpty())) continue;
+                    if (cust.Length == 0 && part.Length == 0 && name.Length == 0 && new[] { "FC", "ORD", "DLV" }.All(k => Cell(k) == null || Cell(k).IsEmpty())) continue;
 
-                    var item = new CalcImportRow { RowNumber = r, Customer = cust, Part = Cell("PART")?.GetString().Trim() ?? "" };
+                    var item = new CalcImportRow { RowNumber = r, Customer = cust, Part = part, PartName = name };
                     int? year = null;
                     if (Cell("YEAR") != null && int.TryParse(Cell("YEAR").GetString().Trim(), out int y)) year = y;
 
-                    if (cust.Length == 0) item.Error = "ไม่มีชื่อลูกค้า";
+                    if (!findCustomer && cust.Length == 0) item.Error = "ไม่มีชื่อลูกค้า";
+                    else if (cust.Length == 0 && part.Length == 0 && name.Length == 0) item.Error = "ไม่มี CUSTOMER / PART NO / PRODUCT NAME";
                     else if (!TryMonth(Cell("MONTH"), year, out DateTime mon)) item.Error = $"เดือนไม่ถูกต้อง ({Cell("MONTH")?.GetString()})";
                     else
                     {
@@ -541,7 +549,60 @@ namespace CIMS.Services
                     rows.Add(item);
                 }
             }
+            if (findCustomer) FillForecastCustomers(rows);
             return rows;
+        }
+
+        // หา CUSTOMER / PART NO จากสินค้าในระบบ (CIMS.Parts) ให้แถวที่ไม่ได้กรอก
+        //   PART NO เทียบกับ PART A / PART NO / PRODUCT CODE · PRODUCT NAME เทียบกับชื่อสินค้า (ตรงทั้งคำ ไม่สนตัวพิมพ์)
+        private void FillForecastCustomers(List<CalcImportRow> rows)
+        {
+            var need = rows.Where(x => x.IsValid && (x.Customer.Length == 0 || (x.Part.Length == 0 && !string.IsNullOrEmpty(x.PartName)))).ToList();
+            if (need.Count == 0) return;
+
+            var parts = new List<(string Cust, string A, string No, string Code, string Name)>();
+            using (var conn = new SqlConnection(_cs))
+            using (var cmd = new SqlCommand(@"SELECT LTRIM(RTRIM(ISNULL(Customer, ''))), LTRIM(RTRIM(ISNULL(PartA, ''))), LTRIM(RTRIM(ISNULL(PartNumber, ''))),
+                                                     LTRIM(RTRIM(ISNULL(PartCode, ''))), LTRIM(RTRIM(ISNULL(Description, ''))) FROM CIMS.Parts", conn))
+            {
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read()) parts.Add((r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4)));
+            }
+            bool Same(string a, string b) => !string.IsNullOrEmpty(a) && string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+            string Key(string a, string no, string code) => a.Length > 0 ? a : no.Length > 0 ? no : code;   // รหัสที่ใช้เก็บ (จับคู่ตอนคำนวณได้)
+
+            foreach (var x in need)
+            {
+                bool custGiven = x.Customer.Length > 0;
+                var pool = custGiven ? parts.Where(p => Same(p.Cust, x.Customer)).ToList() : parts;
+                if (x.Part.Length > 0)
+                {
+                    var hit = pool.Where(p => Same(x.Part, p.A) || Same(x.Part, p.No) || Same(x.Part, p.Code)).ToList();
+                    if (hit.Count > 1 && !string.IsNullOrEmpty(x.PartName))
+                    {
+                        var byName = hit.Where(p => Same(x.PartName, p.Name)).ToList();
+                        if (byName.Count > 0) hit = byName;
+                    }
+                    var custs = hit.Select(p => p.Cust).Where(c => c.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    if (custs.Count == 1) { x.Customer = custs[0]; x.Note = "CUSTOMER จาก PART NO"; continue; }
+                    if (custs.Count > 1) { x.Error = $"PART NO {x.Part} มี {custs.Count} ลูกค้า ({string.Join(", ", custs.Take(3))}) - กรุณาใส่ CUSTOMER"; continue; }
+                    if (hit.Count > 0) { x.Error = $"สินค้า {x.Part} ในระบบไม่มี CUSTOMER - กรุณาใส่ CUSTOMER"; continue; }
+                    if (string.IsNullOrEmpty(x.PartName)) { x.Error = $"ไม่พบ PART NO {x.Part} ในระบบ - กรุณาใส่ CUSTOMER"; continue; }
+                }
+                // ไม่มี PART NO (หรือหา PART NO ไม่เจอ) -> หาจาก PRODUCT NAME
+                var keys = pool.Where(p => Same(x.PartName, p.Name))
+                               .Select(p => (p.Cust, Key: Key(p.A, p.No, p.Code))).Where(k => k.Cust.Length > 0 && k.Key.Length > 0)
+                               .Distinct().ToList();
+                if (keys.Count == 1)
+                {
+                    x.Note = custGiven ? "PART NO จาก PRODUCT NAME" : "CUSTOMER + PART NO จาก PRODUCT NAME";
+                    x.Customer = keys[0].Cust; x.Part = keys[0].Key;
+                }
+                else if (keys.Count > 1) x.Error = $"PRODUCT NAME \"{x.PartName}\" ตรงกับสินค้า {keys.Count} รายการ - กรุณาใส่ PART NO" + (custGiven ? "" : " / CUSTOMER");
+                else if (!custGiven) x.Error = $"ไม่พบสินค้า \"{(x.Part.Length > 0 ? x.Part : x.PartName)}\" ในระบบ - กรุณาใส่ CUSTOMER";
+                // มี CUSTOMER แต่หาชื่อไม่เจอ -> นำเข้าเป็นยอดรวมของลูกค้าเหมือนเดิม
+            }
         }
 
         // บันทึก: ลูกค้า + สินค้า + เดือนเดียวกันที่นำเข้าซ้ำ -> แทนที่ของเดิม

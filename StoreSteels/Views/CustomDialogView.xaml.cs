@@ -21,6 +21,7 @@ namespace CIMS.Views
             this.Loaded += (s, e) =>
             {
                 SetupUI(type);
+                SetupChoices();
                 RunOpenAnimation();
             };
         }
@@ -117,7 +118,32 @@ namespace CIMS.Views
             IconScale.BeginAnimation(ScaleTransform.ScaleYProperty, pulse);
         }
 
-        private void Confirm_Click(object sender, RoutedEventArgs e) { this.DialogResult = true; CloseWindow(); }
+        // เลือก 1 ใน 2 ทาง (+ CANCEL): ปุ่มเรียงลงมา / Choice = 1, 2 (0 = ยกเลิก)
+        private string[] _choices;
+        public int Choice { get; private set; }
+        public void SetChoices(string first, string second) { _choices = new[] { first, second }; Width = 460; }
+
+        private void SetupChoices()
+        {
+            if (_choices == null) return;
+            ButtonPanel.Orientation = Orientation.Vertical;
+            lblMessage.TextAlignment = TextAlignment.Left;
+            lblMessage.Margin = new Thickness(30, 8, 30, 0);
+            Button Make(Button b, string text)
+            {
+                b.Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center };
+                b.Width = 360; b.Height = double.NaN; b.MinHeight = 40; b.Padding = new Thickness(10, 6, 10, 6); b.Margin = new Thickness(5, 4, 5, 4);
+                return b;
+            }
+            Make(btnConfirm, _choices[0]);
+            var second = Make(new Button { Style = (Style)FindResource("DialogButton"), Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2E7D32")) }, _choices[1]);
+            second.Click += (s, e) => { Choice = 2; this.DialogResult = true; CloseWindow(); };
+            ButtonPanel.Children.Insert(1, second);
+            btnCancel.Content = "CANCEL";
+            btnCancel.Margin = new Thickness(5, 4, 5, 8);
+        }
+
+        private void Confirm_Click(object sender, RoutedEventArgs e) { Choice = 1; this.DialogResult = true; CloseWindow(); }
         private void Cancel_Click(object sender, RoutedEventArgs e) { this.DialogResult = false; CloseWindow(); }
         private void CloseWindow()
         {

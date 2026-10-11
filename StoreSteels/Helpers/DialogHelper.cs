@@ -29,6 +29,18 @@ namespace CIMS.Helpers
             });
         }
 
+        // 2.1 เลือก 1 ใน 2 ทาง: คืน 1 / 2 (0 = CANCEL)
+        public static int ShowChoice(string message, string title, string first, string second)
+        {
+            return OnUi(() =>
+            {
+                var win = new CustomDialogView(title, message, CustomDialogView.DialogType.Confirm);
+                win.SetChoices(first, second);
+                SetOwner(win);
+                return win.ShowDialog() == true ? win.Choice : 0;
+            });
+        }
+
         // 3. สำหรับคำเตือน (สีส้มแดง - หน้าใหม่ที่เราเพิ่งทำ)
         public static void ShowWarning(string message, string title = "WARNING")
         {
