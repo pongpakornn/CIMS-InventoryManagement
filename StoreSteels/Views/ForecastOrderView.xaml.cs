@@ -72,53 +72,65 @@ namespace CIMS.Views
             return -1;
         }
 
-        // Dropdown เดียวของหน้า (TABLE): ALL MONTHS (Tag = null) หรือเดือนเดียว - ตาราง / TOP 5 / ปีของกราฟ ตามเดือนนี้
+        // Dropdown 2 ตัว: TABLE (หัวตาราง) = เดือนของตาราง / TOP 5 (ในการ์ด TOP 5) = เดือนของ TOP 5 ORDER + ปีของกราฟ
+        //   ทั้งสองตัวมี ALL MONTHS (Tag = null) หรือเดือนเดียว และเลือกแยกกันได้
         private List<DateTime> _months = new List<DateTime>();
-        private bool TableAll => cbTableMonth.SelectedItem is ComboBoxItem i && i.Tag == null;
-        private DateTime? TableMonth => TableAll ? null : (cbTableMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?;
+        private static bool IsAll(ComboBox cb) => cb.SelectedItem is ComboBoxItem i && i.Tag == null;
+        private static DateTime? MonthOf(ComboBox cb) => IsAll(cb) ? null : (cb.SelectedItem as ComboBoxItem)?.Tag as DateTime?;
+        private bool TableAll => IsAll(cbTableMonth);
+        private DateTime? TableMonth => MonthOf(cbTableMonth);
         private DateTime LatestMonth => _months.Count > 0 ? _months.Max() : new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         private static string MonText(DateTime m) => m.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
 
-        private void SelectTableMonth(DateTime? month, bool all)
+        private void Fill(ComboBox cb, DateTime? month, bool all)
         {
-            var items = cbTableMonth.Items.OfType<ComboBoxItem>();
-            cbTableMonth.SelectedItem = all ? items.FirstOrDefault(i => i.Tag == null)
-                                            : items.FirstOrDefault(i => i.Tag is DateTime d && month.HasValue && d == month.Value) ?? items.FirstOrDefault(i => i.Tag != null);
+            cb.Items.Clear();
+            cb.Items.Add(new ComboBoxItem { Content = "ALL MONTHS", Tag = null });
+            foreach (var m in _months) cb.Items.Add(new ComboBoxItem { Content = MonText(m), Tag = m });
+            if (_months.Count == 0) cb.Items.Add(new ComboBoxItem { Content = MonText(LatestMonth), Tag = LatestMonth });
+            var items = cb.Items.OfType<ComboBoxItem>();
+            cb.SelectedItem = all ? items.First(i => i.Tag == null)
+                                  : items.FirstOrDefault(i => i.Tag is DateTime d && month.HasValue && d == month.Value) ?? items.First(i => i.Tag != null);
         }
 
-        // select = เดือนที่จะเลือก (หลัง Import) / null = คงที่เลือกอยู่ (ALL MONTHS หรือเดือนเดิม)
+        // select = เดือนที่จะเลือกทั้งสองตัว (หลัง Import) / null = คงที่เลือกอยู่
         private async Task LoadMonthsAsync(DateTime? select = null)
         {
             try
             {
                 var months = await Task.Run(() => _service.GetMonths());
-                bool keepAll = TableAll && select == null; var keep = select ?? TableMonth;
+                bool tAll = select == null && TableAll, pAll = select == null && IsAll(cbTopMonth);
+                DateTime? tKeep = select ?? TableMonth, pKeep = select ?? MonthOf(cbTopMonth);
                 _ready = false;
                 _months = months;
-                cbTableMonth.Items.Clear();
-                cbTableMonth.Items.Add(new ComboBoxItem { Content = "ALL MONTHS", Tag = null });
-                foreach (var m in months) cbTableMonth.Items.Add(new ComboBoxItem { Content = MonText(m), Tag = m });
-                if (months.Count == 0) cbTableMonth.Items.Add(new ComboBoxItem { Content = MonText(LatestMonth), Tag = LatestMonth });
-                SelectTableMonth(keep, keepAll);
+                Fill(cbTableMonth, tKeep, tAll);
+                Fill(cbTopMonth, pKeep, pAll);
                 _ready = true;
-                await ReloadAllAsync();
+                await ReloadTopAsync();
+                await LoadRowsAsync(false);
             }
             catch (Exception ex) { DialogHelper.ShowError("โหลดข้อมูล Forecast / Order ไม่สำเร็จ\n" + ex.Message); }
         }
 
         private async void cbTableMonth_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_ready) await ReloadAllAsync();
+            if (_ready) await LoadRowsAsync(false);
         }
 
-        private async Task ReloadAllAsync()
+        private async void cbTopMonth_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            bool all = TableAll;
-            var month = TableMonth;
+            if (_ready) await ReloadTopAsync();
+        }
+
+        // กราฟ (ปีของเดือนที่เลือก / ALL MONTHS = ปีล่าสุด) + TOP 5 ORDER
+        private async Task ReloadTopAsync()
+        {
+            bool all = IsAll(cbTopMonth);
+            var month = MonthOf(cbTopMonth);
             if (!all && month == null) return;
             int year = (month ?? LatestMonth).Year;
             txtChartTitle.Text = $"Forecast, Order & Delivery  •  {year}";
-            txtTopTitle.Text = "TOP 5 ORDER  •  " + (all ? "ALL MONTHS" : MonText(month.Value));
+            txtTopTitle.Text = "TOP 5 ORDER";
             try
             {
                 var yearData = await Task.Run(() => _service.GetYear(year));
@@ -128,7 +140,6 @@ namespace CIMS.Views
                 txtTopEmpty.Visibility = top.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             }
             catch (Exception ex) { DialogHelper.ShowError("โหลดกราฟไม่สำเร็จ\n" + ex.Message); }
-            await LoadRowsAsync(false);
         }
 
         // กราฟแบบเดียวกับ Dashboard: แท่ง Order + Delivery และเส้น + จุด Forecast

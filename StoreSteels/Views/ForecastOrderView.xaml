@@ -101,7 +101,11 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <TextBlock x:Name="txtTopTitle" Text="TOP 5 ORDER" FontSize="17" FontWeight="Bold" Foreground="#1A202C" Margin="0,0,0,8"/>
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock x:Name="txtTopTitle" Text="TOP 5 ORDER" FontSize="17" FontWeight="Bold" Foreground="#1A202C" VerticalAlignment="Center" Margin="0,0,150,0" TextTrimming="CharacterEllipsis"/>
+                            <ComboBox x:Name="cbTopMonth" Width="140" Height="34" HorizontalAlignment="Right" Style="{StaticResource StkCombo}" SelectionChanged="cbTopMonth_SelectionChanged"
+                                      ToolTip="Month of TOP 5 ORDER and the year of the chart (ALL MONTHS = every month added up)"/>
+                        </Grid>
                         <TextBlock x:Name="txtTopEmpty" Grid.Row="1" Text="NO ORDER IN THIS MONTH" Foreground="#AAA" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                         <ItemsControl x:Name="icTop" Grid.Row="1">
                             <ItemsControl.ItemTemplate>
@@ -152,7 +156,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                     <TextBlock Text="TABLE :" FontWeight="Bold" Foreground="#373737" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox x:Name="cbTableMonth" Width="170" Height="44" Style="{StaticResource StkCombo}" SelectionChanged="cbTableMonth_SelectionChanged"
-                              ToolTip="Month shown in the table and TOP 5 (ALL MONTHS = every month, one row per month)"/>
+                              ToolTip="Month shown in the table (ALL MONTHS = every month, one row per month)"/>
                 </StackPanel>
                 <TextBox x:Name="txtSearch" Grid.Column="1" Height="44" Style="{StaticResource StkInput}" Tag="Search Customer, Part A, Part No or Product Name..." TextChanged="txtSearch_TextChanged"/>
             </Grid>
