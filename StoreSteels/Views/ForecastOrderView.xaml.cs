@@ -119,7 +119,7 @@ namespace CIMS.Views
             await LoadRowsAsync(false);
         }
 
-        // กราฟแบบเดียวกับ Dashboard: แท่ง Order + Delivery และจุด Forecast
+        // กราฟแบบเดียวกับ Dashboard: แท่ง Order + Delivery และเส้น + จุด Forecast
         private void BuildChart(List<ForecastMonthTotal> data)
         {
             var f = new ChartValues<double>(); var o = new ChartValues<double>(); var d = new ChartValues<double>();
@@ -136,7 +136,8 @@ namespace CIMS.Views
                 new ColumnSeries { Title = "Delivery", Values = d, Fill = (Brush)new BrushConverter().ConvertFromString("#B39DDB"), MaxColumnWidth = 22 },
                 new LineSeries
                 {
-                    Title = "Forecast", Values = f, Stroke = Brushes.Transparent, Fill = Brushes.Transparent,
+                    Title = "Forecast", Values = f, Fill = Brushes.Transparent, StrokeThickness = 2,   // จุด Forecast ต่อกันเป็นเส้นทุกเดือน
+                    Stroke = (Brush)new BrushConverter().ConvertFromString("#1E88E5"),
                     PointGeometry = DefaultGeometries.Circle, PointGeometrySize = 11, LineSmoothness = 0,
                     PointForeground = (Brush)new BrushConverter().ConvertFromString("#1E88E5")
                 }

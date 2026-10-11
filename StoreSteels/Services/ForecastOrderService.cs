@@ -98,14 +98,14 @@ namespace CIMS.Services
                 WHERE TargetDate >= @from AND TargetDate < @to
                 GROUP BY LTRIM(RTRIM(ISNULL(CustomerCode, ''))), LTRIM(RTRIM(ISNULL(PartACode, '')))
             )
-            SELECT a.Customer, ISNULL(p.PartA, '') AS PartA, a.PartKey AS PartNo, ISNULL(p.Description, '') AS ProductName, a.F, a.O, a.D
+            SELECT a.Customer, ISNULL(p.PartA, '') AS PartA, COALESCE(NULLIF(LTRIM(RTRIM(p.PartNumber)), ''), a.PartKey) AS PartNo, ISNULL(p.Description, '') AS ProductName, a.F, a.O, a.D
             FROM agg a
-            OUTER APPLY (SELECT TOP 1 x.PartA, x.Description FROM CIMS.Parts x
+            OUTER APPLY (SELECT TOP 1 x.PartA, x.PartNumber, x.Description FROM CIMS.Parts x
                          WHERE a.PartKey <> '' AND LTRIM(RTRIM(ISNULL(x.Customer, ''))) = a.Customer
                            AND a.PartKey IN (LTRIM(RTRIM(ISNULL(x.PartA, ''))), LTRIM(RTRIM(ISNULL(x.PartNumber, ''))), LTRIM(RTRIM(x.PartCode)))
                          ORDER BY x.PartID) p
             WHERE @key = '' OR a.Customer LIKE '%' + @key + '%' OR a.PartKey LIKE '%' + @key + '%'
-               OR ISNULL(p.PartA, '') LIKE '%' + @key + '%' OR ISNULL(p.Description, '') LIKE '%' + @key + '%'";
+               OR ISNULL(p.PartA, '') LIKE '%' + @key + '%' OR ISNULL(p.PartNumber, '') LIKE '%' + @key + '%' OR ISNULL(p.Description, '') LIKE '%' + @key + '%'";
 
         public List<ForecastOrderRow> GetRows(DateTime month, string keyword, int skip, int take)
         {

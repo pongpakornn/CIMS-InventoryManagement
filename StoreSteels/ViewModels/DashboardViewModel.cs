@@ -456,7 +456,8 @@ namespace CIMS.ViewModels
                 new ColumnSeries { Title = "Delivery", Values = deliveryValues, Fill = (Brush)new BrushConverter().ConvertFromString("#B39DDB"), MaxColumnWidth = 26 },
                 new LineSeries
                 {
-                    Title = "Forecast", Values = forecastValues, Stroke = Brushes.Transparent, Fill = Brushes.Transparent,
+                    Title = "Forecast", Values = forecastValues, Fill = Brushes.Transparent, StrokeThickness = 2,   // จุด Forecast ต่อกันเป็นเส้น (เหมือนหน้า Forecast / Order)
+                    Stroke = (Brush)new BrushConverter().ConvertFromString("#1E88E5"),
                     PointGeometry = DefaultGeometries.Circle, PointGeometrySize = 11, LineSmoothness = 0,
                     PointForeground = (Brush)new BrushConverter().ConvertFromString("#1E88E5")
                 }

@@ -551,17 +551,17 @@ namespace CIMS.Services
                     rows.Add(item);
                 }
             }
-            if (findCustomer) FillForecastCustomers(rows);
+            FixForecastRows(rows, findCustomer);
             return rows;
         }
 
         // หา CUSTOMER / รหัสสินค้า จากสินค้าในระบบ (CIMS.Parts) ให้แถวที่ไม่ได้กรอก - ลำดับ: PART NO -> PRODUCT NAME -> PART A
         //   PART NO เทียบกับ PART A / PART NO / PRODUCT CODE · PRODUCT NAME เทียบกับชื่อสินค้า · PART A เทียบกับ PART A (ตรงทั้งคำ ไม่สนตัวพิมพ์)
         //   ขั้นไหนเจอหลายลูกค้า: ใช้ช่องอื่น (ชื่อ / PART A) กรองก่อน ยังไม่ชัด -> ไปขั้นถัดไป / ทุกขั้นไม่ชัด = ข้ามแถว (ไม่เดา)
-        private void FillForecastCustomers(List<CalcImportRow> rows)
+        //   + CUSTOMER ที่เป็น PART A (Template เก่าที่ไม่มีคอลัมน์ PART A) / รหัสสินค้าเก็บแบบเดียวกันเสมอ
+        private void FixForecastRows(List<CalcImportRow> rows, bool findCustomer)
         {
-            var need = rows.Where(x => x.IsValid && (x.Customer.Length == 0 || x.Part.Length == 0)).ToList();
-            if (need.Count == 0) return;
+            if (!rows.Any(x => x.IsValid)) return;
 
             var parts = new List<(string Cust, string A, string No, string Code, string Name)>();
             using (var conn = new SqlConnection(_cs))
@@ -575,13 +575,27 @@ namespace CIMS.Services
             bool Same(string a, string b) => !string.IsNullOrEmpty(a) && string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
             string Key(string a, string no, string code) => a.Length > 0 ? a : no.Length > 0 ? no : code;   // รหัสที่ใช้เก็บ (จับคู่ตอนคำนวณได้)
 
+            // CUSTOMER ที่กรอกไม่ใช่ลูกค้าในระบบ แต่เป็น PART A ของสินค้า (เช่น Template เก่าที่ไม่มีคอลัมน์ PART A แล้วใส่ PART A ในช่อง CUSTOMER)
+            //   IMPORT อย่างเดียว = ย้ายไปเป็น PART A แล้วหาลูกค้าให้ / IMPORT + คำนวณ = ข้ามแถว (ต้องมี CUSTOMER จริง)
+            var custSet = new HashSet<string>(parts.Select(p => p.Cust).Where(c => c.Length > 0), StringComparer.OrdinalIgnoreCase);
+            foreach (var x in rows.Where(x => x.IsValid && x.Customer.Length > 0 && !custSet.Contains(x.Customer) && parts.Any(p => Same(x.Customer, p.A))))
+            {
+                if (!findCustomer) { x.Error = $"CUSTOMER {x.Customer} ไม่ใช่ลูกค้าในระบบ (เป็น PART A) - ใส่ CUSTOMER ให้ถูก หรือเลือก IMPORT อย่างเดียว"; continue; }
+                if (string.IsNullOrEmpty(x.PartA)) x.PartA = x.Customer;
+                x.Customer = "";
+            }
+
+            var need = findCustomer ? rows.Where(x => x.IsValid && (x.Customer.Length == 0 || x.Part.Length == 0)).ToList() : new List<CalcImportRow>();
             foreach (var x in need)
             {
                 bool custGiven = x.Customer.Length > 0;
                 var pool = custGiven ? parts.Where(p => Same(p.Cust, x.Customer)).ToList() : parts;
                 // สินค้าที่เจอ -> (ลูกค้า, รหัส) ไม่ซ้ำ / เจอหลายตัว: กรองด้วยชื่อ แล้วด้วย PART A
+                // PART A ที่กรอกมามีในระบบ = ตัวสินค้าชัดที่สุด: ขั้น PART NO / PRODUCT NAME ต้องได้สินค้าตัวนั้น (ไม่ตรง = ไปใช้ขั้น PART A)
+                bool paKnown = !string.IsNullOrEmpty(x.PartA) && pool.Any(p => Same(x.PartA, p.A));
                 List<(string Cust, string Key)> Narrow(List<(string Cust, string A, string No, string Code, string Name)> hit, string keep)
                 {
+                    if (paKnown) hit = hit.Where(p => Same(x.PartA, p.A)).ToList();
                     List<(string Cust, string Key)> K(IEnumerable<(string Cust, string A, string No, string Code, string Name)> h) =>
                         h.Where(p => p.Cust.Length > 0).Select(p => (p.Cust, Key: keep ?? Key(p.A, p.No, p.Code))).Where(k => k.Key.Length > 0)
                          .GroupBy(k => (k.Cust.ToUpperInvariant(), k.Key.ToUpperInvariant())).Select(g => g.First()).ToList();
@@ -630,6 +644,17 @@ namespace CIMS.Services
                     continue;
                 }
                 x.Error = string.Join(" / ", why) + " - กรุณาใส่ CUSTOMER";
+            }
+
+            // รหัสสินค้าเก็บแบบเดียวกันเสมอ (PART A ของสินค้า > PART NO > PRODUCT CODE): Import ซ้ำด้วย PART NO หรือ PART A ก็แทนที่แถวเดิม ไม่เกิดแถวซ้ำ
+            foreach (var x in rows.Where(x => x.IsValid && x.Customer.Length > 0 && x.Part.Length > 0))
+            {
+                // PART A ที่กรอกมาเป็นสินค้าของลูกค้านี้ = ใช้ PART A นั้น (PART NO เดียวกันอาจมีหลายสินค้า)
+                var own = parts.FirstOrDefault(p => Same(p.Cust, x.Customer) && Same(x.PartA, p.A));
+                if (own.A != null) { x.Part = own.A; continue; }
+                var keys = parts.Where(p => Same(p.Cust, x.Customer) && (Same(x.Part, p.A) || Same(x.Part, p.No) || Same(x.Part, p.Code)))
+                                .Select(p => Key(p.A, p.No, p.Code)).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (keys.Count == 1) x.Part = keys[0];
             }
         }
 
