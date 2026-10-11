@@ -126,8 +126,8 @@ namespace CIMS.Services
             return list;
         }
 
-        // TOP 5 Order ของเดือน + เปอร์เซ็นต์
-        public List<ForecastTopItem> GetTop5(DateTime month)
+        // TOP 5 Order ของเดือน + เปอร์เซ็นต์ / month = null -> รวมทุกเดือน
+        public List<ForecastTopItem> GetTop5(DateTime? month)
         {
             var rows = new List<ForecastOrderRow>();
             using (var conn = new SqlConnection(_cs))
@@ -137,6 +137,11 @@ namespace CIMS.Services
                 conn.Open();
                 using (var r = cmd.ExecuteReader()) while (r.Read()) rows.Add(Read(r));
             }
+            // รวมแถวของสินค้าเดียวกันข้ามเดือน (ALL MONTHS)
+            rows = rows.GroupBy(x => (x.Customer, x.PartA, x.PartNo, x.ProductName))
+                       .Select(g => new ForecastOrderRow { Customer = g.Key.Customer, PartA = g.Key.PartA, PartNo = g.Key.PartNo, ProductName = g.Key.ProductName,
+                                                           Forecast = g.Sum(x => x.Forecast), Order = g.Sum(x => x.Order), Delivery = g.Sum(x => x.Delivery) })
+                       .OrderByDescending(x => x.Order).ThenByDescending(x => x.Forecast).ToList();
             decimal total = rows.Sum(x => x.Order);
             var top = rows.Where(x => x.Order > 0).Take(5).ToList();
             decimal first = top.Count > 0 ? top[0].Order : 0;

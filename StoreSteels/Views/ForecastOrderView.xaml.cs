@@ -56,7 +56,7 @@ namespace CIMS.Views
             LiveRefresh.Attach(this, TimeSpan.FromSeconds(8),
                 () => LiveRefresh.DbToken("SELECT MAX(ImportID), COUNT_BIG(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.ForecastOrderImports",
                                           "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.CustomerWorkdays"),
-                () => LoadMonthsAsync(SelectedMonth),
+                () => LoadMonthsAsync(),
                 () => !_ready || _loading || ScrollY(dgRows) > 0.5);
         }
 
@@ -72,11 +72,11 @@ namespace CIMS.Views
             return -1;
         }
 
-        private DateTime? SelectedMonth => (cbMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?;
-
-        // เดือนของตาราง: ALL MONTHS (Tag = null) หรือเดือนเดียว / เปลี่ยน MONTH ด้านบน = ตารางตามไปด้วย แต่เลือกเดือนตารางแยกได้
-        private bool TableAll => (cbTableMonth.SelectedItem as ComboBoxItem)?.Tag == null && cbTableMonth.SelectedItem != null;
-        private DateTime? TableMonth => TableAll ? null : ((cbTableMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?) ?? SelectedMonth;
+        // Dropdown เดียวของหน้า (TABLE): ALL MONTHS (Tag = null) หรือเดือนเดียว - ตาราง / TOP 5 / ปีของกราฟ ตามเดือนนี้
+        private List<DateTime> _months = new List<DateTime>();
+        private bool TableAll => cbTableMonth.SelectedItem is ComboBoxItem i && i.Tag == null;
+        private DateTime? TableMonth => TableAll ? null : (cbTableMonth.SelectedItem as ComboBoxItem)?.Tag as DateTime?;
+        private DateTime LatestMonth => _months.Count > 0 ? _months.Max() : new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         private static string MonText(DateTime m) => m.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
 
         private void SelectTableMonth(DateTime? month, bool all)
@@ -86,56 +86,44 @@ namespace CIMS.Views
                                             : items.FirstOrDefault(i => i.Tag is DateTime d && month.HasValue && d == month.Value) ?? items.FirstOrDefault(i => i.Tag != null);
         }
 
+        // select = เดือนที่จะเลือก (หลัง Import) / null = คงที่เลือกอยู่ (ALL MONTHS หรือเดือนเดิม)
         private async Task LoadMonthsAsync(DateTime? select = null)
         {
             try
             {
                 var months = await Task.Run(() => _service.GetMonths());
-                bool keepAll = TableAll; var keepTable = TableMonth;
+                bool keepAll = TableAll && select == null; var keep = select ?? TableMonth;
                 _ready = false;
-                cbMonth.Items.Clear();
-                foreach (var m in months)
-                    cbMonth.Items.Add(new ComboBoxItem { Content = m.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant(), Tag = m });
-                if (months.Count == 0)
-                {
-                    var now = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-                    cbMonth.Items.Add(new ComboBoxItem { Content = now.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant(), Tag = now });
-                }
-                var pick = cbMonth.Items.OfType<ComboBoxItem>().FirstOrDefault(i => select.HasValue && (DateTime)i.Tag == select.Value) ?? cbMonth.Items.OfType<ComboBoxItem>().First();
-                cbMonth.SelectedItem = pick;
+                _months = months;
                 cbTableMonth.Items.Clear();
                 cbTableMonth.Items.Add(new ComboBoxItem { Content = "ALL MONTHS", Tag = null });
-                foreach (var i in cbMonth.Items.OfType<ComboBoxItem>()) cbTableMonth.Items.Add(new ComboBoxItem { Content = i.Content, Tag = i.Tag });
-                SelectTableMonth(keepAll ? null : (keepTable ?? (DateTime)pick.Tag), keepAll);
+                foreach (var m in months) cbTableMonth.Items.Add(new ComboBoxItem { Content = MonText(m), Tag = m });
+                if (months.Count == 0) cbTableMonth.Items.Add(new ComboBoxItem { Content = MonText(LatestMonth), Tag = LatestMonth });
+                SelectTableMonth(keep, keepAll);
                 _ready = true;
                 await ReloadAllAsync();
             }
             catch (Exception ex) { DialogHelper.ShowError("โหลดข้อมูล Forecast / Order ไม่สำเร็จ\n" + ex.Message); }
         }
 
-        private async void cbMonth_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (!_ready) return;
-            _ready = false; SelectTableMonth(SelectedMonth, false); _ready = true;   // ตารางตามเดือนด้านบน
-            await ReloadAllAsync();
-        }
-
         private async void cbTableMonth_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_ready) await LoadRowsAsync(false);
+            if (_ready) await ReloadAllAsync();
         }
 
         private async Task ReloadAllAsync()
         {
-            var month = SelectedMonth;
-            if (month == null) return;
-            txtChartTitle.Text = $"Forecast, Order & Delivery  •  {month.Value.Year}";
-            txtTopTitle.Text = $"TOP 5 ORDER  •  {month.Value.ToString("MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant()}";
+            bool all = TableAll;
+            var month = TableMonth;
+            if (!all && month == null) return;
+            int year = (month ?? LatestMonth).Year;
+            txtChartTitle.Text = $"Forecast, Order & Delivery  •  {year}";
+            txtTopTitle.Text = "TOP 5 ORDER  •  " + (all ? "ALL MONTHS" : MonText(month.Value));
             try
             {
-                var year = await Task.Run(() => _service.GetYear(month.Value.Year));
-                var top = await Task.Run(() => _service.GetTop5(month.Value));
-                BuildChart(year);
+                var yearData = await Task.Run(() => _service.GetYear(year));
+                var top = await Task.Run(() => _service.GetTop5(all ? null : month));
+                BuildChart(yearData);
                 icTop.ItemsSource = top;
                 txtTopEmpty.Visibility = top.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             }
@@ -247,8 +235,8 @@ namespace CIMS.Views
         // 📤 Export: เลือก ALL MONTHS หรือเฉพาะเดือนที่ต้องการ -> 1 เดือน = 1 ชีท (ตามคำค้นหา) -> Desktop\CIMS_Export แล้วเปิดไฟล์
         private async void Export_Click(object sender, RoutedEventArgs e)
         {
-            var all = cbMonth.Items.OfType<ComboBoxItem>().Select(i => i.Tag).OfType<DateTime>().ToList();
-            if (all.Count == 0) return;
+            var all = _months.ToList();
+            if (all.Count == 0) { DialogHelper.ShowWarning("ยังไม่มีข้อมูล Forecast / Order / Delivery ให้ Export"); return; }
             var pre = TableAll ? all : new List<DateTime> { TableMonth ?? all[0] };
             string key = txtSearch.Text;
             var months = MonthPickWindow.Choose("📤 EXPORT FORECAST / ORDER / DELIVERY",
@@ -276,7 +264,7 @@ namespace CIMS.Views
         private async void Template_Click(object sender, RoutedEventArgs e)
         {
             if (_session?.CanImportForecastOrder != true) return;
-            var month = SelectedMonth ?? new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            var month = TableMonth ?? LatestMonth;
             string mon = month.ToString("MMM yyyy", CultureInfo.InvariantCulture);
             if (!DialogHelper.ShowConfirm(
                     $"ต้องการสร้างไฟล์ Template สำหรับนำเข้า Forecast / Order / Delivery ใช่หรือไม่?\n\n" +

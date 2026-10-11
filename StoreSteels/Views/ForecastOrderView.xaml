@@ -53,8 +53,6 @@
                     <TextBlock x:Name="txtSub" Text="Monthly forecast, customer orders and deliveries" FontSize="13" FontWeight="SemiBold" Foreground="#8A8490" Margin="2,2,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock Text="MONTH :" FontWeight="Bold" Foreground="#373737" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="cbMonth" Width="170" Height="42" Style="{StaticResource StkCombo}" SelectionChanged="cbMonth_SelectionChanged"/>
                     <Button x:Name="btnTemplate" Content="📄 TEMPLATE EXCEL" Style="{StaticResource StkButton}" Background="#6750A4" Margin="10,0,0,0" Click="Template_Click"
                             ToolTip="File to fill in for IMPORT FORECAST / ORDER / DELIVERY (rows of the selected month are filled in)"/>
                     <Button x:Name="btnImport" Content="📥 IMPORT FORECAST / ORDER / DELIVERY" Style="{StaticResource StkButton}" Background="#2E7D32" Margin="10,0,0,0" Click="Import_Click"/>
@@ -154,7 +152,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                     <TextBlock Text="TABLE :" FontWeight="Bold" Foreground="#373737" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox x:Name="cbTableMonth" Width="170" Height="44" Style="{StaticResource StkCombo}" SelectionChanged="cbTableMonth_SelectionChanged"
-                              ToolTip="Month shown in the table (ALL MONTHS = every month, one row per month)"/>
+                              ToolTip="Month shown in the table and TOP 5 (ALL MONTHS = every month, one row per month)"/>
                 </StackPanel>
                 <TextBox x:Name="txtSearch" Grid.Column="1" Height="44" Style="{StaticResource StkInput}" Tag="Search Customer, Part A, Part No or Product Name..." TextChanged="txtSearch_TextChanged"/>
             </Grid>
