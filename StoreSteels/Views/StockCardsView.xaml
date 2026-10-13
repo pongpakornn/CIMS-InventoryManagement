@@ -34,7 +34,8 @@
             </Grid>
 
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl x:Name="icStocks">
+                <!-- เว้นด้านบนให้การ์ดแถวแรกเด้งขึ้นได้ไม่โดนตัด -->
+                <ItemsControl x:Name="icStocks" Margin="0,10,0,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -98,8 +99,29 @@
                                 </Grid>
                             </Border>
                             <DataTemplate.Triggers>
+                                <!-- ชี้เมาส์แล้วการ์ดเด้งขึ้น + เงาเข้มขึ้น (แบบการ์ดหน้า Dashboard) -->
                                 <Trigger SourceName="card" Property="IsMouseOver" Value="True">
                                     <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="card" Storyboard.TargetProperty="(Border.RenderTransform).(TranslateTransform.Y)" To="-8" Duration="0:0:0.25">
+                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                                <DoubleAnimation Storyboard.TargetName="card" Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)" To="25" Duration="0:0:0.25"/>
+                                                <DoubleAnimation Storyboard.TargetName="card" Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" To="0.3" Duration="0:0:0.25"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="card" Storyboard.TargetProperty="(Border.RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.2"/>
+                                                <DoubleAnimation Storyboard.TargetName="card" Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)" To="14" Duration="0:0:0.2"/>
+                                                <DoubleAnimation Storyboard.TargetName="card" Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)" To="0.08" Duration="0:0:0.2"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
                                 </Trigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
