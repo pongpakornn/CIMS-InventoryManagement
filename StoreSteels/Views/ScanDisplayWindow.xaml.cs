@@ -9,7 +9,7 @@ using System.Windows.Input;
 
 namespace CIMS.Views
 {
-    // 🏷️ ตั้งค่าที่แสดงในช่อง PRODUCT CODE ต่อคลัง: คอลัมน์ของสินค้า (PRODUCT CODE / PART A / PART NO / MODEL / PRODUCT NAME)
+    // 🏷️ ตั้งค่าที่แสดงในช่อง PRODUCT CODE ต่อคลัง (ของผู้ใช้คนนั้น): คอลัมน์ของสินค้า (PRODUCT CODE / PART A / PART NO / MODEL / PRODUCT NAME)
     //    หรือช่องที่ n ของป้ายตาม Barcode Format ที่คลังรับ (เช่น Panta #11) - แสดงผลอย่างเดียว
     public partial class ScanDisplayWindow : Window
     {
@@ -39,7 +39,7 @@ namespace CIMS.Views
             var scan = new ScanService();
             Dictionary<int, string> map;
             List<BarcodeFormatModel> formats;
-            try { map = scan.GetScanDisplayMap(); formats = new StockService().GetFormats(); }
+            try { map = scan.GetScanDisplayMap(session?.UserId); formats = new StockService().GetFormats(); }
             catch (Exception ex) { DialogHelper.ShowError("โหลดการตั้งค่าไม่สำเร็จ\n" + ex.Message); map = new Dictionary<int, string>(); formats = new List<BarcodeFormatModel>(); }
 
             _rows = stocks.Select(s =>

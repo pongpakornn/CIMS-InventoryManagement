@@ -60,7 +60,8 @@ namespace CIMS.Views
                 From = from, To = to,
                 StkId = stock?.StkId,
                 StockIsMain = stock?.IsMain ?? false,
-                TxType = string.IsNullOrEmpty(type) ? null : type
+                TxType = string.IsNullOrEmpty(type) ? null : type,
+                UserId = _session?.UserId
             };
         }
 

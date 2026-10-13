@@ -105,7 +105,7 @@ namespace CIMS.Views
         // ✏️ แก้จำนวน: ทีละ 1 รายการ -> กรอกจำนวนใหม่ -> กรอกหมายเหตุ
         private async void EditQty_Click(object sender, RoutedEventArgs e)
         {
-            if (_session?.UserLevel != 1) return;
+            if (_session?.CanDeleteScan != true) return;
             var sel = Selected();
             if (sel.Count != 1) { DialogHelper.ShowWarning("กรุณาติ๊กเลือก 1 รายการที่ต้องการแก้ไขจำนวน"); return; }
             var row = sel[0];
@@ -135,7 +135,7 @@ namespace CIMS.Views
         // 🗑 ลบ (ยกเลิก) หลายรายการ: หมายเหตุเดียวใช้กับทุกรายการที่เลือก - รายการที่ปรับไม่ได้ (เช่น ยอดไม่พอ) ข้ามแล้วแจ้ง
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (_session?.UserLevel != 1) return;
+            if (_session?.CanDeleteScan != true) return;
             var sel = Selected();
             if (sel.Count == 0) { DialogHelper.ShowWarning("กรุณาติ๊กเลือกรายการที่ต้องการลบ"); return; }
 

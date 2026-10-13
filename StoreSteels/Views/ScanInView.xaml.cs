@@ -112,7 +112,7 @@ namespace CIMS.Views
         // 🏷️ DISPLAY: ค่าที่แสดงในช่อง PRODUCT CODE ต่อคลัง -> บันทึกแล้วใช้กับตารางวันนี้ทันที
         private void ScanDisplay_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel.CurrentUser?.CanEditStore != true) return;
+            if (_viewModel.CurrentUser?.CanEditScanner != true) return;
             List<StockModel> stocks;
             try { stocks = new CIMS.Services.StockService().GetStocks().Where(s => _viewModel.CurrentUser.CanViewStock(s)).ToList(); }
             catch { stocks = _viewModel.Stocks.ToList(); }
@@ -122,12 +122,12 @@ namespace CIMS.Views
             FocusScanBox();
         }
 
-        // ✏️ ADJUST SCAN (Level 1 เท่านั้น): แก้จำนวน / ลบรายการสแกน -> ปรับยอดย้อนให้ แล้วโหลดตารางวันนี้ใหม่
+        // ✏️ ADJUST SCAN (สิทธิ์ DEL ของ Multi-Scanner): แก้จำนวน / ลบรายการสแกน -> ปรับยอดย้อนให้ แล้วโหลดตารางวันนี้ใหม่
         private void AdjustScan_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel.CurrentUser?.UserLevel != 1)
+            if (_viewModel.CurrentUser?.CanDeleteScan != true)
             {
-                DialogHelper.ShowWarning("เฉพาะผู้ดูแลระบบ (Level 1) เท่านั้นที่แก้ไขรายการสแกนได้", "ACCESS DENIED");
+                DialogHelper.ShowWarning("ต้องมีสิทธิ์ DEL ของ Multi-Scanner จึงแก้ไข / ลบรายการสแกนได้", "ACCESS DENIED");
                 return;
             }
             List<StockModel> stocks;
@@ -142,6 +142,7 @@ namespace CIMS.Views
         // 🏬 เลือกคลังที่สแกน (การ์ดคลัง: 1 คลัง / หลายคลังสแกนร่วมกัน / AUTO) -> กลับไปโฟกัสช่องสแกนทันที
         private void ScanStocks_Click(object sender, RoutedEventArgs e)
         {
+            if (!_viewModel.CanChangeScope) { DialogHelper.ShowWarning("ต้องมีสิทธิ์ EDIT ของ Multi-Scanner จึงเลือกคลังที่สแกนได้", "ACCESS DENIED"); FocusScanBox(); return; }
             var w = StockPickerWindow.ShowScanStocks(_viewModel.Stocks, _viewModel.ScopeAuto, _viewModel.ScopeIds.ToList(), _viewModel.PriorityStockId);
             if (w != null)
             {

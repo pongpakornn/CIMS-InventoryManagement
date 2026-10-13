@@ -390,10 +390,12 @@ namespace CIMS.ViewModels
         public Visibility RemainderBannerVisibility => IsRemainderMode ? Visibility.Visible : Visibility.Collapsed;
         public Visibility RemainderButtonVisibility =>
             CurrentUser?.CanViewScanIn == true || CurrentUser?.CanViewScanOut == true ? Visibility.Visible : Visibility.Collapsed;
-        // ✏️ ADJUST SCAN: Level 1 (Admin) เท่านั้น
-        public Visibility AdjustButtonVisibility => CurrentUser?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
-        // 🏷️ DISPLAY: เลือกค่าที่แสดงแทนรหัสต่อคลัง (ตั้งค่าคลัง = EDIT ของ Store(Max-Min))
-        public Visibility DisplayButtonVisibility => CurrentUser?.CanEditStore == true ? Visibility.Visible : Visibility.Collapsed;
+        // ✏️ ADJUST SCAN: สิทธิ์ DEL ของ Multi-Scanner
+        public Visibility AdjustButtonVisibility => CurrentUser?.CanDeleteScan == true ? Visibility.Visible : Visibility.Collapsed;
+        // 🏷️ DISPLAY: เลือกค่าที่แสดงแทนรหัสต่อคลัง (ของผู้ใช้คนนั้น) = EDIT ของ Multi-Scanner
+        public Visibility DisplayButtonVisibility => CurrentUser?.CanEditScanner == true ? Visibility.Visible : Visibility.Collapsed;
+        // 🏬 เลือกคลังที่สแกน (STOCK) = EDIT ของ Multi-Scanner / ไม่มีสิทธิ์ = สแกนตามคลังที่ตั้งไว้ในเครื่องนี้
+        public bool CanChangeScope => CurrentUser?.CanEditScanner == true;
 
         public ICommand ToggleRemainderModeCommand { get; }
         #endregion
@@ -451,6 +453,7 @@ namespace CIMS.ViewModels
             OnPropertyChanged(nameof(RemainderButtonVisibility));
             OnPropertyChanged(nameof(AdjustButtonVisibility));
             OnPropertyChanged(nameof(DisplayButtonVisibility));
+            OnPropertyChanged(nameof(CanChangeScope));
             LoadStocks();
         }
         #endregion
@@ -528,6 +531,7 @@ namespace CIMS.ViewModels
             _priorityId = priorityId.HasValue && Stocks.Any(s => s.StkId == priorityId.Value) ? priorityId : null;
 
             _selectedStock = IsMultiScope ? null : ScopeStocks.FirstOrDefault();
+            BuildSummaryStocks();
             OnPropertyChanged(nameof(SelectedStock));
             OnPropertyChanged(nameof(ScopeText));
             OnPropertyChanged(nameof(ScopeSubText));
@@ -540,6 +544,28 @@ namespace CIMS.ViewModels
 
         private static bool SupportsReturn(StockModel s) => s != null && (s.InSysQr || s.InSupplier);
 
+        // 📊 ตารางสรุป: สแกนหลายคลัง -> เลือกดูทั้งหมด หรือทีละคลัง (สิทธิ์ VIEW ใช้ได้)
+        public class SummaryStockItem { public int? Id { get; set; } public string Text { get; set; } }
+        public ObservableCollection<SummaryStockItem> SummaryStocks { get; } = new ObservableCollection<SummaryStockItem>();
+        private int? _summaryStkId;
+        public int? SummaryStkId
+        {
+            get => _summaryStkId;
+            set { if (_summaryStkId == value) return; _summaryStkId = value; OnPropertyChanged(); RefreshModeFilter(); }
+        }
+        public Visibility SummaryPickerVisibility => IsMultiScope && ScopeStocks.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+        private void BuildSummaryStocks()
+        {
+            int? keep = _summaryStkId;
+            SummaryStocks.Clear();
+            SummaryStocks.Add(new SummaryStockItem { Id = null, Text = "ALL STOCKS" });
+            foreach (var s in ScopeStocks) SummaryStocks.Add(new SummaryStockItem { Id = s.StkId, Text = s.Code });
+            _summaryStkId = keep.HasValue && SummaryStocks.Any(x => x.Id == keep) ? keep : null;
+            OnPropertyChanged(nameof(SummaryStkId));
+            OnPropertyChanged(nameof(SummaryPickerVisibility));
+        }
+
         // 🏷️ ค่าที่แสดงแทนรหัสต่อคลัง (ปุ่ม DISPLAY) - แสดงผลอย่างเดียว ไม่มีผลกับการบันทึก
         private Dictionary<int, string> _displayMap = new Dictionary<int, string>();
         private List<BarcodeFormatModel> _displayFormats = new List<BarcodeFormatModel>();
@@ -548,7 +574,7 @@ namespace CIMS.ViewModels
         {
             try
             {
-                _displayMap = _scanService.GetScanDisplayMap();
+                _displayMap = _scanService.GetScanDisplayMap(CurrentUser?.UserId);
                 _displayFormats = _displayMap.Values.Any(v => v.StartsWith("FIELD:")) ? _stockService.GetFormats() : new List<BarcodeFormatModel>();
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"LoadDisplaySettings: {ex.Message}"); }
@@ -762,8 +788,9 @@ namespace CIMS.ViewModels
 
             // 🔀 แสดงเฉพาะรายการของโหมดที่กดอยู่: รับเข้า = IN / สแกนออก = OUT / คืนเหล็ก = RETURN
             System.Windows.Data.CollectionViewSource.GetDefaultView(ScannedItems).Filter = o => o is ScanItemModel s && s.Status == ModeStatus;
+            // 📊 ตารางสรุปวันนี้: แสดงทุกรายการเสมอ (รับเข้า / คืน / สแกนออก) ไม่ขึ้นกับโหมดที่กด - เลือกดูทีละคลังได้ (SummaryStkId)
             System.Windows.Data.CollectionViewSource.GetDefaultView(HistoryItems).Filter = o => o is ScanItemModel s &&
-                (IsScanOutMode ? s.OutCount > 0 : s.InCount > 0);
+                (SummaryStkId == null || s.StkId == SummaryStkId);
         }
 
         private string ModeStatus => IsScanOutMode ? "OUT" : IsReturnMode ? "RETURN" : "IN";
@@ -1499,14 +1526,16 @@ namespace CIMS.ViewModels
         }
 
         // knownBalance: ยอดที่ดึงมาแล้วเบื้องหลัง (โหลดตารางวันนี้) / null = ดึงเองตอนนี้ (หลังสแกน 1 รายการ)
+        //   1 แถว = 1 สินค้า (PartID) ต่อ 1 คลัง - สินค้าที่ PD CODE ซ้ำกัน (เช่น "-") ต้องไม่รวมเป็นแถวเดียว
         private void UpdateSummary(ScanItemModel item, decimal? knownBalance = null)
         {
-            if (string.IsNullOrWhiteSpace(item.PartACode)) return;
+            if (item.PartId <= 0 && string.IsNullOrWhiteSpace(item.PartACode)) return;
 
             // ยอดคงเหลือของคลังที่รายการนั้นลงจริง (สแกนร่วมหลายคลังแยกแถวสรุปตามคลัง)
             var itemStock = Stocks.FirstOrDefault(s => s.StkId == item.StkId && item.StkId != 0) ?? SelectedStock;
             decimal actualCurrentStock = knownBalance ?? _scanService.GetInventoryBalance(item.PartId, itemStock);
-            var existing = HistoryItems.FirstOrDefault(x => x.PartACode == item.PartACode && x.StkId == item.StkId);
+            var existing = HistoryItems.FirstOrDefault(x => x.StkId == item.StkId &&
+                (item.PartId > 0 ? x.PartId == item.PartId : x.PartId <= 0 && x.PartACode == item.PartACode));
 
             if (existing != null)
             {

@@ -33,7 +33,7 @@ namespace CIMS.Views
             _session = session;
             _deducted = deducted;
             InitializeComponent();
-            btnDelete.Visibility = !deducted && _session?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
+            btnDelete.Visibility = !deducted && _session?.CanDeleteScan == true ? Visibility.Visible : Visibility.Collapsed;   // ลบ = DEL ของ Multi-Scanner
             if (deducted)
             {
                 Title = "Deducted";

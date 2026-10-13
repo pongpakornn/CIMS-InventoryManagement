@@ -33,12 +33,16 @@ namespace CIMS.Models
         // 📊 Dashboard: VIEW
         public bool CanViewDashboard => P("DASHBOARD", p => p.CanView);
 
-        // 📷 Multi-Scanner (SystemID MultiScanner): VIEW = เมนู + ดูหน้า / HISTORY / TEST MODE
-        //    ADD = สแกนเข้า + คืน (RETURN) / EDIT = สแกนออก
+        // 📷 Multi-Scanner (SystemID MultiScanner)
+        //    VIEW = ใช้หน้าสแกนได้ทุกปุ่ม: สแกนเข้า / ออก / คืน / เศษ / TEST MODE / HISTORY / DEDUCTED / NOT DEDUCTED (ยกเว้นลบ)
+        //    EDIT = เลือกคลังที่สแกน (STOCK) + DISPLAY (ค่าที่แสดงต่อคลัง ของผู้ใช้คนนั้น)
+        //    DEL  = ADJUST SCAN (แก้จำนวน / ลบรายการสแกน) + ลบรายการ NOT DEDUCTED
         public bool CanViewScannerMenu => P("MultiScanner", p => p.CanView);
-        public bool CanViewScanIn => CanViewScannerMenu && P("MultiScanner", p => p.CanAdd);
-        public bool CanViewScanOut => CanViewScannerMenu && P("MultiScanner", p => p.CanEdit);
-        public bool CanScanReturn => CanViewScanIn;
+        public bool CanViewScanIn => CanViewScannerMenu;
+        public bool CanViewScanOut => CanViewScannerMenu;
+        public bool CanScanReturn => CanViewScannerMenu;
+        public bool CanEditScanner => CanViewScannerMenu && P("MultiScanner", p => p.CanEdit);
+        public bool CanDeleteScan => CanViewScannerMenu && P("MultiScanner", p => p.CanDelete);
 
         // 🏷️ Inventory Registration (ProductControl): VIEW = เมนู + ดู + Export QR / ADD = ลงทะเบียน + IMPORT
         //    EDIT = แก้ไข + SHOW/HIDE + รูปภาพ / DEL = ลบสินค้า

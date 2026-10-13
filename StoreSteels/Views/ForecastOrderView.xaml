@@ -27,6 +27,7 @@
             </Setter>
         </Style>
         <Style x:Key="Cell" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextWrapping" Value="Wrap"/>

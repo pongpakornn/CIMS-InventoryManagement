@@ -14,6 +14,27 @@ namespace CIMS.Helpers
         private static bool? _columnOrder;
         private static bool? _coilRegister;
 
+        // Update_20261013.sql: CIMS.UserScanDisplays (DISPLAY ของหน้าสแกน แยกตามผู้ใช้)
+        private static bool? _userScanDisplays;
+        public static bool HasUserScanDisplays
+        {
+            get
+            {
+                if (_userScanDisplays.HasValue) return _userScanDisplays.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID('CIMS.UserScanDisplays', 'U') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _userScanDisplays = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _userScanDisplays.Value;
+            }
+        }
+
         // Update_20261008.sql: ทะเบียน Coil (CIMS.Coils / CIMS.CoilMoves + BarcodeFormats.CoilNoPosition)
         public static bool HasCoilRegister
         {

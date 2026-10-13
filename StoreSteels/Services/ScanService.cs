@@ -189,19 +189,29 @@ namespace CIMS.Services
 
         // stock = null -> ทุกคลัง (พฤติกรรมเดิม), ระบุคลัง -> เฉพาะรายการของคลังนั้น
         // (แถวเก่าก่อนมีระบบหลายคลังมี StockID = NULL นับเป็นของ Stock-CHR)
-        // 🏷️ ค่าที่แสดงแทนรหัสของแต่ละคลัง (CIMS.Stocks.ScanDisplayField) - ยังไม่ตั้ง = ไม่มีในรายการ
-        public Dictionary<int, string> GetScanDisplayMap()
+        // 🏷️ ค่าที่แสดงแทนรหัสของแต่ละคลัง: ค่าของผู้ใช้ (CIMS.UserScanDisplays) > ค่าของคลัง (CIMS.Stocks.ScanDisplayField)
+        //    userId = null -> ค่าของคลังอย่างเดียว / ยังไม่ตั้ง = ไม่มีในรายการ (แสดง PRODUCT CODE)
+        public Dictionary<int, string> GetScanDisplayMap(string userId = null)
         {
             var map = new Dictionary<int, string>();
             using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand("SELECT StockID, ScanDisplayField FROM CIMS.Stocks WHERE ISNULL(ScanDisplayField, '') <> ''", conn))
             {
                 conn.Open();
+                using (var cmd = new SqlCommand("SELECT StockID, ScanDisplayField FROM CIMS.Stocks WHERE ISNULL(ScanDisplayField, '') <> ''", conn))
                 using (var r = cmd.ExecuteReader()) while (r.Read()) map[r.GetInt32(0)] = r.GetString(1);
+                if (!string.IsNullOrWhiteSpace(userId) && Helpers.DbSchema.HasUserScanDisplays)
+                    using (var cmd = new SqlCommand("SELECT StockID, DisplayField FROM CIMS.UserScanDisplays WHERE UserID = @u", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        using (var r = cmd.ExecuteReader()) while (r.Read()) map[r.GetInt32(0)] = r.GetString(1);
+                    }
             }
+            // PRODUCT CODE (ค่าเริ่มต้น) ที่ผู้ใช้เลือกเอง = แสดงรหัสปกติ
+            foreach (var k in map.Where(kv => kv.Value == Helpers.ScanDisplay.Default).Select(kv => kv.Key).ToList()) map.Remove(k);
             return map;
         }
 
+        // บันทึก DISPLAY ของผู้ใช้คนนั้น (ไม่กระทบผู้ใช้อื่น) / ฐานยังไม่รัน Update_20261013.sql -> บันทึกที่คลังแบบเดิม
         public void SaveScanDisplayMap(Dictionary<int, string> map, string userId)
         {
             using (var conn = new SqlConnection(_connectionString))
@@ -209,6 +219,22 @@ namespace CIMS.Services
                 conn.Open();
                 using (var tr = conn.BeginTransaction())
                 {
+                    if (!string.IsNullOrWhiteSpace(userId) && Helpers.DbSchema.HasUserScanDisplays)
+                    {
+                        foreach (var kv in map)
+                            using (var cmd = new SqlCommand(@"IF EXISTS (SELECT 1 FROM CIMS.UserScanDisplays WHERE UserID = @u AND StockID = @s)
+                                                                  UPDATE CIMS.UserScanDisplays SET DisplayField = @v, UpdatedDate = GETDATE() WHERE UserID = @u AND StockID = @s
+                                                              ELSE
+                                                                  INSERT INTO CIMS.UserScanDisplays (UserID, StockID, DisplayField) VALUES (@u, @s, @v)", conn, tr))
+                            {
+                                cmd.Parameters.AddWithValue("@u", userId);
+                                cmd.Parameters.AddWithValue("@s", kv.Key);
+                                cmd.Parameters.AddWithValue("@v", string.IsNullOrWhiteSpace(kv.Value) ? Helpers.ScanDisplay.Default : kv.Value);
+                                cmd.ExecuteNonQuery();
+                            }
+                        tr.Commit();
+                        return;
+                    }
                     foreach (var kv in map)
                         using (var cmd = new SqlCommand("UPDATE CIMS.Stocks SET ScanDisplayField = @v, UpdatedBy = @u, UpdatedDate = GETDATE() WHERE StockID = @s", conn, tr))
                         {

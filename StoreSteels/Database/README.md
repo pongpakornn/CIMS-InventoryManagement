@@ -1,4 +1,4 @@
-# CIMS database scripts
+﻿# CIMS database scripts
 
 Since October 2026 every table, column, view, procedure and trigger uses a full name in the `CIMS` schema
 (for example `dbo.MST_PART.PT_CODE` became `CIMS.Parts.PartCode`, `dbo.SYS_LOGS` became `CIMS.SystemLogs`).
@@ -39,4 +39,5 @@ Run the dated update scripts in order (each one is safe to run more than once):
 | `Update_20261010b.sql` | NOT DEDUCTED list: new table `CIMS.DeductMisses` - labels received with SCAN IN whose mother coil could not be cut (not found / not enough weight), saved automatically by the scanner. Adds one table only. |
 | `Update_20261010c.sql` | DEDUCTED list: `StockTransfers.ScanTransactionID` links each source-stock cut to its SCAN IN (older SCAN transfers linked by product / stock / time). Adds one column + index. |
 | `Update_20261010d.sql` | Product cards per stock: `Stocks.CardStyle` (`IMAGE` card with picture, `TEXT` card without picture, `OFF` no cards; NULL = as before: IMAGE when the stock shows the IMAGE column). Adds one column. |
+| `Update_20261013.sql` | Multi-Scanner DISPLAY per user: `CIMS.UserScanDisplays` (UserID + StockID + DisplayField). A user without a row sees the stock setting (`Stocks.ScanDisplayField`) as before. Creates one table. |
 | `ClearOperationalData.sql` | Clears transactions / logs / stock quantities while keeping users, permissions and setup. Only run it when you really want to reset data. |

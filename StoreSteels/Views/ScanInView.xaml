@@ -791,7 +791,8 @@
                     <StackPanel Grid.Column="1" Margin="20,0,0,0" HorizontalAlignment="Left">
                         <TextBlock Text="STOCK" FontWeight="Bold" Foreground="#999" Margin="5,10,0,6" FontSize="13"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button x:Name="btnScanStocks" Width="360" Height="42" Focusable="False" Click="ScanStocks_Click"
+                            <Button x:Name="btnScanStocks" Width="360" Height="42" Focusable="False" Click="ScanStocks_Click" IsEnabled="{Binding CanChangeScope}"
+                                    ToolTip="Choose the stocks to scan (EDIT of Multi-Scanner)" ToolTipService.ShowOnDisabled="True"
                                     Style="{StaticResource StkButton}" Background="{StaticResource MainPurple}" HorizontalContentAlignment="Left">
                                 <Grid Width="326">
                                     <TextBlock Text="{Binding ScopeText}" FontWeight="Black" FontSize="14" TextTrimming="CharacterEllipsis" Margin="0,0,24,0" VerticalAlignment="Center"/>
@@ -987,9 +988,14 @@
                     </DataGrid>
                 </DockPanel>
 
-                <!-- Daily Stock Movement Summary (ตารางฝั่งขวา คงเดิม) -->
+                <!-- Daily Stock Movement Summary: ทุกรายการของวันนี้เสมอ (ไม่ขึ้นกับโหมด) / สแกนหลายคลัง = เลือกดูทีละคลังได้ -->
                 <DockPanel Grid.Column="2">
-                    <TextBlock DockPanel.Dock="Top" Text="Daily Stock Movement Summary" FontWeight="ExtraBold" Foreground="#888" FontSize="13" Margin="5,0,0,10"/>
+                    <Grid DockPanel.Dock="Top" Margin="5,0,0,10" MinHeight="22">
+                        <TextBlock Text="Daily Stock Movement Summary" FontWeight="ExtraBold" Foreground="#888" FontSize="13" VerticalAlignment="Center"/>
+                        <ComboBox HorizontalAlignment="Right" Width="190" Height="32" Focusable="False" Style="{StaticResource StkCombo}"
+                                  ItemsSource="{Binding SummaryStocks}" DisplayMemberPath="Text" SelectedValuePath="Id" SelectedValue="{Binding SummaryStkId, Mode=TwoWay}"
+                                  Visibility="{Binding SummaryPickerVisibility}" ToolTip="Show the summary of all stocks or one stock"/>
+                    </Grid>
                     <DataGrid x:Name="dgHistory" ItemsSource="{Binding HistoryItems}" AutoGenerateColumns="False" Focusable="False" SelectionUnit="Cell"
                               IsReadOnly="True" Background="Transparent" BorderThickness="0" RowHeight="50" FontSize="14" SelectionMode="Single" 
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#F5F5F5" HeadersVisibility="Column" VerticalGridLinesBrush="#EAEAEA"

@@ -40,6 +40,7 @@ namespace CIMS.Services
         public int? StkId { get; set; }       // null = ทุกคลัง
         public bool StockIsMain { get; set; } // แถวเก่าที่ไม่มี StockID นับเป็นของคลังหลัก
         public string TxType { get; set; }    // null = ทุกประเภท
+        public string UserId { get; set; }    // DISPLAY ของผู้ใช้คนนั้น
     }
 
     public class ScanHistoryService
@@ -106,16 +107,16 @@ namespace CIMS.Services
                         while (await r.ReadAsync(ct).ConfigureAwait(false)) rows.Add(Read(r));
                 }
             }
-            ApplyDisplay(rows);
+            ApplyDisplay(rows, f.UserId);
             return (rows, total);
         }
 
         // ค่าที่แสดงแทนรหัสตามการตั้งค่าของแต่ละคลัง
-        private static void ApplyDisplay(List<ScanHistoryRow> rows)
+        private static void ApplyDisplay(List<ScanHistoryRow> rows, string userId)
         {
             try
             {
-                var map = new ScanService().GetScanDisplayMap();
+                var map = new ScanService().GetScanDisplayMap(userId);
                 if (map.Count == 0) return;
                 var formats = map.Values.Any(v => v.StartsWith("FIELD:")) ? new StockService().GetFormats() : new List<CIMS.Models.BarcodeFormatModel>();
                 foreach (var x in rows)
@@ -159,7 +160,7 @@ namespace CIMS.Services
                 conn.Open();
                 using (var r = cmd.ExecuteReader()) while (r.Read()) rows.Add(Read(r));
             }
-            ApplyDisplay(rows);
+            ApplyDisplay(rows, f.UserId);
 
             using (var wb = new XLWorkbook())
             {
