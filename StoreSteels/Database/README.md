@@ -40,4 +40,5 @@ Run the dated update scripts in order (each one is safe to run more than once):
 | `Update_20261010c.sql` | DEDUCTED list: `StockTransfers.ScanTransactionID` links each source-stock cut to its SCAN IN (older SCAN transfers linked by product / stock / time). Adds one column + index. |
 | `Update_20261010d.sql` | Product cards per stock: `Stocks.CardStyle` (`IMAGE` card with picture, `TEXT` card without picture, `OFF` no cards; NULL = as before: IMAGE when the stock shows the IMAGE column). Adds one column. |
 | `Update_20261013.sql` | Multi-Scanner DISPLAY per user: `CIMS.UserScanDisplays` (UserID + StockID + DisplayField). A user without a row sees the stock setting (`Stocks.ScanDisplayField`) as before. Creates one table. |
+| `Update_20261013b.sql` | Settings remembered per user: `CIMS.UserSettings` (UserID + SettingKey -> SettingValue), e.g. the stock chosen in Inventory Registration. Creates one table. |
 | `ClearOperationalData.sql` | Clears transactions / logs / stock quantities while keeping users, permissions and setup. Only run it when you really want to reset data. |

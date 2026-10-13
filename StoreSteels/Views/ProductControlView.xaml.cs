@@ -21,6 +21,8 @@
         {
             private readonly ProductControlViewModel _viewModel;
             private string _currentViewingCode = "";
+            private readonly string _userId;   // คลังที่เลือกค้างไว้จำตาม UserID (CIMS.UserSettings)
+            private const string KeyFilter = "ProductControl.Filter", KeyStocks = "ProductControl.Stocks";
             // ✅ แก้ไขตรงนี้: เปลี่ยนจาก _oldPartCode เป็น _oldPartACode เพื่อให้สามารถเรียกใช้งานในเมธอดด้านล่างได้
             private string _oldPartACode = "";
 
@@ -30,6 +32,7 @@
 
                 _viewModel = new ProductControlViewModel();
                 _viewModel.CurrentUser = session;
+                _userId = session?.UserId;
 
                 this.DataContext = _viewModel;
 
@@ -107,7 +110,7 @@
                     System.Diagnostics.Debug.WriteLine($"LoadStocks: {ex.Message}");
                     _stocks = new List<StockModel>();
                 }
-                SetStockChips(true, null);
+                SetDefaultStockChips();
                 btnStockDelete.Visibility = DeletableStocks().Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
                 // ช่องกรองตารางตามคลัง: ALL STOCKS + ทุกคลัง
@@ -115,7 +118,11 @@
                 cbStockFilter.Items.Clear();
                 cbStockFilter.Items.Add(new ComboBoxItem { Content = "ALL STOCKS", Tag = null });
                 foreach (var s in _stocks) cbStockFilter.Items.Add(new ComboBoxItem { Content = s.Code, Tag = s.StkId, ToolTip = s.Name });
-                cbStockFilter.SelectedIndex = 0;
+                // คลังที่ผู้ใช้เลือกดูไว้ครั้งก่อน (ไม่มีแล้ว = ALL STOCKS)
+                string savedFilter = UserSettings.Get(_userId, KeyFilter, "");
+                var savedItem = cbStockFilter.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag is int id && id.ToString() == savedFilter);
+                cbStockFilter.SelectedItem = savedItem ?? cbStockFilter.Items[0];
+                if (savedItem != null) { _viewModel.FilterStkId = (int)savedItem.Tag; _viewModel.LoadData(txtSearch.Text); }
                 cbStockFilter.Visibility = _stocks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
                 _loadingFilter = false;
 
@@ -149,8 +156,29 @@
             {
                 if (_loadingFilter || _viewModel == null) return;
                 _viewModel.FilterStkId = (cbStockFilter.SelectedItem as ComboBoxItem)?.Tag as int?;
+                UserSettings.Set(_userId, KeyFilter, _viewModel.FilterStkId?.ToString() ?? "");   // เลือกค้างไว้ (ตาม UserID)
                 _viewModel.LoadData(txtSearch.Text);
             }
+
+            // คลังที่ติ๊กไว้ตอนลงทะเบียนสินค้าใหม่: จำค่าที่ผู้ใช้ติ๊กครั้งล่าสุด "main|id,id" (ยังไม่เคยเลือก = คลังหลัก)
+            private void SetDefaultStockChips()
+            {
+                bool inMain = true; var ids = new List<int>();
+                string v = UserSettings.Get(_userId, KeyStocks, "");
+                if (!string.IsNullOrEmpty(v))
+                {
+                    var parts = v.Split('|');
+                    inMain = parts[0] == "1";
+                    if (parts.Length > 1)
+                        foreach (var t in parts[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                            if (int.TryParse(t, out int id) && _stocks.Any(x => x.StkId == id && !x.IsMain)) ids.Add(id);
+                    if (!inMain && ids.Count == 0) inMain = true;
+                }
+                SetStockChips(inMain, ids);
+            }
+
+            private void SaveDefaultStockChips() =>
+                UserSettings.Set(_userId, KeyStocks, (SelectedInMain() ? "1" : "0") + "|" + string.Join(",", SelectedOtherStockIds()));
 
             // Stock-CHR ติ๊ก = แสดงในตารางคลังหลัก (IsShowInMaster) / คลังอื่นติ๊ก = อยู่ในคลังนั้น
             private void SetStockChips(bool inMain, IEnumerable<int> otherIds)
@@ -159,14 +187,17 @@
                 wpStocks.Children.Clear();
                 foreach (var s in _stocks)
                 {
-                    wpStocks.Children.Add(new CheckBox
+                    var chip = new CheckBox
                     {
                         Content = s.Code,
                         Tag = s,
                         ToolTip = s.Name,
                         IsChecked = s.IsMain ? inMain : others.Contains(s.StkId),
                         Style = (Style)FindResource("StkChip")
-                    });
+                    };
+                    // ติ๊กตอนเพิ่มสินค้าใหม่ (ไม่ได้เปิดสินค้าเดิมอยู่) = จำเป็นค่าเริ่มต้นของผู้ใช้
+                    chip.Click += (o, e) => { if (string.IsNullOrEmpty(_currentViewingCode)) SaveDefaultStockChips(); };
+                    wpStocks.Children.Add(chip);
                 }
             }
 
@@ -527,8 +558,8 @@
             // 🎯 หัวใจสำคัญ: สร้างตัวใหม่ไปเลย เพื่อตัดความสัมพันธ์กับ Row เดิมในตาราง
             _viewModel.SelectedProduct = new ProductControlModel();
 
-            // คลังกลับเป็นค่าเริ่มต้น (Stock-CHR)
-            SetStockChips(true, null);
+            // คลังกลับเป็นค่าที่ผู้ใช้เลือกค้างไว้ (ยังไม่เคยเลือก = คลังหลัก)
+            SetDefaultStockChips();
 
             _currentViewingCode = string.Empty;
             _oldPartACode = null;

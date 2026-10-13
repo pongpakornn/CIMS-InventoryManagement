@@ -178,13 +178,17 @@ namespace CIMS.ViewModels
         private int _currentOffset = 0;
         private const int PageSize = 100;
 
+        private int _loadVer;   // โหลดซ้อนกัน (เช่น เปิดหน้าแล้วตั้งคลังที่จำไว้) -> ใช้ผลของครั้งล่าสุดเท่านั้น
+
         public async void LoadData(string keyword = "", bool isLoadMore = false)
         {
             if (!isLoadMore) _currentOffset = 0;
+            int ver = isLoadMore ? _loadVer : ++_loadVer;
 
             try
             {
                 var data = await Task.Run(() => _qrService.GetInventoryForQR(keyword?.Trim(), FilterStkId));
+                if (ver != _loadVer) return;
                 var paged = data.Skip(_currentOffset).Take(PageSize).ToList();
 
                 Application.Current.Dispatcher.Invoke(() =>
