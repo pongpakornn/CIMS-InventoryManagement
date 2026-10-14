@@ -133,6 +133,11 @@ namespace CIMS.Services
 
             var cards = new UniformGrid { Columns = cols, Rows = rows, Margin = new Thickness(m, m, m, m + A4FooterMm * MmToPx) };
 
+            // 14 ใบ (2×7): การ์ด = แบบ 10 ใบย่อลงทั้งใบ (สัดส่วนเดียวกัน กว้าง 5/7 ของช่อง ≈ 69 มม.) วางกลางช่อง
+            //   ไม่งั้นกว้างเท่าแบบ 10 แต่เตี้ยกว่า การ์ดดูยาวเกิน / แบบ 10 และ 12 ใบ = เต็มช่องเหมือนเดิม
+            double cellW = (w - 2 * m) / cols;
+            double holderW = rows >= 7 ? cellW * 5 / rows : double.NaN;
+
             for (int i = 0; i < cols * rows; i++)
             {
                 // เส้นประรอบช่อง = แนวตัดการ์ด
@@ -148,7 +153,7 @@ namespace CIMS.Services
                     StrokeThickness = 0.8,
                     StrokeDashArray = new DoubleCollection { 6, 4 }
                 };
-                var holder = new Grid();
+                var holder = new Grid { Width = holderW, HorizontalAlignment = HorizontalAlignment.Center };
                 holder.Children.Add(dash);
                 if (i < pageItems.Count) { cell.BorderThickness = new Thickness(0); cell.Child = BuildA4Card(pageItems[i], rows); }
                 holder.Children.Add(cell);
@@ -219,7 +224,7 @@ namespace CIMS.Services
         // แถวที่เหลือยาวเต็มการ์ด - ข้อมูลแสดงอย่างเดียว ไม่แก้ไขอะไร
         // ขนาดตามจำนวนใบต่อแผ่น (2 คอลัมน์ x rows แถว): 10 ใบ = 2x5 / 12 ใบ = 2x6 / 14 ใบ = 2x7
         private static (double S, double QrMm, double LogoMm) CardSizes(int rows) =>
-            rows >= 7 ? (0.64, 13.5, 6.2) : rows == 6 ? (0.72, 16, 7.4) : (0.82, 19, 8.8);
+            rows >= 7 ? (0.58, 13.5, 6.2) : rows == 6 ? (0.72, 16, 7.4) : (0.82, 19, 8.8);   // 14 ใบ = แบบ 10 ใบ × 5/7
 
         private static readonly Lazy<System.Windows.Media.Imaging.BitmapImage> Logo = new Lazy<System.Windows.Media.Imaging.BitmapImage>(() =>
         {
