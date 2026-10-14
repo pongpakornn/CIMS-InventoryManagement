@@ -35,9 +35,9 @@ namespace CIMS.Views
 
         public PrintQueue SelectedQueue { get; private set; }
         public bool IsA4 { get; private set; }
-        public int Cols => 2;
-        // A4: 10 ใบ (2 x 5) / 12 ใบ (2 x 6) / 14 ใบ (2 x 7) ต่อแผ่น
-        public int Rows => rb14.IsChecked == true ? 7 : rb12.IsChecked == true ? 6 : 5;
+        // A4: 10 ใบ (2 x 5) / 12 ใบ (2 x 6) / 14 ใบ (2 x 7) / 21 ใบ (3 x 7) ต่อแผ่น
+        public int Cols => rb21.IsChecked == true ? 3 : 2;
+        public int Rows => rb14.IsChecked == true || rb21.IsChecked == true ? 7 : rb12.IsChecked == true ? 6 : 5;
 
         private PrinterChoiceWindow(IList<PackingCardModel> items, List<PrinterItem> printers)
         {
@@ -53,7 +53,8 @@ namespace CIMS.Views
                                       ?? printers.FirstOrDefault(p => p.IsDefault)
                                       ?? printers.FirstOrDefault();
             int lastRows = UiPrefs.GetInt("PickListA4Rows", 5);
-            (lastRows == 7 ? rb14 : lastRows == 6 ? rb12 : rb10).IsChecked = true;
+            int lastCols = UiPrefs.GetInt("PickListA4Cols", 2);
+            (lastCols == 3 ? rb21 : lastRows == 7 ? rb14 : lastRows == 6 ? rb12 : rb10).IsChecked = true;
             _ready = true;
             Refresh();
         }
@@ -138,6 +139,7 @@ namespace CIMS.Views
             IsA4 = !p.IsLabel;
             UiPrefs.Set("PickListPrinter", p.Name);
             UiPrefs.Set("PickListA4Rows", Rows);
+            UiPrefs.Set("PickListA4Cols", Cols);
             DialogResult = true;
         }
 

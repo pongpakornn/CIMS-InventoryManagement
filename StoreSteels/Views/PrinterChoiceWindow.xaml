@@ -64,23 +64,30 @@
 
                     <StackPanel x:Name="pnlLayout" DockPanel.Dock="Bottom" Margin="0,14,0,0">
                         <TextBlock Text="A4 LAYOUT" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
-                        <UniformGrid Columns="3">
-                            <RadioButton x:Name="rb10" GroupName="layout" Checked="Layout_Checked" Margin="0,0,5,0" Style="{StaticResource LayoutOption}">
+                        <UniformGrid Columns="2">   <!-- 2 × 2: 4 ปุ่มเรียงแถวเดียวแคบจนตัวหนังสือโดนตัด -->
+                            <RadioButton x:Name="rb10" GroupName="layout" Checked="Layout_Checked" Margin="0,0,5,5" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="10 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="2 × 5 • large" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="rb12" GroupName="layout" Checked="Layout_Checked" Margin="5,0,5,0" Style="{StaticResource LayoutOption}">
+                            <RadioButton x:Name="rb12" GroupName="layout" Checked="Layout_Checked" Margin="5,0,0,5" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="12 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="2 × 6 • medium" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="rb14" GroupName="layout" Checked="Layout_Checked" Margin="5,0,0,0" Style="{StaticResource LayoutOption}">
+                            <RadioButton x:Name="rb14" GroupName="layout" Checked="Layout_Checked" Margin="0,5,5,0" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="14 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="2 × 7 • compact" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <!-- 21 ใบ (3 × 7): การ์ดขนาดเกือบเท่าแบบ 14 ใบ ขอบกระดาษ 5 มม. -->
+                            <RadioButton x:Name="rb21" GroupName="layout" Checked="Layout_Checked" Margin="5,5,0,0" Style="{StaticResource LayoutOption}">
+                                <StackPanel>
+                                    <TextBlock Text="21 / PAGE" FontSize="15" FontWeight="Black"/>
+                                    <TextBlock Text="3 × 7 • small" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
                                 </StackPanel>
                             </RadioButton>
                         </UniformGrid>

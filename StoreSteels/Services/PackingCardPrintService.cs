@@ -81,6 +81,7 @@ namespace CIMS.Services
         // ================================================================================
         private const double A4WidthMm = 210, A4HeightMm = 297;
         private const double A4MarginMm = 8;      // ขอบกระดาษ (เครื่องพิมพ์ส่วนใหญ่พิมพ์ชิดขอบได้ไม่เกิน ~4-5mm)
+        private const double A4MarginMm3Cols = 5; // 21 ใบ (3 × 7): ขอบ 5 มม. ให้การ์ดใหญ่เกือบเท่าแบบ 14 ใบ (≈ 66 × 40 มม.)
         private const double A4FooterMm = 6;      // บรรทัดท้ายหน้า (เลขหน้า)
 
         private List<PackingCardModel> PrintA4(PrintDialog printDialog, IList<PackingCardModel> items, int cols, int rows, Action<int, int> onProgress)
@@ -128,7 +129,7 @@ namespace CIMS.Services
         // 1 หน้า A4: ตาราง cols x rows ของการ์ด / ช่องที่ไม่มีการ์ดปล่อยว่าง / เลขหน้าด้านล่าง
         public FrameworkElement BuildA4Page(IList<PackingCardModel> pageItems, int cols, int rows, int pageNo, int pageCount)
         {
-            double w = A4WidthMm * MmToPx, h = A4HeightMm * MmToPx, m = A4MarginMm * MmToPx;
+            double w = A4WidthMm * MmToPx, h = A4HeightMm * MmToPx, m = (cols >= 3 ? A4MarginMm3Cols : A4MarginMm) * MmToPx;
             var root = new Grid { Width = w, Height = h, Background = Brushes.White };
 
             var cards = new UniformGrid { Columns = cols, Rows = rows, Margin = new Thickness(m, m, m, m + A4FooterMm * MmToPx) };
@@ -136,7 +137,7 @@ namespace CIMS.Services
             // 14 ใบ (2×7): การ์ด = แบบ 10 ใบย่อลงทั้งใบ (สัดส่วนเดียวกัน กว้าง 5/7 ของช่อง ≈ 69 มม.) วางกลางช่อง
             //   ไม่งั้นกว้างเท่าแบบ 10 แต่เตี้ยกว่า การ์ดดูยาวเกิน / แบบ 10 และ 12 ใบ = เต็มช่องเหมือนเดิม
             double cellW = (w - 2 * m) / cols;
-            double holderW = rows >= 7 ? cellW * 5 / rows : double.NaN;
+            double holderW = cols == 2 && rows >= 7 ? cellW * 5 / rows : double.NaN;
 
             for (int i = 0; i < cols * rows; i++)
             {
@@ -153,9 +154,14 @@ namespace CIMS.Services
                     StrokeThickness = 0.8,
                     StrokeDashArray = new DoubleCollection { 6, 4 }
                 };
-                var holder = new Grid { Width = holderW, HorizontalAlignment = HorizontalAlignment.Center };
+                // กว้างเต็มช่องเสมอ ยกเว้น 14 ใบที่ย่อความกว้าง (ช่องว่างก็ต้องเต็มช่อง ไม่งั้นเส้นประหดเป็นเส้นเดียว)
+                var holder = new Grid
+                {
+                    Width = holderW,
+                    HorizontalAlignment = double.IsNaN(holderW) ? HorizontalAlignment.Stretch : HorizontalAlignment.Center
+                };
                 holder.Children.Add(dash);
-                if (i < pageItems.Count) { cell.BorderThickness = new Thickness(0); cell.Child = BuildA4Card(pageItems[i], rows); }
+                if (i < pageItems.Count) { cell.BorderThickness = new Thickness(0); cell.Child = BuildA4Card(pageItems[i], rows, cols); }
                 holder.Children.Add(cell);
                 cards.Children.Add(holder);
             }
@@ -223,7 +229,8 @@ namespace CIMS.Services
         // Product Code-Product Name, Work Order-LOT NO., Part Name (FG_FPDNAME), Quantity + หน่วย-TicketDate) จัดให้พอดีช่อง: QR อยู่ขวาข้างหัวการ์ด + แถว Bill-Group
         // แถวที่เหลือยาวเต็มการ์ด - ข้อมูลแสดงอย่างเดียว ไม่แก้ไขอะไร
         // ขนาดตามจำนวนใบต่อแผ่น (2 คอลัมน์ x rows แถว): 10 ใบ = 2x5 / 12 ใบ = 2x6 / 14 ใบ = 2x7
-        private static (double S, double QrMm, double LogoMm) CardSizes(int rows) =>
+        private static (double S, double QrMm, double LogoMm) CardSizes(int rows, int cols = 2) =>
+            cols >= 3 ? (0.56, 13, 6.0) :                                                     // 21 ใบ (3 × 7) ≈ ขนาดแบบ 14 ใบ
             rows >= 7 ? (0.58, 13.5, 6.2) : rows == 6 ? (0.72, 16, 7.4) : (0.82, 19, 8.8);   // 14 ใบ = แบบ 10 ใบ × 5/7
 
         private static readonly Lazy<System.Windows.Media.Imaging.BitmapImage> Logo = new Lazy<System.Windows.Media.Imaging.BitmapImage>(() =>
@@ -237,9 +244,9 @@ namespace CIMS.Services
             return bmp;
         });
 
-        public FrameworkElement BuildA4Card(PackingCardModel item, int rows = 5)
+        public FrameworkElement BuildA4Card(PackingCardModel item, int rows = 5, int cols = 2)
         {
-            var (s, qrMm, logoMm) = CardSizes(rows);
+            var (s, qrMm, logoMm) = CardSizes(rows, cols);
             var card = new Border
             {
                 Background = Brushes.White,
