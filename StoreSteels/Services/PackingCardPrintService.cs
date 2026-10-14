@@ -61,7 +61,7 @@ namespace CIMS.Services
 
             if (a4) return PrintA4(printDialog, items, cols, rows, onProgress);
 
-            // เครื่องพิมพ์ฉลาก QL-800 (62mm) เหมือนเดิม
+            // เครื่องพิมพ์ฉลาก QL-800 (62mm) - เครื่องสำรอง ใช้แม่แบบ .lbx เดิม (เปลี่ยนแค่ Part Name เป็น FG_FPDNAME)
             return File.Exists(TemplatePath)
                 ? PrintViaBpac(printDialog, items, onProgress)
                 : PrintViaPrintVisual(printDialog, items, onProgress);
@@ -164,11 +164,58 @@ namespace CIMS.Services
                 Margin = new Thickness(0, 0, 0, m)
             };
             root.Children.Add(footer);
+
+            // จัดวางก่อน 1 รอบให้รู้ความกว้างจริงของแต่ละช่อง แล้วย่อตัวอักษรค่าที่ยาวเกินให้แสดงครบ (ไม่ตัด ...)
+            root.Measure(new Size(w, h));
+            root.Arrange(new Rect(0, 0, w, h));
+            FitA4Texts(root);
+            root.InvalidateMeasure();
             return root;
         }
 
-        // การ์ด A4 (10 / 12 / 14 ใบต่อแผ่น) = ข้อมูลชุดเดียวกับการ์ด Pick List เดิม (โลโก้บริษัท / QR / Bill-Group,
-        // Work Order-LOT NO., Part Name, Quantity-TicketDate) จัดให้พอดีช่อง: QR อยู่ขวาข้างหัวการ์ด + แถว Bill-Group
+        // ค่าที่ Tag = จำนวนบรรทัดที่ยอมให้ (1 / 2): ย่อฟอนต์ทีละนิดจนพอดีช่อง (เล็กสุด 55% ของขนาดปกติ)
+        private static void FitA4Texts(DependencyObject node)
+        {
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+            {
+                if (child is TextBlock tb && tb.Tag is int lines && tb.Parent is Border box)
+                {
+                    // ความสูงที่ใช้ได้ = ความสูงแถวของการ์ด (แถว star) ไม่ใช่ความสูงของข้อความเอง
+                    double height = double.PositiveInfinity;
+                    if (box.Parent is Grid line && line.Parent is Grid card && Grid.GetRow(line) < card.RowDefinitions.Count)
+                        height = card.RowDefinitions[Grid.GetRow(line)].ActualHeight - line.Margin.Bottom - box.BorderThickness.Bottom - 1;
+                    FitText(tb, box.ActualWidth, height, lines);
+                }
+                if (child is DependencyObject d) FitA4Texts(d);
+            }
+        }
+
+        private static void FitText(TextBlock tb, double width, double height, int lines)
+        {
+            if (width <= 0 || string.IsNullOrEmpty(tb.Text)) return;
+            width = width * 0.96 - 2;   // เผื่อระยะ: ตัวอักษรจริงกว้างกว่าค่าที่คำนวณได้นิดหน่อย
+            double baseSize = tb.FontSize, pad = tb.Padding.Top + tb.Padding.Bottom;
+            var face = new Typeface(tb.FontFamily, tb.FontStyle, tb.FontWeight, tb.FontStretch);
+            for (double f = baseSize; f >= baseSize * 0.5; f -= baseSize * 0.03)
+            {
+                var ft = new FormattedText(tb.Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, face, f, Brushes.Black, 1.0);
+                double lineH = ft.Height;   // ความสูง 1 บรรทัด (ก่อนตัดบรรทัด)
+                bool fits;
+                if (ft.WidthIncludingTrailingWhitespace <= width) fits = lineH + pad <= height;   // บรรทัดเดียวพอ
+                else if (lines >= 2)
+                {
+                    ft.MaxTextWidth = width;
+                    fits = ft.Height <= lineH * lines + 0.5 && ft.Height + pad <= height;          // 2 บรรทัด และแถวสูงพอ
+                }
+                else fits = false;
+                tb.FontSize = f;
+                if (fits) break;
+            }
+            tb.MaxHeight = Math.Max(tb.FontSize * 1.4, Math.Min(height, lines * tb.FontSize * 1.6));
+        }
+
+        // การ์ด A4 (10 / 12 / 14 ใบต่อแผ่น) = เครื่องพิมพ์หลักของ Pick List (Fuji ApeosPort) (โลโก้บริษัท / QR / Bill-Group,
+        // Product Code-Product Name, Work Order-LOT NO., Part Name (FG_FPDNAME), Quantity + หน่วย-TicketDate) จัดให้พอดีช่อง: QR อยู่ขวาข้างหัวการ์ด + แถว Bill-Group
         // แถวที่เหลือยาวเต็มการ์ด - ข้อมูลแสดงอย่างเดียว ไม่แก้ไขอะไร
         // ขนาดตามจำนวนใบต่อแผ่น (2 คอลัมน์ x rows แถว): 10 ใบ = 2x5 / 12 ใบ = 2x6 / 14 ใบ = 2x7
         private static (double S, double QrMm, double LogoMm) CardSizes(int rows) =>
@@ -201,8 +248,9 @@ namespace CIMS.Services
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 0 header
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                       // 1 divider
-            // 2 Bill-Group / 3 Work Order-LOT / 4 Part Name (สูงกว่า ให้ชื่อยาวขึ้น 2 บรรทัดได้ครบ) / 5 Quantity-TicketDate
-            foreach (double weight in new[] { 1.0, 1.0, 1.7, 1.0 }) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(weight, GridUnitType.Star) });
+            // 2 Bill-Group / 3 Product Code / 4 Product Name (2 บรรทัดได้) - การ์ดแคบ ใส่คู่กันในบรรทัดเดียวแล้วชื่อสินค้าเหลือที่น้อยเกิน
+            // 5 Work Order-LOT / 6 Part Name = FG_FPDNAME (2 บรรทัดได้) / 7 Quantity (+ หน่วย FUNITM)-TicketDate
+            foreach (double weight in new[] { 1.0, 1.0, 1.35, 1.0, 1.2, 1.0 }) g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(weight, GridUnitType.Star) });
 
             // หัวการ์ด: โลโก้บริษัท (รูป CH. RADIATORS CO.,LTD. + ชื่อไทย) อย่างเดียว
             var logo = new Image
@@ -231,25 +279,31 @@ namespace CIMS.Services
 
             // ปี ค.ศ. เสมอ ตรงกับพรีวิวการ์ดในหน้า Pick List (เครื่องที่ตั้งปฏิทินไทยจะได้ 2569 ถ้าใช้รูปแบบของเครื่อง)
             string date = item.TicketDate == DateTime.MinValue ? "" : item.TicketDate.ToString("dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture);
-            AddA4Row(g, 2, 1, s, ("Bill", item.TicketNo), ("Group", item.GroupCode));
-            AddA4Row(g, 3, 2, s, ("Work Order", item.WorkOrder), ("LOT NO.", item.LotNo));
-            AddA4Row(g, 4, 2, s, ("Part Name", item.JobName));
-            AddA4Row(g, 5, 2, s, ("Quantity", $"{item.Qty:0.##}"), ("TicketDate", date));
+            AddA4Row(g, 2, 1, s, new[] { 1.8, 1.0 }, false, ("Bill", item.TicketNo), ("Group", item.GroupCode));
+            AddA4Row(g, 3, 2, s, null, false, ("Product Code", item.MaterialCode));
+            AddA4Row(g, 4, 2, s, ("Product Name", item.ProductName));
+            AddA4Row(g, 5, 2, s, new[] { 1.8, 1.0 }, false, ("Work Order", item.WorkOrder), ("LOT NO.", item.LotNo));
+            AddA4Row(g, 6, 2, s, ("Part Name", item.FgName));
+            AddA4Row(g, 7, 2, s, ("Quantity", item.QtyText), ("TicketDate", date));
 
             card.Child = g;
             return card;
         }
         // แถวของการ์ด A4: ป้ายชื่อตัวหนา + ค่าบนเส้นใต้ (แบบเดียวกับการ์ดเดิม) - 1 หรือ 2 คู่ต่อแถว
         private static void AddA4Row(Grid g, int row, int colSpan, double s, params (string Label, string Value)[] fields)
+            => AddA4Row(g, row, colSpan, s, null, fields.Length == 1, fields);
+
+        // stars = สัดส่วนความกว้างของค่าแต่ละช่อง (null = เท่ากัน) / twoLines = ค่ายาวได้ 2 บรรทัด
+        private static void AddA4Row(Grid g, int row, int colSpan, double s, double[] stars, bool twoLines, params (string Label, string Value)[] fields)
         {
             var line = new Grid { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 0.6 * MmToPx * s) };
             for (int i = 0; i < fields.Length; i++)
             {
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(stars != null && i < stars.Length ? stars[i] : 1, GridUnitType.Star) });
                 var label = new TextBlock { Text = fields[i].Label, FontSize = 13.5 * s, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6 * s, 2 * s) };
                 Grid.SetColumn(label, i * 2);
-                bool wide = fields.Length == 1;
+                bool wide = twoLines && i == fields.Length - 1;   // ช่องสุดท้ายของแถว (Product Name / Part Name) ยาวได้ 2 บรรทัด
                 var value = new TextBlock
                 {
                     Text = fields[i].Value ?? "",
@@ -258,8 +312,10 @@ namespace CIMS.Services
                     HorizontalAlignment = HorizontalAlignment.Center,
                     TextAlignment = TextAlignment.Center,
                     TextWrapping = TextWrapping.Wrap,
-                    MaxHeight = (wide ? 2 : 1) * 15 * s * 1.6,   // Part Name ยาวได้ 2 บรรทัด / ค่าอื่น 1 บรรทัด
+                    MaxHeight = (wide ? 2 : 1) * 15 * s * 1.6,   // Part Name / Product Name ยาวได้ 2 บรรทัด / ค่าอื่น 1 บรรทัด
                     TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Bottom,  // ชิดเส้นใต้เสมอ แม้ช่องข้างๆ สูง 2 บรรทัด
+                    Tag = wide ? 2 : 1,                           // FitA4Texts: ยาวเกินช่อง = ย่อฟอนต์ให้ครบ
                     Padding = new Thickness(0, 0, 0, 1.5 * s)
                 };
                 var under = new Border
@@ -345,7 +401,7 @@ namespace CIMS.Services
             SetText(doc, "GroupCode", item.GroupCode);
             SetText(doc, "WorkOrder", item.WorkOrder);
             SetText(doc, "LotNo", item.LotNo);
-            SetText(doc, "JobName", item.JobName);
+            SetText(doc, "JobName", item.FgName);   // ช่อง Part Name ในแม่แบบ = FG_FPDNAME (เดิม FREMARK)
             SetText(doc, "Qty", item.Qty.ToString("0.##"));
             SetText(doc, "TicketDate", item.TicketDate == DateTime.MinValue ? "" : item.TicketDate.ToString("dd-MM-yyyy"));
 
@@ -453,7 +509,7 @@ namespace CIMS.Services
             Grid.SetRow(workLot, 3);
             root.Children.Add(workLot);
 
-            var partNameRow = BuildSingleFieldRow("Part Name", item.JobName);
+            var partNameRow = BuildSingleFieldRow("Part Name", item.FgName);
             Grid.SetRow(partNameRow, 4);
             root.Children.Add(partNameRow);
 

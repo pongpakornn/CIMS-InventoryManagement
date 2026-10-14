@@ -18,9 +18,20 @@ namespace CIMS.Models
         public string MaterialCode { get; set; }    // FPDCODE
         public string WorkOrder { get; set; }       // FWONO
         public string LotNo { get; set; }           // FLOTNO
-        public string JobName { get; set; }         // FREMARK -> แสดงเป็น Part Name
+        public string JobName { get; set; }         // FREMARK (ยังอยู่ใน QR + ค้นหาได้)
         public decimal Qty { get; set; }            // FQTY
         public DateTime TicketDate { get; set; }    // FMDATE
+        public string ProductName { get; set; }     // SD05PDDS.FPDNAME ของ FPDCODE -> PRODUCT NAME
+        public string Unit { get; set; }            // SD05PDDS.FUNITM -> หน่วยต่อท้ายจำนวน
+        public string FgName { get; set; }          // FG_FPDNAME (ชื่อสินค้าสำเร็จรูปของ Work Order) -> PART NAME
+
+        public string QtyText => string.IsNullOrEmpty(Unit) ? Qty.ToString("0.##") : $"{Qty:0.##} {Unit}";
+
+        // 🕘 ประวัติย้อนหลัง: พิมพ์แล้วหรือยัง (ว่าง = ยังไม่พิมพ์)
+        public string PrintedBy { get; set; }
+        public DateTime? PrintedDate { get; set; }
+        public bool IsPrinted => PrintedDate.HasValue;
+        public string PrintedText => PrintedDate.HasValue ? $"{PrintedDate.Value.ToString("dd-MM-yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)}  {PrintedBy}" : "";
 
         public bool IsSelected
         {

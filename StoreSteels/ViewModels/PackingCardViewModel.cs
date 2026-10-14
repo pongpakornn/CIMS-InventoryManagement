@@ -65,12 +65,41 @@ namespace CIMS.ViewModels
 
         private List<PackingCardModel> _allItems = new List<PackingCardModel>();
 
+        // 🕘 โหมดประวัติย้อนหลัง (ไม่เกิน 2 เดือน) - ปกติ = วันนี้ที่ยังไม่พิมพ์ / ประวัติ = ทุกรายการในช่วงวันที่ + สถานะพิมพ์
+        private bool _isHistory;
+        public bool IsHistory
+        {
+            get => _isHistory;
+            private set { _isHistory = value; OnPropertyChanged(); }
+        }
+        public DateTime HistoryFrom { get; private set; }
+        public DateTime HistoryTo { get; private set; }
+        public static DateTime HistoryMin => DateTime.Today.AddMonths(-PackingCardErpService.HistoryMonths);
+
+        public void LoadHistory(DateTime from, DateTime to)
+        {
+            HistoryFrom = from.Date; HistoryTo = to.Date;
+            IsHistory = true;
+            LoadData();
+        }
+
+        public void BackToToday()
+        {
+            IsHistory = false;
+            LoadData();
+        }
+
+        private int _loadVersion;
+
         public async void LoadData()
         {
             IsLoading = true;
+            int ver = ++_loadVersion;
             try
             {
-                var data = await Task.Run(() => _erpService.GetPendingPackingCards());
+                bool history = IsHistory; DateTime from = HistoryFrom, to = HistoryTo;
+                var data = await Task.Run(() => history ? _erpService.GetHistory(from, to) : _erpService.GetPendingPackingCards());
+                if (ver != _loadVersion) return;   // กดโหลดรอบใหม่ไปแล้ว ผลรอบนี้ไม่ใช้
                 _allItems = data;
                 ApplyFilter();
             }
@@ -87,6 +116,7 @@ namespace CIMS.ViewModels
         // ⚡ เรียลไทม์ (1) เครื่องอื่นพิมพ์ไปแล้ว (CIMS.PickListPrintLogs) -> ตัดออกจากรายการนี้ทันที
         public void RemovePrinted(HashSet<string> printedKeys)
         {
+            if (IsHistory) return;   // ประวัติ = แสดงทั้งที่พิมพ์แล้ว ไม่ตัดออก
             var gone = _allItems.Where(x => printedKeys.Contains(PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo))).ToList();
             if (gone.Count > 0) RemoveItems(gone);
         }
@@ -100,22 +130,23 @@ namespace CIMS.ViewModels
 
         public void ApplyLive(List<PackingCardModel> data)
         {
-            if (data == null || Signature(data) == Signature(_allItems)) return;
+            if (IsHistory || data == null || Signature(data) == Signature(_allItems)) return;
             _allItems = data;
             ApplyFilter();
         }
 
         public bool HasSelection => VisibleItems.Any(x => x.IsSelected);
 
-        // 🔎 ค้นหาได้ทุกช่อง (Bill No / Item / Group / Material / Work Order / Lot / Job / Qty / วันที่) พิมพ์แล้วกรองทันที
+        // 🔎 ค้นหาได้ทุกช่อง (Bill No / Item / Group / PD Code / Product Name / Work Order / Lot / Part Name (FG) / Remark /
+        //    Qty / หน่วย / วันที่ / ผู้พิมพ์) พิมพ์แล้วกรองทันที
         //    หลายคำคั่นด้วยช่องว่าง = ต้องเจอครบทุกคำ / เรียงที่ใกล้เคียงที่สุดก่อน (ตรงเป๊ะ > ขึ้นต้นด้วย > มีอยู่ข้างใน)
         //    กรองบน Thread เบื้องหลัง + ยกเลิกรอบเก่าเมื่อพิมพ์ต่อ หน้าจอจึงไม่ค้าง
         private int _filterVersion;
 
         private static string[] Fields(PackingCardModel x) => new[]
         {
-            x.TicketNo, x.ItemNo, x.GroupCode, x.MaterialCode, x.WorkOrder, x.LotNo, x.JobName,
-            x.Qty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+            x.TicketNo, x.ItemNo, x.GroupCode, x.MaterialCode, x.ProductName, x.WorkOrder, x.LotNo, x.FgName, x.JobName,
+            x.Qty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), x.Unit, x.PrintedBy,
             x.TicketDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             x.TicketDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)
         };

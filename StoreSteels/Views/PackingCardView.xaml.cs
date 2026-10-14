@@ -22,6 +22,7 @@ namespace CIMS.Views
         public PackingCardView(UserSession session)
         {
             InitializeComponent();
+            InitHistoryDates();
 
             _viewModel = new PackingCardViewModel();
             _viewModel.CurrentUser = session;
@@ -50,7 +51,7 @@ namespace CIMS.Views
             LiveRefresh.Attach(this, TimeSpan.FromSeconds(60),
                 () => { fresh = _viewModel.FetchPending(); return PackingCardViewModel.Signature(fresh); },
                 () => { _viewModel.ApplyLive(fresh); UpdateItemCountText(); },
-                () => _viewModel.IsLoading || _viewModel.HasSelection || ScrollY(dgPackingCards) > 0.5);
+                () => _viewModel.IsHistory || _viewModel.IsLoading || _viewModel.HasSelection || ScrollY(dgPackingCards) > 0.5);
         }
 
         private static double ScrollY(DependencyObject root)
@@ -69,7 +70,10 @@ namespace CIMS.Views
         {
             int total = _viewModel.VisibleItems.Count;
             int selected = _viewModel.VisibleItems.Count(x => x.IsSelected);
-            txtItemCount.Text = $"SHOWING {total} ITEMS  |  SELECTED {selected} ITEMS";
+            string mode = _viewModel.IsHistory
+                ? $"🕘 HISTORY {_viewModel.HistoryFrom.ToString("dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture)} – {_viewModel.HistoryTo.ToString("dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture)}"
+                : $"TODAY {DateTime.Today.ToString("dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture)}";
+            txtItemCount.Text = $"{mode}  |  SHOWING {total} ITEMS  |  SELECTED {selected} ITEMS";
         }
 
         private void Search_Click(object sender, RoutedEventArgs e)
@@ -82,6 +86,46 @@ namespace CIMS.Views
         {
             _viewModel.ClearSearch();
             UpdateItemCountText();
+        }
+
+        // 🕘 ประวัติย้อนหลัง: เลือกได้ตั้งแต่ 2 เดือนก่อน ถึงวันนี้ (ERP อ่านอย่างเดียว)
+        private void InitHistoryDates()
+        {
+            dpFrom.DisplayDateStart = dpTo.DisplayDateStart = PackingCardViewModel.HistoryMin;
+            dpFrom.DisplayDateEnd = dpTo.DisplayDateEnd = DateTime.Today;
+            dpFrom.SelectedDate = DateTime.Today.AddDays(-7);
+            dpTo.SelectedDate = DateTime.Today;
+        }
+
+        private void History_Click(object sender, RoutedEventArgs e)
+        {
+            DateTime min = PackingCardViewModel.HistoryMin;
+            DateTime from = dpFrom.SelectedDate ?? min, to = dpTo.SelectedDate ?? DateTime.Today;
+            if (from > to) { DialogHelper.ShowWarning("วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุดครับ"); return; }
+            if (from < min || to > DateTime.Today)
+            {
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                DialogHelper.ShowWarning($"ค้นหาประวัติย้อนหลังได้ไม่เกิน 2 เดือน ({min.ToString("dd-MM-yyyy", inv)} ถึง {DateTime.Today.ToString("dd-MM-yyyy", inv)}) ครับ");
+                return;
+            }
+            _viewModel.LoadHistory(from, to);
+            ApplyMode();
+        }
+
+        private void Today_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.BackToToday();
+            ApplyMode();
+        }
+
+        private void ApplyMode()
+        {
+            bool h = _viewModel.IsHistory;
+            colPrinted.Visibility = h ? Visibility.Visible : Visibility.Collapsed;
+            btnToday.Visibility = h ? Visibility.Visible : Visibility.Collapsed;
+            _viewModel.PreviewItem = null;
+            UpdateItemCountText();
+            RefitColumns();
         }
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
@@ -214,7 +258,9 @@ namespace CIMS.Views
 
                 if (printedItems.Count > 0)
                 {
-                    _viewModel.RemoveItems(printedItems);
+                    // ประวัติ = แสดงทั้งที่พิมพ์แล้ว -> โหลดใหม่ให้เห็นสถานะ PRINTED / วันนี้ = ตัดรายการที่พิมพ์แล้วออก
+                    if (_viewModel.IsHistory) _viewModel.LoadData();
+                    else _viewModel.RemoveItems(printedItems);
                     UpdateItemCountText();
                     if (logError == null) DialogHelper.ShowSuccess($"พิมพ์ Packing Card สำเร็จ {printedItems.Count} ใบ");
                     else DialogHelper.ShowWarning($"พิมพ์ Packing Card แล้ว {printedItems.Count} ใบ แต่บันทึกประวัติการพิมพ์ไม่สำเร็จ\nรายการนี้อาจกลับมาแสดงให้พิมพ์อีกครั้ง\n\n{logError}");

@@ -39,6 +39,23 @@ namespace CIMS.Services
             return keys;
         }
 
+        // 🕘 ประวัติย้อนหลัง: ใครพิมพ์ เมื่อไหร่ (key = TicketNo|ItemNo) - พิมพ์ซ้ำได้ ยึดครั้งแรก (LogPrinted ไม่บันทึกซ้ำ)
+        public Dictionary<string, (string By, DateTime Date)> GetPrintedInfo()
+        {
+            var map = new Dictionary<string, (string By, DateTime Date)>(StringComparer.OrdinalIgnoreCase);
+            const string sql = "SELECT TicketNo, ItemNo, PrintedBy, PrintedDate FROM CIMS.PickListPrintLogs";
+            using (var conn = new SqlConnection(_connStr))
+            using (var cmd = new SqlCommand(sql, conn))
+            {
+                conn.Open();
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                        map[MakeKey(rdr["TicketNo"].ToString(), rdr["ItemNo"].ToString())] =
+                            (rdr["PrintedBy"]?.ToString() ?? "", rdr["PrintedDate"] is DateTime d ? d : DateTime.MinValue);
+            }
+            return map;
+        }
+
         // ป้องกัน "String or binary data would be truncated" เผื่อฐานที่ deploy จริงยังเป็นสคีมาเดิม
         // (LabelRef VARCHAR(50) ก่อนที่จะขยายเป็น 200 ใน CIMS.PickListPrintLogs.sql) - ตัดให้พอดี 50 เสมอ
         private const int LabelRefMaxLength = 50;
