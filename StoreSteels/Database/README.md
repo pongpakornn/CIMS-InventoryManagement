@@ -42,4 +42,5 @@ Run the dated update scripts in order (each one is safe to run more than once):
 | `Update_20261013.sql` | Multi-Scanner DISPLAY per user: `CIMS.UserScanDisplays` (UserID + StockID + DisplayField). A user without a row sees the stock setting (`Stocks.ScanDisplayField`) as before. Creates one table. |
 | `Update_20261013b.sql` | Settings remembered per user: `CIMS.UserSettings` (UserID + SettingKey -> SettingValue), e.g. the stock chosen in Inventory Registration. Creates one table. |
 | `Update_20261013c.sql` | Inventory Registration list (`CIMS.sp_GetPartForQR`) asks for a small memory grant (`OPTION (MAX_GRANT_PERCENT = 5)`) so filtering by a stock does not wait behind other queries. Same result and order. |
+| `Update_20261014.sql` | Pick List keeps every item of today on screen and counts reprints: adds `PrintCount`, `LastPrintedBy`, `LastPrintedDate` to `CIMS.PickListPrintLogs` (`PrintedBy` / `PrintedDate` stay the first print). Adds columns only. |
 | `ClearOperationalData.sql` | Clears transactions / logs / stock quantities while keeping users, permissions and setup. Only run it when you really want to reset data. |

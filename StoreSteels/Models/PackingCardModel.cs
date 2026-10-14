@@ -27,11 +27,30 @@ namespace CIMS.Models
 
         public string QtyText => string.IsNullOrEmpty(Unit) ? Qty.ToString("0.##") : $"{Qty:0.##} {Unit}";
 
-        // 🕘 ประวัติย้อนหลัง: พิมพ์แล้วหรือยัง (ว่าง = ยังไม่พิมพ์)
-        public string PrintedBy { get; set; }
-        public DateTime? PrintedDate { get; set; }
+        // 🖨 พิมพ์แล้วหรือยัง (ว่าง = ยังไม่พิมพ์): ครั้งแรก + จำนวนครั้ง + ครั้งล่าสุด (CIMS.PickListPrintLogs)
+        public string PrintedBy { get; private set; }
+        public DateTime? PrintedDate { get; private set; }
+        public int PrintCount { get; private set; }
+        public string LastPrintedBy { get; private set; }
+        public DateTime? LastPrintedDate { get; private set; }
         public bool IsPrinted => PrintedDate.HasValue;
-        public string PrintedText => PrintedDate.HasValue ? $"{PrintedDate.Value.ToString("dd-MM-yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)}  {PrintedBy}" : "";
+
+        private static string Stamp(DateTime d) => d.ToString("dd-MM-yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        public string PrintedText => !PrintedDate.HasValue ? "" : $"{Stamp(PrintedDate.Value)}  {PrintedBy}";
+        // พิมพ์ซ้ำ: "×2 • 14-10-2026 16:40  2125" (ครั้งล่าสุด)
+        public string ReprintText => PrintCount > 1 && LastPrintedDate.HasValue ? $"×{PrintCount} • {Stamp(LastPrintedDate.Value)}  {LastPrintedBy}" : "";
+
+        public void SetPrintInfo(CIMS.Services.PackingPrintLogService.PrintInfo p)
+        {
+            PrintedBy = p?.By;
+            PrintedDate = p == null || p.Date == DateTime.MinValue ? (DateTime?)null : p.Date;
+            PrintCount = p?.Count ?? 0;
+            LastPrintedBy = p?.LastBy;
+            LastPrintedDate = p?.LastDate;
+            OnPropertyChanged(nameof(PrintedText));
+            OnPropertyChanged(nameof(ReprintText));
+            OnPropertyChanged(nameof(IsPrinted));
+        }
 
         public bool IsSelected
         {

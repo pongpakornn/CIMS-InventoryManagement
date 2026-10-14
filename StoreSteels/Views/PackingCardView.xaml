@@ -381,8 +381,27 @@
                         <DataGridTextColumn Header="LOT" Binding="{Binding LotNo}" Width="85" MinWidth="75" ElementStyle="{StaticResource NoWrapCellTextStyle}"/>
                         <!-- PART NAME = FG_FPDNAME (ชื่อสินค้าสำเร็จรูปของ Work Order: PD20WOI1 -> SD05PDDS) แทน FREMARK เดิม -->
                         <DataGridTextColumn Header="PART NAME" Binding="{Binding FgName}" Width="2*" MinWidth="170" ElementStyle="{StaticResource WrapCellTextStyle}"/>
-                        <!-- 🕘 เฉพาะโหมดประวัติ: พิมพ์แล้วเมื่อไหร่ / ใครพิมพ์ -->
-                        <DataGridTextColumn x:Name="colPrinted" Header="PRINTED" Binding="{Binding PrintedText}" Width="1.2*" MinWidth="140" ElementStyle="{StaticResource WrapCellTextStyle}" Visibility="Collapsed"/>
+                        <!-- 🖨 พิมพ์แล้วเมื่อไหร่ / UserID ที่พิมพ์ (ครั้งแรก) + พิมพ์ซ้ำ ×n ครั้งล่าสุด - ว่าง = ยังไม่พิมพ์ -->
+                        <DataGridTemplateColumn x:Name="colPrinted" Header="PRINTED" Width="1.3*" MinWidth="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding PrintedText}" FontSize="12" FontWeight="Bold" Foreground="#2E7D32" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ReprintText}" FontSize="11" FontWeight="SemiBold" Foreground="#E65100" HorizontalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Text" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
             </Border>

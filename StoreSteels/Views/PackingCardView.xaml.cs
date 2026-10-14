@@ -34,13 +34,16 @@ namespace CIMS.Views
 
             RunEntryAnimation();
 
-            // ⚡ เรียลไทม์ (1): เครื่องอื่นพิมพ์ Pick List แล้ว -> รายการนั้นหายจากหน้านี้เอง (ดูจาก CIMS ทุก 5 วินาที)
+            // ⚡ เรียลไทม์ (1): มีคนพิมพ์ / พิมพ์ซ้ำ (เครื่องไหนก็ได้) -> ช่อง PRINTED อัพเดทเอง รายการไม่หาย (ดูจาก CIMS ทุก 5 วินาที)
+            string printToken = DbSchema.HasPickListPrintCount
+                ? "SELECT MAX(PrintID), COUNT_BIG(*), SUM(PrintCount) FROM CIMS.PickListPrintLogs"
+                : "SELECT MAX(PrintID), COUNT_BIG(*) FROM CIMS.PickListPrintLogs";
             LiveRefresh.Attach(this, TimeSpan.FromSeconds(5),
-                () => LiveRefresh.DbToken("SELECT MAX(PrintID), COUNT_BIG(*) FROM CIMS.PickListPrintLogs"),
+                () => LiveRefresh.DbToken(printToken),
                 async () =>
                 {
-                    var keys = await System.Threading.Tasks.Task.Run(() => _printLogService.GetPrintedKeys());
-                    _viewModel.RemovePrinted(keys);
+                    var printed = await System.Threading.Tasks.Task.Run(() => _printLogService.GetPrintedInfo());
+                    _viewModel.ApplyPrinted(printed);
                     UpdateItemCountText();
                 },
                 () => _viewModel.IsLoading);
@@ -121,8 +124,7 @@ namespace CIMS.Views
         private void ApplyMode()
         {
             bool h = _viewModel.IsHistory;
-            colPrinted.Visibility = h ? Visibility.Visible : Visibility.Collapsed;
-            btnToday.Visibility = h ? Visibility.Visible : Visibility.Collapsed;
+           btnToday.Visibility = h ? Visibility.Visible : Visibility.Collapsed;
             _viewModel.PreviewItem = null;
             UpdateItemCountText();
             RefitColumns();
@@ -258,12 +260,12 @@ namespace CIMS.Views
 
                 if (printedItems.Count > 0)
                 {
-                    // ประวัติ = แสดงทั้งที่พิมพ์แล้ว -> โหลดใหม่ให้เห็นสถานะ PRINTED / วันนี้ = ตัดรายการที่พิมพ์แล้วออก
-                    if (_viewModel.IsHistory) _viewModel.LoadData();
-                    else _viewModel.RemoveItems(printedItems);
+                    // รายการไม่หาย: อัพเดทช่อง PRINTED (ใครพิมพ์ เมื่อไหร่ / พิมพ์ซ้ำกี่ครั้ง) + เอาติ๊กออก
+                    try { _viewModel.ApplyPrinted(_printLogService.GetPrintedInfo()); } catch { }
+                    foreach (var item in printedItems) item.IsSelected = false;
                     UpdateItemCountText();
                     if (logError == null) DialogHelper.ShowSuccess($"พิมพ์ Packing Card สำเร็จ {printedItems.Count} ใบ");
-                    else DialogHelper.ShowWarning($"พิมพ์ Packing Card แล้ว {printedItems.Count} ใบ แต่บันทึกประวัติการพิมพ์ไม่สำเร็จ\nรายการนี้อาจกลับมาแสดงให้พิมพ์อีกครั้ง\n\n{logError}");
+                    else DialogHelper.ShowWarning($"พิมพ์ Packing Card แล้ว {printedItems.Count} ใบ แต่บันทึกประวัติการพิมพ์ไม่สำเร็จ\nช่อง PRINTED ของรายการนี้จะยังไม่แสดงว่าพิมพ์แล้ว\n\n{logError}");
                 }
             }
             catch (Exception ex)

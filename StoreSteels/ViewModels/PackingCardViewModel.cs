@@ -98,7 +98,7 @@ namespace CIMS.ViewModels
             try
             {
                 bool history = IsHistory; DateTime from = HistoryFrom, to = HistoryTo;
-                var data = await Task.Run(() => history ? _erpService.GetHistory(from, to) : _erpService.GetPendingPackingCards());
+                var data = await Task.Run(() => history ? _erpService.GetHistory(from, to) : _erpService.GetTodayPackingCards());
                 if (ver != _loadVersion) return;   // กดโหลดรอบใหม่ไปแล้ว ผลรอบนี้ไม่ใช้
                 _allItems = data;
                 ApplyFilter();
@@ -113,12 +113,10 @@ namespace CIMS.ViewModels
             }
         }
 
-        // ⚡ เรียลไทม์ (1) เครื่องอื่นพิมพ์ไปแล้ว (CIMS.PickListPrintLogs) -> ตัดออกจากรายการนี้ทันที
-        public void RemovePrinted(HashSet<string> printedKeys)
+        // ⚡ เรียลไทม์ (1) มีการพิมพ์ (เครื่องนี้ / เครื่องอื่น) -> อัพเดทช่อง PRINTED ของทุกแถว รายการไม่หาย
+        public void ApplyPrinted(Dictionary<string, PackingPrintLogService.PrintInfo> printed)
         {
-            if (IsHistory) return;   // ประวัติ = แสดงทั้งที่พิมพ์แล้ว ไม่ตัดออก
-            var gone = _allItems.Where(x => printedKeys.Contains(PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo))).ToList();
-            if (gone.Count > 0) RemoveItems(gone);
+            PackingCardErpService.ApplyPrintInfo(_allItems, printed);
         }
 
         // ⚡ เรียลไทม์ (2) รายการใหม่จาก ERP (อ่านอย่างเดียว นาทีละครั้ง) - ข้อมูลเปลี่ยนจริงค่อยแสดงใหม่ (คงคำค้น)
@@ -126,11 +124,11 @@ namespace CIMS.ViewModels
             list.Count + "|" + string.Join(",", list.Select(x => PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo) + ":" + x.Qty.ToString(System.Globalization.CultureInfo.InvariantCulture)))
                                 .GetHashCode().ToString();
 
-        public List<PackingCardModel> FetchPending() => _erpService.GetPendingPackingCards();
+        public List<PackingCardModel> FetchPending() => _erpService.GetTodayPackingCards();
 
         public void ApplyLive(List<PackingCardModel> data)
         {
-            if (IsHistory || data == null || Signature(data) == Signature(_allItems)) return;
+            if (IsHistory || data == null || Signature(data) == Signature(_allItems)) return;   // สถานะพิมพ์อัพเดทแยกที่ ApplyPrinted
             _allItems = data;
             ApplyFilter();
         }
@@ -146,7 +144,7 @@ namespace CIMS.ViewModels
         private static string[] Fields(PackingCardModel x) => new[]
         {
             x.TicketNo, x.ItemNo, x.GroupCode, x.MaterialCode, x.ProductName, x.WorkOrder, x.LotNo, x.FgName, x.JobName,
-            x.Qty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), x.Unit, x.PrintedBy,
+            x.Qty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), x.Unit, x.PrintedBy, x.LastPrintedBy,
             x.TicketDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             x.TicketDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)
         };

@@ -23,27 +23,21 @@ namespace CIMS.Services
             _printLogService = printLogService ?? new PackingPrintLogService();
         }
 
-        // หน้า Pick List ปกติ = วันนี้เท่านั้น ที่ยังไม่ได้พิมพ์
-        public List<PackingCardModel> GetPendingPackingCards()
-        {
-            var today = DateTime.Today;
-            var list = Query(today, today);
-            var printed = _printLogService.GetPrintedKeys();
-            return list.Where(x => !printed.Contains(PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo))).ToList();
-        }
+        // หน้า Pick List ปกติ = รายการของวันนี้ครบทุกรายการเสมอ (พิมพ์แล้วไม่หาย แสดงว่าใครพิมพ์ เมื่อไหร่)
+        public List<PackingCardModel> GetTodayPackingCards() => GetHistory(DateTime.Today, DateTime.Today);
 
         // 🕘 ประวัติย้อนหลัง (from-to ไม่เกิน 2 เดือน) = ทุกรายการทั้งที่พิมพ์แล้วและยังไม่พิมพ์ (บอกว่าใครพิมพ์ เมื่อไหร่)
         public List<PackingCardModel> GetHistory(DateTime from, DateTime to)
         {
             var list = Query(from.Date, to.Date);
-            var printed = _printLogService.GetPrintedInfo();
-            foreach (var x in list)
-                if (printed.TryGetValue(PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo), out var p))
-                {
-                    x.PrintedBy = p.By;
-                    x.PrintedDate = p.Date;
-                }
+            ApplyPrintInfo(list, _printLogService.GetPrintedInfo());
             return list;
+        }
+
+        public static void ApplyPrintInfo(IEnumerable<PackingCardModel> list, Dictionary<string, PackingPrintLogService.PrintInfo> printed)
+        {
+            foreach (var x in list)
+                x.SetPrintInfo(printed.TryGetValue(PackingPrintLogService.MakeKey(x.TicketNo, x.ItemNo), out var p) ? p : null);
         }
 
         // ที่มาข้อมูลอ้างอิงรายงาน sp26issf_CH.rpt ของ ERP - ใช้เฉพาะที่ต้องแสดง:

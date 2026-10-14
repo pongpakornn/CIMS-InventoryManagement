@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using CIMS.Core;
+using CIMS.Helpers;
 using CIMS.Models;
 using System;
 using System.Collections.Generic;
@@ -39,19 +40,43 @@ namespace CIMS.Services
             return keys;
         }
 
-        // 🕘 ประวัติย้อนหลัง: ใครพิมพ์ เมื่อไหร่ (key = TicketNo|ItemNo) - พิมพ์ซ้ำได้ ยึดครั้งแรก (LogPrinted ไม่บันทึกซ้ำ)
-        public Dictionary<string, (string By, DateTime Date)> GetPrintedInfo()
+        // ใครพิมพ์ เมื่อไหร่ (key = TicketNo|ItemNo): ครั้งแรก + ครั้งล่าสุด + จำนวนครั้ง (Update_20261014.sql)
+        public class PrintInfo
         {
-            var map = new Dictionary<string, (string By, DateTime Date)>(StringComparer.OrdinalIgnoreCase);
-            const string sql = "SELECT TicketNo, ItemNo, PrintedBy, PrintedDate FROM CIMS.PickListPrintLogs";
+            public string By { get; set; }
+            public DateTime Date { get; set; }
+            public int Count { get; set; } = 1;
+            public string LastBy { get; set; }
+            public DateTime? LastDate { get; set; }
+        }
+
+        public Dictionary<string, PrintInfo> GetPrintedInfo()
+        {
+            var map = new Dictionary<string, PrintInfo>(StringComparer.OrdinalIgnoreCase);
+            bool hasCount = DbSchema.HasPickListPrintCount;
+            string sql = hasCount
+                ? "SELECT TicketNo, ItemNo, PrintedBy, PrintedDate, PrintCount, LastPrintedBy, LastPrintedDate FROM CIMS.PickListPrintLogs"
+                : "SELECT TicketNo, ItemNo, PrintedBy, PrintedDate FROM CIMS.PickListPrintLogs";
             using (var conn = new SqlConnection(_connStr))
             using (var cmd = new SqlCommand(sql, conn))
             {
                 conn.Open();
                 using (var rdr = cmd.ExecuteReader())
                     while (rdr.Read())
-                        map[MakeKey(rdr["TicketNo"].ToString(), rdr["ItemNo"].ToString())] =
-                            (rdr["PrintedBy"]?.ToString() ?? "", rdr["PrintedDate"] is DateTime d ? d : DateTime.MinValue);
+                    {
+                        var p = new PrintInfo
+                        {
+                            By = rdr["PrintedBy"]?.ToString() ?? "",
+                            Date = rdr["PrintedDate"] is DateTime d ? d : DateTime.MinValue
+                        };
+                        if (hasCount)
+                        {
+                            p.Count = rdr["PrintCount"] is int c ? c : 1;
+                            p.LastBy = rdr["LastPrintedBy"] as string;
+                            p.LastDate = rdr["LastPrintedDate"] as DateTime?;
+                        }
+                        map[MakeKey(rdr["TicketNo"].ToString(), rdr["ItemNo"].ToString())] = p;
+                    }
             }
             return map;
         }
@@ -70,8 +95,13 @@ namespace CIMS.Services
                 labelRef = labelRef.Substring(0, LabelRefMaxLength);
             }
 
-            const string sql = @"
-                IF NOT EXISTS (SELECT 1 FROM CIMS.PickListPrintLogs WHERE TicketNo = @TicketNo AND ItemNo = @ItemNo)
+            // พิมพ์ซ้ำ = เก็บครั้งแรกไว้เหมือนเดิม + นับครั้ง / คนพิมพ์ล่าสุด (ฐานที่ยังไม่รัน Update_20261014.sql = ไม่บันทึกซ้ำแบบเดิม)
+            string reprint = DbSchema.HasPickListPrintCount
+                ? @"UPDATE CIMS.PickListPrintLogs SET PrintCount = PrintCount + 1, LastPrintedBy = @PrintedBy, LastPrintedDate = GETDATE()
+                    WHERE TicketNo = @TicketNo AND ItemNo = @ItemNo;
+                    IF @@ROWCOUNT = 0 "
+                : "IF NOT EXISTS (SELECT 1 FROM CIMS.PickListPrintLogs WHERE TicketNo = @TicketNo AND ItemNo = @ItemNo) ";
+            string sql = reprint + @"
                 INSERT INTO CIMS.PickListPrintLogs
                     (TicketNo, ItemNo, Warehouse, LotNo, MaterialCode, WorkOrder, TicketDate, JobName, Quantity, PrintedBy, LabelRef)
                 VALUES
