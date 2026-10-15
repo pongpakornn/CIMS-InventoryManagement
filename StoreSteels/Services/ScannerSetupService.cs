@@ -18,6 +18,7 @@ namespace CIMS.Services
         {
             public List<int> StockIds { get; set; } = new List<int>();
             public int? PriorityId { get; set; }
+            public List<int> DeductIds { get; set; } = new List<int>();   // คลังที่เห็นปุ่ม DEDUCTED / NOT DEDUCTED (Update_20261016.sql)
             public bool IsSet => StockIds.Count > 0;
         }
 
@@ -26,7 +27,7 @@ namespace CIMS.Services
             var a = new Assignment();
             if (!DbSchema.HasUserScanStocks || string.IsNullOrEmpty(userId)) return a;
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT StockID, IsPriority FROM CIMS.UserScanStocks WHERE UserID = @u ORDER BY StockID", conn))
+            using (var cmd = new SqlCommand("SELECT StockID, IsPriority, " + (DbSchema.HasScanDeduct ? "ShowDeduct" : "CAST(0 AS bit) AS ShowDeduct") + " FROM CIMS.UserScanStocks WHERE UserID = @u ORDER BY StockID", conn))
             {
                 cmd.Parameters.AddWithValue("@u", userId);
                 conn.Open();
@@ -36,6 +37,7 @@ namespace CIMS.Services
                         int id = Convert.ToInt32(r["StockID"]);
                         a.StockIds.Add(id);
                         if (Convert.ToBoolean(r["IsPriority"])) a.PriorityId = id;
+                        if (Convert.ToBoolean(r["ShowDeduct"])) a.DeductIds.Add(id);
                     }
             }
             return a;
@@ -64,9 +66,11 @@ namespace CIMS.Services
         }
 
         // แทนที่คลังของผู้ใช้ทั้งชุด (ว่าง = ยังไม่ได้กำหนด -> สแกนไม่ได้)
-        public void SaveAssignment(string userId, IEnumerable<int> stockIds, int? priorityId, string by)
+        public void SaveAssignment(string userId, IEnumerable<int> stockIds, int? priorityId, string by, IEnumerable<int> deductIds = null)
         {
             var ids = (stockIds ?? Enumerable.Empty<int>()).Distinct().ToList();
+            var deduct = new HashSet<int>(deductIds ?? Enumerable.Empty<int>());
+            bool hasDeduct = DbSchema.HasScanDeduct;
             using (var conn = new SqlConnection(_cs))
             {
                 conn.Open();
@@ -78,8 +82,11 @@ namespace CIMS.Services
                         del.ExecuteNonQuery();
                     }
                     foreach (int id in ids)
-                        using (var ins = new SqlCommand("INSERT INTO CIMS.UserScanStocks (UserID, StockID, IsPriority, UpdatedBy) VALUES (@u, @s, @p, @by)", conn, tr))
+                        using (var ins = new SqlCommand(hasDeduct
+                                   ? "INSERT INTO CIMS.UserScanStocks (UserID, StockID, IsPriority, ShowDeduct, UpdatedBy) VALUES (@u, @s, @p, @d, @by)"
+                                   : "INSERT INTO CIMS.UserScanStocks (UserID, StockID, IsPriority, UpdatedBy) VALUES (@u, @s, @p, @by)", conn, tr))
                         {
+                            ins.Parameters.AddWithValue("@d", deduct.Contains(id));
                             ins.Parameters.AddWithValue("@u", userId);
                             ins.Parameters.AddWithValue("@s", id);
                             ins.Parameters.AddWithValue("@p", priorityId.HasValue && priorityId.Value == id);
@@ -91,12 +98,27 @@ namespace CIMS.Services
             }
         }
 
+        // 🔁 คลังที่ตัดสต็อกข้ามคลัง: คลังต้นทางของรูปแบบป้ายที่ตั้ง "ตัดยอดจากคลัง" + คลังที่รับป้ายรูปแบบนั้น (เปิดรับ Supplier)
+        //    ใช้แสดงปุ่ม DEDUCTED / NOT DEDUCTED เฉพาะคลังกลุ่มนี้ (วันนี้ = STOCK-MAT รับ Panta แล้วตัด STOCK-PANTA)
+        public static HashSet<int> DeductStockIds(IEnumerable<CIMS.Models.StockModel> stocks, IEnumerable<CIMS.Models.BarcodeFormatModel> formats)
+        {
+            var set = new HashSet<int>();
+            var deductFormats = (formats ?? Enumerable.Empty<CIMS.Models.BarcodeFormatModel>()).Where(f => f.IsActive && f.SourceStkId.HasValue).ToList();
+            foreach (var f in deductFormats)
+            {
+                set.Add(f.SourceStkId.Value);
+                foreach (var s in stocks ?? Enumerable.Empty<CIMS.Models.StockModel>())
+                    if (s.StkId != f.SourceStkId.Value && s.InSupplier && (s.FormatIds == null || s.FormatIds.Count == 0 || s.FormatIds.Contains(f.FmtId)))
+                        set.Add(s.StkId);
+            }
+            return set;
+        }
         // หน้า Multi-Scanner เช็คทุกไม่กี่วินาทีว่า Admin เปลี่ยนคลังให้หรือยัง
         public string AssignmentToken(string userId)
         {
             if (!DbSchema.HasUserScanStocks || string.IsNullOrEmpty(userId)) return "";
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(@"SELECT CAST(COUNT(*) AS varchar) + '|' + ISNULL(CAST(CHECKSUM_AGG(BINARY_CHECKSUM(StockID, IsPriority)) AS varchar), '')
+            using (var cmd = new SqlCommand(@"SELECT CAST(COUNT(*) AS varchar) + '|' + ISNULL(CAST(CHECKSUM_AGG(BINARY_CHECKSUM(*)) AS varchar), '')
                                                      + '|' + ISNULL((SELECT CAST(CHECKSUM_AGG(BINARY_CHECKSUM(StockID, DisplayField)) AS varchar) FROM CIMS.UserScanDisplays WHERE UserID = @u), '')
                                               FROM CIMS.UserScanStocks WHERE UserID = @u", conn))
             {

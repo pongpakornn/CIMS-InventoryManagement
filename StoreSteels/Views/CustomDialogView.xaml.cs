@@ -9,7 +9,8 @@ namespace CIMS.Views
     public partial class CustomDialogView : Window
     {
         // เพิ่ม Info เข้าไปใน enum ตรงนี้ครับ
-        public enum DialogType { Success, Confirm, Info }
+        // Notice = แบบ Info (ไอคอน i + ปุ่ม OK) แต่ข้อความอยู่กลางเต็มความกว้าง (ข้อความสั้นหลายบรรทัด เช่น "กรุณารอสักครู่")
+        public enum DialogType { Success, Confirm, Info, Notice }
 
         public CustomDialogView(string title, string message, DialogType type)
         {
@@ -55,6 +56,19 @@ namespace CIMS.Views
                     lblMessage.Margin = new Thickness(85, 0, 30, 0);  // (LEFT, TOP, RIGHT, BOTTOM)
 
                     // ซ่อนปุ่ม Cancel และเปลี่ยน YES เป็น OK
+                    btnCancel.Visibility = Visibility.Collapsed;
+                    btnConfirm.Content = "OK";
+                    btnConfirm.Width = 100;
+                    btnConfirm.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#34495E"));
+                    break;
+
+                case DialogType.Notice:
+                    StatusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#34495E"));
+                    txtIcon.Text = "i";
+                    txtIcon.Foreground = Brushes.White;
+                    lblMessage.TextAlignment = TextAlignment.Center;
+                    lblMessage.HorizontalAlignment = HorizontalAlignment.Center;
+                    lblMessage.Margin = new Thickness(24, 0, 24, 0);
                     btnCancel.Visibility = Visibility.Collapsed;
                     btnConfirm.Content = "OK";
                     btnConfirm.Width = 100;

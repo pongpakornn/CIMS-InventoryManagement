@@ -48,8 +48,9 @@ namespace CIMS.Services
         public const int PageSize = 50;
 
         // WHERE + ลำดับความใกล้เคียง: ตรงเป๊ะ > รหัสขึ้นต้นด้วยคำค้น > ชื่อขึ้นต้นด้วยคำค้น > มีคำค้นอยู่ข้างใน แล้วค่อยใหม่ -> เก่า
-        private const string FromWhere = @"
-            FROM CIMS.ScanTransactions t
+        // รวมแถว OUT ของคลังต้นทางที่ถูกตัดตอนสแกนรับเข้าคลังอื่น (ScanService.ScanRowsSource)
+        private static string FromWhere => @"
+            FROM " + ScanService.ScanRowsSource + @" t
             LEFT JOIN CIMS.Parts p  ON p.PartID = t.PartID
             LEFT JOIN CIMS.Stocks s ON s.StockID = t.StockID
             LEFT JOIN CIMS.Users u  ON u.UserID = t.UserID
@@ -60,6 +61,7 @@ namespace CIMS.Services
                    OR ISNULL(p.PartA, '') LIKE '%' + @key + '%' OR ISNULL(p.PartNumber, '') LIKE '%' + @key + '%'
                    OR ISNULL(p.QRCode, '') LIKE '%' + @key + '%' OR ISNULL(t.PartACode, '') LIKE '%' + @key + '%'
                    OR ISNULL(t.ReferenceNo, '') LIKE '%' + @key + '%' OR t.UserID LIKE '%' + @key + '%' OR ISNULL(u.FullName, '') LIKE '%' + @key + '%')";
+
 
         private const string Rank = @"
             CASE WHEN @key = '' THEN 0

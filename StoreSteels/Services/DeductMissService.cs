@@ -60,19 +60,29 @@ namespace CIMS.Services
 
         private const string Visible = "ISNULL(t.IsCancelled, 0) = 0";
 
+        // เฉพาะคลังที่ผู้ใช้เห็นปุ่ม DEDUCTED / NOT DEDUCTED (null = ทุกคลัง) - รายการที่คลังรับเข้าหรือคลังต้นทางอยู่ในชุดนี้
+        private static string StockFilter(IEnumerable<int> stockIds, string toCol, string fromCol)
+        {
+            if (stockIds == null) return "";
+            var ids = stockIds.Distinct().ToList();
+            if (ids.Count == 0) return " AND 1 = 0";
+            string list = string.Join(",", ids.Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            return $" AND ({toCol} IN ({list}) OR {fromCol} IN ({list}))";
+        }
+
         // จำนวนรายการทั้งหมด (ปุ่ม NOT DEDUCTED (n) หน้า Multi-Scanner)
-        public int Count()
+        public int Count(IEnumerable<int> stockIds = null)
         {
             if (!CIMS.Helpers.DbSchema.HasDeductMisses) return 0;
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand($"SELECT COUNT(*) FROM CIMS.DeductMisses m LEFT JOIN CIMS.ScanTransactions t ON t.TransactionID = m.TransactionID WHERE {Visible}", conn))
+            using (var cmd = new SqlCommand($"SELECT COUNT(*) FROM CIMS.DeductMisses m LEFT JOIN CIMS.ScanTransactions t ON t.TransactionID = m.TransactionID WHERE {Visible}" + StockFilter(stockIds, "m.StockID", "m.SourceStockID"), conn))
             {
                 conn.Open();
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
 
-        public List<DeductMissRow> GetRows(string keyword, DateTime from, DateTime to)
+        public List<DeductMissRow> GetRows(string keyword, DateTime from, DateTime to, IEnumerable<int> stockIds = null)
         {
             var list = new List<DeductMissRow>();
             using (var conn = new SqlConnection(_cs))
@@ -88,6 +98,7 @@ namespace CIMS.Services
                 WHERE {Visible} AND m.ScanDate >= @from AND m.ScanDate < @to
                   AND (@k = '' OR m.CoilNo LIKE '%' + @k + '%' OR m.MotherCoil LIKE '%' + @k + '%' OR p.PartCode LIKE '%' + @k + '%'
                        OR p.Description LIKE '%' + @k + '%' OR m.UserID LIKE '%' + @k + '%' OR m.Barcode LIKE '%' + @k + '%')
+                  {StockFilter(stockIds, "m.StockID", "m.SourceStockID")}
                 ORDER BY m.ScanDate DESC, m.MissID DESC", conn))
             {
                 cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = from.Date;
@@ -119,12 +130,13 @@ namespace CIMS.Services
         }
 
         // ✔ DEDUCTED: จำนวนรายการที่ตัดคลังต้นทางได้ "วันนี้" (ปุ่ม DEDUCTED (n))
-        public int CountDeductedToday()
+        public int CountDeductedToday(IEnumerable<int> stockIds = null)
         {
             if (!CIMS.Helpers.DbSchema.HasTransferScanTx) return 0;
             using (var conn = new SqlConnection(_cs))
             using (var cmd = new SqlCommand(@"SELECT COUNT(*) FROM CIMS.StockTransfers st JOIN CIMS.ScanTransactions t ON t.TransactionID = st.ScanTransactionID
-                                              WHERE st.TransferMode = 'SCAN' AND ISNULL(t.IsCancelled, 0) = 0 AND st.TransferDate >= CAST(GETDATE() AS date)", conn))
+                                              WHERE st.TransferMode = 'SCAN' AND ISNULL(t.IsCancelled, 0) = 0 AND st.TransferDate >= CAST(GETDATE() AS date)"
+                                              + StockFilter(stockIds, "st.ToStockID", "st.FromStockID"), conn))
             {
                 conn.Open();
                 return Convert.ToInt32(cmd.ExecuteScalar());
@@ -132,12 +144,12 @@ namespace CIMS.Services
         }
 
         // ✔ DEDUCTED: แต่ละป้ายที่แสกนรับเข้าแล้วตัดคลังต้นทางได้ - ตัดอะไร เท่าไร ต้นทางเหลือเท่าไร (รายการที่ยกเลิกแล้วไม่แสดง)
-        public List<DeductMissRow> GetDeducted(string keyword, DateTime from, DateTime to)
+        public List<DeductMissRow> GetDeducted(string keyword, DateTime from, DateTime to, IEnumerable<int> stockIds = null)
         {
             var list = new List<DeductMissRow>();
             if (!CIMS.Helpers.DbSchema.HasTransferScanTx) return list;
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(@"
+            using (var cmd = new SqlCommand($@"
                 SELECT st.TransferID, t.TransactionID, t.TransactionDate, t.Quantity AS LabelQty, st.Quantity AS Cut, st.FromBalanceAfter, t.UserID, t.ReferenceNo,
                        st.FromStockCode, st.ToStockCode, p.PartCode, p.Description, sp.PartCode AS SourcePartCode,
                        ch.CoilNo, ch.MotherCoil, mo.CoilNo AS MotherNo, mo.MoveWeight AS MotherAfter, mo.NowWeight AS MotherNow, ch.Action AS ChildAction
@@ -153,6 +165,7 @@ namespace CIMS.Services
                 WHERE st.TransferMode = 'SCAN' AND ISNULL(t.IsCancelled, 0) = 0 AND st.TransferDate >= @from AND st.TransferDate < @to
                   AND (@k = '' OR ch.CoilNo LIKE '%' + @k + '%' OR ch.MotherCoil LIKE '%' + @k + '%' OR mo.CoilNo LIKE '%' + @k + '%' OR p.PartCode LIKE '%' + @k + '%'
                        OR sp.PartCode LIKE '%' + @k + '%' OR p.Description LIKE '%' + @k + '%' OR t.UserID LIKE '%' + @k + '%' OR t.ReferenceNo LIKE '%' + @k + '%')
+                  {StockFilter(stockIds, "st.ToStockID", "st.FromStockID")}
                 ORDER BY st.TransferDate DESC, st.TransferID DESC", conn))
             {
                 cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = from.Date;

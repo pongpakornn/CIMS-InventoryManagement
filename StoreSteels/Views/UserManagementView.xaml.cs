@@ -148,14 +148,16 @@ namespace CIMS.Views
                 string scanNote = "";
                 if (w.HasScannerSetup && (w.ScanStocksChanged || w.DisplayChanges.Count > 0))
                 {
-                    var ids = w.ScanStockIds; var prio = w.ScanPriorityId; var disp = w.DisplayChanges;
+                    var ids = w.ScanStockIds; var prio = w.ScanPriorityId; var disp = w.DisplayChanges; var ded = w.ScanDeductIds;
+                    bool stocksChanged = w.ScanStocksChanged;
                     await Task.Run(() =>
                     {
-                        if (w.ScanStocksChanged) new ScannerSetupService().SaveAssignment(u.UserId, ids, prio, _session?.UserId);
+                        if (stocksChanged) new ScannerSetupService().SaveAssignment(u.UserId, ids, prio, _session?.UserId, ded);
                         if (disp.Count > 0) new ScanService().SaveScanDisplayMap(disp, u.UserId);
                     });
                     LogService.WriteLog(_session?.UserId, "SCANNER_SETUP",
                         $"Multi-Scanner of {u.UserId} | Stocks: {(ids.Count == 0 ? "NONE" : string.Join(",", ids))}{(prio.HasValue ? $" | ★ {prio}" : "")}" +
+                        (ded.Count > 0 ? $" | Deducted: {string.Join(",", ded)}" : "") +
                         (disp.Count > 0 ? " | Display: " + string.Join(",", disp.Select(kv => $"{kv.Key}={kv.Value}")) : ""), u.UserId);
                     scanNote = "\nคลังสแกน / DISPLAY มีผลที่หน้าสแกนทันที";
                 }

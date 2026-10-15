@@ -19,6 +19,27 @@ namespace CIMS.Helpers
         public static bool HasUserScanStocks => _userScanStocks ?? (_userScanStocks = TableExists("CIMS.UserScanStocks")) ?? false;
         public static bool HasAdminContacts => _adminContacts ?? (_adminContacts = TableExists("CIMS.AdminContacts")) ?? false;
 
+        // Update_20261016.sql: CIMS.UserScanStocks.ShowDeduct (ปุ่ม DEDUCTED / NOT DEDUCTED ตาม UserID + คลัง)
+        private static bool? _scanDeduct;
+        public static bool HasScanDeduct
+        {
+            get
+            {
+                if (_scanDeduct.HasValue) return _scanDeduct.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH('CIMS.UserScanStocks', 'ShowDeduct') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _scanDeduct = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _scanDeduct.Value;
+            }
+        }
+
         private static bool? TableExists(string name)
         {
             try

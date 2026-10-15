@@ -99,9 +99,9 @@ namespace CIMS.Views
                     $"ไม่มีสิทธิ์ใช้งานหน้าสแกน\nยังไม่ได้เลือกคลังของ UserID {uid}\n\n" +
                     $"กรุณาติดต่อ Admin เพื่อขอความช่วยเหลือ\n{_viewModel.AdminContactText}\n\n" +
                     "จดรายละเอียดแล้วกด CLOSE", "NO SCAN STOCK");
-                DialogHelper.ShowInfo(
-                    "กรุณารอสักครู่\nAdmin จะติดต่อกลับเมื่อกำหนดคลังสแกนให้เรียบร้อยแล้ว\n\n" +
-                    "เมื่อกำหนดแล้ว หน้านี้จะใช้งานได้เองโดยไม่ต้องเข้าหน้าใหม่", "PLEASE WAIT");
+                DialogHelper.ShowNotice(
+                    "กรุณารอสักครู่\nAdmin จะติดต่อกลับ\nเมื่อกำหนดคลังสแกนให้เรียบร้อยแล้ว\n\n" +
+                    "เมื่อกำหนดแล้ว หน้านี้จะใช้งานได้เอง\nโดยไม่ต้องเข้าหน้าใหม่", "PLEASE WAIT");
             }
             finally
             {
@@ -133,7 +133,7 @@ namespace CIMS.Views
         // ✔ DEDUCTED: ป้ายที่รับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้
         private async void Deducted_Click(object sender, RoutedEventArgs e)
         {
-            new DeductMissWindow(_viewModel.CurrentUser, deducted: true).ShowDialog();
+            new DeductMissWindow(_viewModel.CurrentUser, deducted: true, stockIds: _viewModel.DeductStockIds).ShowDialog();
             await _viewModel.RefreshNotDeductedAsync();
             FocusScanBox();
         }
@@ -141,7 +141,7 @@ namespace CIMS.Views
         // ⚠ NOT DEDUCTED: ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้
         private async void NotDeducted_Click(object sender, RoutedEventArgs e)
         {
-            new DeductMissWindow(_viewModel.CurrentUser).ShowDialog();
+            new DeductMissWindow(_viewModel.CurrentUser, stockIds: _viewModel.DeductStockIds).ShowDialog();
             await _viewModel.RefreshNotDeductedAsync();
             FocusScanBox();
         }

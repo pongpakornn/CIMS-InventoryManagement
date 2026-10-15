@@ -563,6 +563,7 @@ namespace CIMS.ViewModels
             OnPropertyChanged(nameof(IsMultiScope));
             ApplyStockModes();
             if (save) SaveScope();
+            RefreshDeductButtons();
             LoadTodayData();
         }
 
@@ -698,6 +699,8 @@ namespace CIMS.ViewModels
                     // คลังที่ Admin กำหนดให้ UserID นี้ (เฉพาะคลังที่ยังสแกนได้ + มีสิทธิ์ VIEW คลังนั้น)
                     var a = _setup.GetAssignment(CurrentUser?.UserId);
                     _assignToken = _setup.AssignmentToken(CurrentUser?.UserId);
+                    _eligibleDeduct = ScannerSetupService.DeductStockIds(all, _allFormats);
+                    _assignedDeduct = a.DeductIds;
                     ApplyScope(false, a.StockIds, a.PriorityId, save: false);
                 }
                 else
@@ -755,7 +758,7 @@ namespace CIMS.ViewModels
             {
                 try
                 {
-                    _setup.SaveAssignment(CurrentUser?.UserId, _scopeAuto ? Stocks.Select(s => s.StkId) : _scopeIds, _priorityId, CurrentUser?.UserId);
+                    _setup.SaveAssignment(CurrentUser?.UserId, _scopeAuto ? Stocks.Select(s => s.StkId) : _scopeIds, _priorityId, CurrentUser?.UserId, _assignedDeduct);
                     _assignToken = _setup.AssignmentToken(CurrentUser?.UserId);
                 }
                 catch (Exception ex) { DialogHelper.ShowError("บันทึกคลังที่สแกนไม่สำเร็จ\n" + ex.Message); }
@@ -955,18 +958,35 @@ namespace CIMS.ViewModels
         // ⚠ ปุ่ม NOT DEDUCTED (n): ป้ายที่รับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้ (ยังไม่รัน Update_20261010b.sql = ซ่อนปุ่ม)
         private int _notDeducted;
         public string NotDeductedText => $"⚠ NOT DEDUCTED ({_notDeducted:N0})";
-        public Visibility NotDeductedVisibility => DbSchema.HasDeductMisses ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility NotDeductedVisibility => DbSchema.HasDeductMisses && HasDeductStocks ? Visibility.Visible : Visibility.Collapsed;
 
         // ✔ ปุ่ม DEDUCTED (n): ป้ายที่รับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้ "วันนี้"
         private int _deductedToday;
         public string DeductedText => $"✔ DEDUCTED ({_deductedToday:N0})";
-        public Visibility DeductedVisibility => DbSchema.HasTransferScanTx ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility DeductedVisibility => DbSchema.HasTransferScanTx && HasDeductStocks ? Visibility.Visible : Visibility.Collapsed;
+
+        // 🔁 ปุ่ม DEDUCTED / NOT DEDUCTED แสดงเฉพาะคลังที่ตัดสต็อกข้ามคลัง (คลังรับป้ายที่ตั้ง "ตัดยอดจากคลัง" + คลังต้นทาง)
+        //    ที่ Admin เปิดให้ UserID นี้ (Level 1 = ทุกคลังกลุ่มนี้ที่สแกน) - ตัวเลขและรายการกรองเฉพาะคลังเหล่านี้
+        //    ฐานที่ยังไม่รัน Update_20261015.sql = ทุกคลังแบบเดิม (null)
+        private HashSet<int> _eligibleDeduct = new HashSet<int>();
+        private List<int> _assignedDeduct = new List<int>();
+        public List<int> DeductStockIds => !_assignMode ? null
+            : ScopeStocks.Select(s => s.StkId).Where(id => _eligibleDeduct.Contains(id) && (IsAdminUser || _assignedDeduct.Contains(id))).ToList();
+        private bool HasDeductStocks => DeductStockIds == null || DeductStockIds.Count > 0;
+
+        private void RefreshDeductButtons()
+        {
+            OnPropertyChanged(nameof(DeductedVisibility));
+            OnPropertyChanged(nameof(NotDeductedVisibility));
+            _ = RefreshNotDeductedAsync();
+        }
 
         public async Task RefreshDeductedAsync()
         {
             try
             {
-                int n = await Task.Run(() => new DeductMissService().CountDeductedToday());
+                var ids = DeductStockIds;
+                int n = await Task.Run(() => new DeductMissService().CountDeductedToday(ids));
                 if (n == _deductedToday) return;
                 _deductedToday = n;
                 OnPropertyChanged(nameof(DeductedText));
@@ -979,7 +999,8 @@ namespace CIMS.ViewModels
             _ = RefreshDeductedAsync();
             try
             {
-                int n = await Task.Run(() => new DeductMissService().Count());
+                var ids = DeductStockIds;
+                int n = await Task.Run(() => new DeductMissService().Count(ids));
                 if (n == _notDeducted) return;
                 _notDeducted = n;
                 OnPropertyChanged(nameof(NotDeductedText));

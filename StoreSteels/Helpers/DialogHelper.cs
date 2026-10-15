@@ -63,6 +63,17 @@ namespace CIMS.Helpers
             });
         }
 
+        // ข้อความแจ้ง (ไอคอน i) จัดกลาง - ใช้กับข้อความสั้นหลายบรรทัด เช่น "กรุณารอสักครู่"
+        public static void ShowNotice(string message, string title = "NOTICE")
+        {
+            OnUi(() =>
+            {
+                var win = new CustomDialogView(title, message, CustomDialogView.DialogType.Notice);
+                SetOwner(win);
+                win.ShowDialog();
+            });
+        }
+
         public static void ShowInfo(string message, string title = "PR DETAILS")
         {
             OnUi(() =>

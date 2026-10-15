@@ -261,6 +261,21 @@ namespace CIMS.Services
             }
         }
 
+        // 📜 รายการสแกน + รายการที่ถูกตัดจากคลังต้นทางตอนสแกนรับเข้าคลังอื่น (เช่น รับเข้า STOCK-MAT -> ตัด Coil แม่ STOCK-PANTA)
+        //    แถวตัดคลังต้นทาง = OUT ของคลังต้นทาง (StockID = คลังต้นทาง, สินค้าต้นทาง, จำนวนที่ตัด, คนสแกน, ป้ายเดิม)
+        //    ยกเลิกรายการสแกนรับเข้า (ADJUST SCAN) = แถวตัดคลังต้นทางยกเลิกตามไปด้วย / TransactionID ติดลบ = แถวตัด (ไม่ใช่รายการสแกนจริง)
+        //    ฐานที่ยังไม่รัน Update_20261010c.sql (ไม่มี StockTransfers.ScanTransactionID) = รายการสแกนอย่างเดียว
+        public static string ScanRowsSource => CIMS.Helpers.DbSchema.HasTransferScanTx ? @"(
+                SELECT t.TransactionID, t.TransactionDate, t.StockID, t.TransactionType, t.PartID, t.PartACode, t.Quantity,
+                       t.UserID, t.ReferenceNo, t.IsCancelled
+                FROM CIMS.ScanTransactions t
+                UNION ALL
+                SELECT -st.TransferID, st.TransferDate, st.FromStockID, 'OUT', ISNULL(st.SourcePartID, st.PartID), sc.PartACode, st.Quantity,
+                       sc.UserID, 'DEDUCT <- SCAN IN ' + ISNULL(st.ToStockCode, '') + ' | ' + ISNULL(sc.ReferenceNo, ''), sc.IsCancelled
+                FROM CIMS.StockTransfers st
+                JOIN CIMS.ScanTransactions sc ON sc.TransactionID = st.ScanTransactionID
+                WHERE st.TransferMode = 'SCAN')" : "CIMS.ScanTransactions";
+
         public List<ScanItemModel> GetTodayTransactions(StockModel stock = null)
         {
             var list = new List<ScanItemModel>();
@@ -280,7 +295,7 @@ namespace CIMS.Services
                                     ISNULL(m.PartNumber, '') AS PartNumber,
                                     ISNULL(m.Model, '') AS Model,
                                     ISNULL(t.ReferenceNo, '') AS ReferenceNo
-                               FROM CIMS.ScanTransactions t
+                               FROM " + ScanRowsSource + @" t
                                LEFT JOIN CIMS.Parts m ON t.PartID = m.PartID
                                WHERE t.TransactionDate >= CAST(CAST(GETDATE() AS DATE) AS DATETIME)
                                  AND t.TransactionDate < DATEADD(DAY, 1, CAST(CAST(GETDATE() AS DATE) AS DATETIME))

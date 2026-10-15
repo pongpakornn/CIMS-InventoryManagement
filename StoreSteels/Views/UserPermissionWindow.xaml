@@ -193,6 +193,7 @@
                                                                     <ColumnDefinition Width="60"/>
                                                                     <ColumnDefinition Width="*"/>
                                                                     <ColumnDefinition Width="120"/>
+                                                                    <ColumnDefinition Width="140"/>
                                                                     <ColumnDefinition Width="300"/>
                                                                 </Grid.ColumnDefinitions>
                                                                 <CheckBox Style="{StaticResource PermCheck}" IsChecked="{Binding IsChecked, Mode=TwoWay}" HorizontalAlignment="Left"/>
@@ -203,7 +204,13 @@
                                                                 <Button Grid.Column="2" Content="{Binding PriorityText}" Foreground="{Binding PriorityBrush}" Click="ScanPriority_Click" Tag="{Binding}"
                                                                         Style="{StaticResource StkCardButton}" IsEnabled="{Binding CanPriority}" HorizontalAlignment="Left"
                                                                         ToolTip="★ = stock used first for SCAN OUT when an item is in several stocks"/>
-                                                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <!-- 🔁 ปุ่ม DEDUCTED / NOT DEDUCTED ของคลังนี้ (เฉพาะคลังที่ตัดสต็อกข้ามคลัง เช่น STOCK-MAT ↔ STOCK-PANTA) -->
+                                                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding DeductVisibility}"
+                                                                            ToolTip="Show ✔ DEDUCTED / ⚠ NOT DEDUCTED for this stock (stocks that cut stock across stocks)">
+                                                                    <TextBlock Text="DEDUCTED" FontSize="10" FontWeight="Black" Foreground="#8A8490" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                    <CheckBox Style="{StaticResource PermCheck}" IsChecked="{Binding IsDeduct, Mode=TwoWay}" IsEnabled="{Binding IsChecked}"/>
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                                                                     <TextBlock Text="DISPLAY" FontSize="10" FontWeight="Black" Foreground="#8A8490" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                                                     <ComboBox Width="230" Height="32" Style="{StaticResource StkCombo}" ItemsSource="{Binding Options}"
                                                                               DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding SelectedDisplay, Mode=TwoWay}"

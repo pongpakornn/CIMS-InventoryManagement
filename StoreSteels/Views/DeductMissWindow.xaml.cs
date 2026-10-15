@@ -27,11 +27,13 @@ namespace CIMS.Views
 
         // deducted = true -> ✔ DEDUCTED: ป้ายที่แสกนรับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้ (ดูอย่างเดียว ไม่มีปุ่มลบ)
         private readonly bool _deducted;
+        private readonly List<int> _stockIds;   // คลังที่ผู้ใช้เห็นปุ่มนี้ (null = ทุกคลัง)
 
-        public DeductMissWindow(UserSession session, bool deducted = false)
+        public DeductMissWindow(UserSession session, bool deducted = false, IEnumerable<int> stockIds = null)
         {
             _session = session;
             _deducted = deducted;
+            _stockIds = stockIds?.ToList();
             InitializeComponent();
             btnDelete.Visibility = !deducted && _session?.CanDeleteScan == true ? Visibility.Visible : Visibility.Collapsed;   // ลบ = DEL ของ Multi-Scanner
             if (deducted)
@@ -68,7 +70,7 @@ namespace CIMS.Views
             txtStatus.Text = "⏳ LOADING...";
             try
             {
-                var list = await Task.Run(() => _deducted ? _service.GetDeducted(key, from, to) : _service.GetRows(key, from, to));
+                var list = await Task.Run(() => _deducted ? _service.GetDeducted(key, from, to, _stockIds) : _service.GetRows(key, from, to, _stockIds));
                 if (ver != _version) return;
                 var picked = new HashSet<int>(_rows.Where(r => r.IsSelected).Select(r => r.MissId));
                 _rows.Clear();

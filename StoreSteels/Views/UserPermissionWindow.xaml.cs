@@ -27,8 +27,10 @@ namespace CIMS.Views
         public bool HasScannerSetup => _scanner != null;
         public List<int> ScanStockIds => _scanner?.Items.Where(i => i.IsChecked).Select(i => i.Stock.StkId).ToList() ?? new List<int>();
         public int? ScanPriorityId => _scanner?.Items.FirstOrDefault(i => i.IsChecked && i.IsPriority)?.Stock.StkId;
+        public List<int> ScanDeductIds => _scanner?.Items.Where(i => i.IsChecked && i.IsDeduct).Select(i => i.Stock.StkId).ToList() ?? new List<int>();
         public bool ScanStocksChanged => _scanner != null &&
-            (!ScanStockIds.OrderBy(x => x).SequenceEqual(_scanner.OriginalIds.OrderBy(x => x)) || ScanPriorityId != _scanner.OriginalPriority);
+            (!ScanStockIds.OrderBy(x => x).SequenceEqual(_scanner.OriginalIds.OrderBy(x => x)) || ScanPriorityId != _scanner.OriginalPriority ||
+             !ScanDeductIds.OrderBy(x => x).SequenceEqual(_scanner.OriginalDeduct.OrderBy(x => x)));
         public Dictionary<int, string> DisplayChanges => _scanner?.Items.Where(i => i.IsChecked && i.SelectedDisplay != i.OriginalDisplay)
                                                              .ToDictionary(i => i.Stock.StkId, i => i.SelectedDisplay) ?? new Dictionary<int, string>();
 
@@ -79,14 +81,17 @@ namespace CIMS.Views
             try
             {
                 // คลังที่เปิดช่องทางสแกน (รับเข้า / จ่ายออก) อย่างน้อย 1 ช่องทาง
-                var stocks = new StockService().GetStocks().Where(s => s.CanScanIn || s.CanScanOut).ToList();
+                var all = new StockService().GetStocks();
+                var stocks = all.Where(s => s.CanScanIn || s.CanScanOut).ToList();
                 var a = new ScannerSetupService().GetAssignment(_user.UserId);
                 var map = new ScanService().GetScanDisplayMap(_user.UserId);
                 var formats = new StockService().GetFormats();
+                var eligible = DbSchema.HasScanDeduct ? ScannerSetupService.DeductStockIds(all, formats) : new HashSet<int>();
                 var setup = new ScannerSetup
                 {
                     OriginalIds = a.StockIds.Where(id => stocks.Any(s => s.StkId == id)).ToList(),
                     OriginalPriority = a.PriorityId,
+                    OriginalDeduct = a.DeductIds.Where(id => eligible.Contains(id) && stocks.Any(s => s.StkId == id)).ToList(),
                     IsExpanded = readOnly
                 };
                 foreach (var s in stocks)
@@ -96,9 +101,10 @@ namespace CIMS.Views
                     {
                         Options = ScanDisplayWindow.OptionsFor(s, formats, cur),
                         SelectedDisplay = cur,
-                        OriginalDisplay = cur
+                        OriginalDisplay = cur,
+                        IsDeductEligible = eligible.Contains(s.StkId)
                     };
-                    item.SetInitial(setup.OriginalIds.Contains(s.StkId), a.PriorityId == s.StkId);
+                    item.SetInitial(setup.OriginalIds.Contains(s.StkId), a.PriorityId == s.StkId, setup.OriginalDeduct.Contains(s.StkId));
                     setup.Items.Add(item);
                 }
                 setup.Refresh();
@@ -170,6 +176,7 @@ namespace CIMS.Views
             public ObservableCollection<ScanStockChoice> Items { get; } = new ObservableCollection<ScanStockChoice>();
             public List<int> OriginalIds { get; set; } = new List<int>();
             public int? OriginalPriority { get; set; }
+            public List<int> OriginalDeduct { get; set; } = new List<int>();
 
             private bool _isExpanded;
             public bool IsExpanded { get => _isExpanded; set { _isExpanded = value; N(); N(nameof(ItemsVisibility)); N(nameof(ExpandText)); } }
@@ -182,7 +189,7 @@ namespace CIMS.Views
                 {
                     var on = Items.Where(i => i.IsChecked).ToList();
                     return on.Count == 0 ? "⛔ NOT SET - this user cannot scan (the scan page asks them to contact the Admin)"
-                         : "STOCKS : " + string.Join(",  ", on.Select(i => i.Code + (i.IsPriority ? " ★" : ""))) + (on.Count > 1 ? "   (scan together)" : "");
+                         : "STOCKS : " + string.Join(",  ", on.Select(i => i.Code + (i.IsPriority ? " ★" : "") + (i.IsDeduct ? " (DEDUCTED)" : ""))) + (on.Count > 1 ? "   (scan together)" : "");
                 }
             }
             public Brush SummaryBrush => Items.Any(i => i.IsChecked) ? new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32)) : new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
@@ -211,7 +218,13 @@ namespace CIMS.Views
             public string OriginalDisplay { get; set; }
 
             public ScanStockChoice(ScannerSetup owner, StockModel stock) { Owner = owner; Stock = stock; }
-            public void SetInitial(bool on, bool priority) { _isChecked = on; _isPriority = on && priority; }
+            public void SetInitial(bool on, bool priority, bool deduct) { _isChecked = on; _isPriority = on && priority; _isDeduct = on && deduct && IsDeductEligible; }
+
+            // 🔁 ปุ่ม DEDUCTED / NOT DEDUCTED ของคลังนี้ (แสดงเฉพาะคลังที่ตัดสต็อกข้ามคลัง)
+            public bool IsDeductEligible { get; set; }
+            public Visibility DeductVisibility => IsDeductEligible ? Visibility.Visible : Visibility.Hidden;
+            private bool _isDeduct;
+            public bool IsDeduct { get => _isDeduct; set { _isDeduct = value && IsDeductEligible; N(); Owner?.Refresh(); } }
 
             private bool _isChecked;
             public bool IsChecked
@@ -220,7 +233,8 @@ namespace CIMS.Views
                 set
                 {
                     _isChecked = value;
-                    if (!value) IsPriority = false;
+                    if (!value) { IsPriority = false; IsDeduct = false; }
+                    else if (IsDeductEligible && !_isDeduct) IsDeduct = true;   // เลือกคลังกลุ่มตัดข้ามคลัง = เปิด DEDUCTED ให้ก่อน (ปิดเองได้)
                     N(); N(nameof(CanPriority)); Owner?.Refresh();
                 }
             }
