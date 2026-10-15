@@ -353,9 +353,29 @@
                 _viewModel.LoadData(txtSearch.Text);
             }
 
+            // 📋 เปิดจาก NOT DEDUCTED (หน้าต่าง PRODUCT CONTROL): ผู้มีสิทธิ์ APPROVE ของ Multi-Scanner ลงทะเบียนได้ / ใส่ข้อมูลจากป้ายไว้ให้ / แจ้งเมื่อบันทึกแล้ว
+            private bool _forceAllowRegister;
+            public bool ForceAllowRegister
+            {
+                get => _forceAllowRegister;
+                set { _forceAllowRegister = value; if (value) btnRegister.Visibility = Visibility.Visible; }
+            }
+            public event Action<int, string> PartRegistered;   // PartID, PartCode
+            public ProductControlModel SelectedTableProduct => dgQRHistory.SelectedItem as ProductControlModel;
+
+            public void Prefill(string partCode, string partName, string qrCode, string supplier, string search)
+            {
+                ClearOnlyInputs();
+                if (!string.IsNullOrWhiteSpace(partCode)) txtProductCode.Text = partCode.Trim();
+                if (!string.IsNullOrWhiteSpace(partName)) txtProductName.Text = partName.Trim();
+                if (!string.IsNullOrWhiteSpace(qrCode)) txtQRCode.Text = qrCode.Trim();
+                if (!string.IsNullOrWhiteSpace(supplier)) txtSupplier.Text = supplier.Trim();
+                if (!string.IsNullOrWhiteSpace(search)) { txtSearch.Text = search.Trim(); _viewModel.LoadData(txtSearch.Text); }
+            }
+
             private async void RegisterPart_Click(object sender, RoutedEventArgs e)
             {
-                if (_viewModel.CurrentUser?.CanAddProduct != true) { DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ลงทะเบียนสินค้า", "ACCESS DENIED"); return; }
+                if (_viewModel.CurrentUser?.CanAddProduct != true && !ForceAllowRegister) { DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ลงทะเบียนสินค้า", "ACCESS DENIED"); return; }
                 if (string.IsNullOrEmpty(txtProductCode.Text))
                 {
                     DialogHelper.ShowWarning("กรุณากรอกรหัสสินค้าก่อนทำการลงทะเบียนครับ");
@@ -379,6 +399,13 @@
                 if (result)
                 {
                     await ApplyStockSelection(newModel.PartACode, inMain, otherIds, newModel.PtId);
+                    if (PartRegistered != null)
+                    {
+                        // เปิดจาก NOT DEDUCTED: ไปทำขั้นต่อ (รับเข้าคลัง) เลย ไม่ต้องแจ้งซ้ำ
+                        ClearOnlyInputs();
+                        PartRegistered.Invoke(newModel.PtId, newModel.PartCode);
+                        return;
+                    }
                     DialogHelper.ShowSuccess("ลงทะเบียนสินค้าใหม่เรียบร้อยแล้ว!");
                     ClearOnlyInputs();
                 }

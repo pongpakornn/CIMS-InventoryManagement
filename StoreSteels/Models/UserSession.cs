@@ -43,6 +43,8 @@ namespace CIMS.Models
         public bool CanScanReturn => CanViewScannerMenu;
         public bool CanEditScanner => CanViewScannerMenu && P("MultiScanner", p => p.CanEdit);
         public bool CanDeleteScan => CanViewScannerMenu && P("MultiScanner", p => p.CanDelete);
+        // NOT DEDUCTED ช่อง ACTION: APPROVE (รับเข้า) / ลงทะเบียนสินค้า (PRODUCT CONTROL) / ลบ = APPROVE ของ Multi-Scanner
+        public bool CanApproveScan => CanViewScannerMenu && P("MultiScanner", p => p.CanApprove);
 
         // 🏷️ Inventory Registration (ProductControl): VIEW = เมนู + ดู + Export QR / ADD = ลงทะเบียน + IMPORT
         //    EDIT = แก้ไข + SHOW/HIDE + รูปภาพ / DEL = ลบสินค้า

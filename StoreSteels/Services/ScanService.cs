@@ -602,6 +602,51 @@ namespace CIMS.Services
             public decimal? MotherBefore { get; set; }  // น้ำหนัก Coil แม่ก่อนตัด (null = ไม่มี Coil แม่ลงทะเบียน)
             public string MotherCoil { get; set; }
             public decimal RequestedQty { get; set; }
+            public bool Held { get; set; }              // ตัดต้นทางไม่ได้ -> ค้างไว้ที่ NOT DEDUCTED (ยังไม่รับเข้า)
+            public int TxId { get; set; }
+        }
+
+        // 📋 NOT DEDUCTED แบบรอดำเนินการ (Update_20261016b.sql): ป้ายที่ยังไม่รับเข้าคลัง - รอผู้มีสิทธิ์ APPROVE ของ Multi-Scanner
+        //    reason: NOT_FOUND (ไม่มี Coil แม่ในคลังต้นทาง) / SHORT (Coil แม่เหลือไม่พอ) / NO_PRODUCT (สินค้ายังไม่ลงทะเบียน)
+        public int AddPendingMiss(int stockId, int sourceStkId, int? partId, CoilLabel coil, decimal qty, decimal canCut, string reason,
+                                  string barcode, string userId, int? formatId)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.DeductMisses (TransactionID, StockID, SourceStockID, PartID, CoilNo, MotherCoil, LabelQty, Deducted, Reason, Barcode, UserID, Status, FormatID)
+                                              VALUES (NULL, @s, @src, @p, @c, @m, @q, @d, @why, @b, @u, 'PENDING', @f);
+                                              SELECT CAST(SCOPE_IDENTITY() AS INT);", conn))
+            {
+                cmd.Parameters.AddWithValue("@s", stockId);
+                cmd.Parameters.AddWithValue("@src", sourceStkId);
+                cmd.Parameters.AddWithValue("@p", (object)partId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@c", coil?.HasCoilNo == true ? coil.CoilNo.Trim() : (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("@m", string.IsNullOrWhiteSpace(coil?.MotherCoil) ? (object)DBNull.Value : coil.MotherCoil.Trim());
+                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@q", qty));
+                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@d", canCut));
+                cmd.Parameters.AddWithValue("@why", reason);
+                string bc = barcode ?? "";
+                cmd.Parameters.AddWithValue("@b", bc.Length > 300 ? bc.Substring(0, 300) : bc);
+                cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@f", (object)formatId ?? DBNull.Value);
+                conn.Open();
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        // ป้ายเดียวกันค้างอยู่ใน NOT DEDUCTED แล้ว (กันสแกนซ้ำ) - เทียบเลข Coil ลูก ไม่มีเลข Coil = เทียบป้ายทั้งชุด
+        public bool HasPendingMiss(string coilNo, string barcode)
+        {
+            if (!CIMS.Helpers.DbSchema.HasMissStatus) return false;
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"SELECT COUNT(*) FROM CIMS.DeductMisses WHERE Status = 'PENDING'
+                                                AND ((@c <> '' AND CoilNo = @c) OR (@c = '' AND Barcode = @b))", conn))
+            {
+                cmd.Parameters.AddWithValue("@c", (coilNo ?? "").Trim());
+                string bc = barcode ?? "";
+                cmd.Parameters.AddWithValue("@b", bc.Length > 300 ? bc.Substring(0, 300) : bc);
+                conn.Open();
+                return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+            }
         }
 
         // BIN ที่ใช้จับคู่ได้ (ว่าง / N/A / - = ไม่มี BIN)
@@ -615,8 +660,13 @@ namespace CIMS.Services
         //   สินค้าในคลังต้นทางที่ถูกตัด = สินค้าที่ BIN เดียวกับสินค้าที่สแกน (PRODUCT CODE 2 คลังต่างกันได้)
         //   ไม่มี BIN / ไม่เจอ BIN เดียวกัน = สินค้าตัวเดียวกัน (แบบเดิม) / BIN ซ้ำหลายตัว = ตัวเดียวกันก่อน แล้วตัวที่ยอดมากสุด
         //   รับเข้าเต็มจำนวนตามป้ายเสมอ (ของอยู่หน้างานแล้ว) ตัดต้นทาง "เท่าที่มี" (ไม่ติดลบ) / คลังนับ Coil: รับเข้า +1 Coil, ต้นทาง -1 Coil
+        //   holdPending   = ตัดต้นทางตาม Coil แม่ไม่ได้ / ไม่ครบ -> ไม่รับเข้าเลย เก็บเป็น NOT DEDUCTED รอดำเนินการ (Held = true)
+        //   approveMissId = APPROVE / ลงทะเบียนจาก NOT DEDUCTED: รับเข้า + ตัดเท่าที่ตัดได้ แล้วปิดรายการนั้น (approveStatus) ไม่สร้างรายการใหม่
+        //   existingTxId  = รายการเดิมที่รับเข้าไปแล้ว (RECEIVED ก่อนอัพเดทนี้): ไม่รับเข้าซ้ำ ตัดต้นทางอย่างเดียว ผูกกับรายการสแกนเดิม
         public DeductResult UpdateStockWithDeduct(int ptId, string partCode, string partACode, decimal qty, string userId, string refNo,
-                                                  StockModel stock, int sourceStkId, bool remainder = false, CoilLabel coil = null)
+                                                  StockModel stock, int sourceStkId, bool remainder = false, CoilLabel coil = null,
+                                                  bool holdPending = false, int? approveMissId = null, string approveStatus = "APPROVED",
+                                                  int? existingTxId = null, int? formatId = null)
         {
             if (stock != null) qty = CIMS.Helpers.Qty.Round(qty, stock.AllowDecimal);
             var result = new DeductResult { RequestedQty = qty };
@@ -628,33 +678,7 @@ namespace CIMS.Services
                 {
                     try
                     {
-                        // 1) รับเข้าคลังที่สแกน (CIMS.sp_Stock_AddQty: คลังหลัก = CIMS.Parts / คลังอื่น = CIMS.PartStocks)
-                        decimal toBalance; int txId;
-                        using (var cmd = new SqlCommand("CIMS.sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
-                        {
-                            cmd.Parameters.AddWithValue("@StkId", stock.StkId);
-                            cmd.Parameters.AddWithValue("@PtId", ptId);
-                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
-                            var nb = cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@NewBal", 0m)); nb.Direction = ParameterDirection.Output;
-                            cmd.Parameters.AddWithValue("@Box", boxMove);
-                            cmd.ExecuteNonQuery();
-                            toBalance = CIMS.Helpers.Qty.Read(nb.Value);
-                        }
-
-                        using (var cmd = new SqlCommand(@"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
-                                                          VALUES (@UserId, @Qty, 'IN', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box);
-                                                          SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
-                        {
-                            cmd.Parameters.AddWithValue("@UserId", userId);
-                            cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
-                            cmd.Parameters.AddWithValue("@PtId", ptId);
-                            cmd.Parameters.AddWithValue("@PtACode", string.IsNullOrWhiteSpace(partACode) ? DBNull.Value : (object)partACode.Trim());
-                            string safeRefNo = string.IsNullOrWhiteSpace(refNo) ? null : (refNo.Length > RefNoMaxLength ? refNo.Substring(0, RefNoMaxLength) : refNo);
-                            cmd.Parameters.AddWithValue("@RefNo", (object)safeRefNo ?? DBNull.Value);
-                            cmd.Parameters.Add("@StkId", SqlDbType.Int).Value = stock.StkId;
-                            cmd.Parameters.Add("@Box", SqlDbType.Int).Value = boxMove;
-                            txId = Convert.ToInt32(cmd.ExecuteScalar());
-                        }
+                        decimal toBalance = 0; int txId = existingTxId ?? 0;
 
                         // 2) คลังต้นทาง + สินค้าที่จะตัด: Coil ลูกเดียวกัน > Coil แม่เดียวกัน > BIN เดียวกัน > สินค้าตัวเดียวกัน
                         bool sourceCoil = false;
@@ -731,6 +755,54 @@ namespace CIMS.Services
                             }
                         result.SourceAfter = result.SourceBefore - result.Deducted;
 
+                        // ⏸ ตัด Coil แม่ไม่ได้ / ไม่ครบ -> ไม่รับเข้า เก็บเป็น NOT DEDUCTED รอผู้มีสิทธิ์ APPROVE (ไม่มีอะไรเปลี่ยนในคลัง)
+                        if (holdPending && result.MotherCoil != null && result.Deducted < qty && !remainder && CIMS.Helpers.DbSchema.HasMissStatus)
+                        {
+                            trans.Rollback();
+                            AddPendingMiss(stock.StkId, sourceStkId, ptId, coil, qty, result.Deducted, result.MatchedHow == null ? "NOT_FOUND" : "SHORT", refNo, userId, formatId);
+                            result.Held = true;
+                            return result;
+                        }
+
+                        // 1) รับเข้าคลังที่สแกน (CIMS.sp_Stock_AddQty: คลังหลัก = CIMS.Parts / คลังอื่น = CIMS.PartStocks) - รายการเดิมที่รับไปแล้ว = ข้าม
+                        if (existingTxId == null)
+                        {
+                            using (var cmd = new SqlCommand("CIMS.sp_Stock_AddQty", conn, trans) { CommandType = CommandType.StoredProcedure })
+                            {
+                                cmd.Parameters.AddWithValue("@StkId", stock.StkId);
+                                cmd.Parameters.AddWithValue("@PtId", ptId);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
+                                var nb = cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@NewBal", 0m)); nb.Direction = ParameterDirection.Output;
+                                cmd.Parameters.AddWithValue("@Box", boxMove);
+                                cmd.ExecuteNonQuery();
+                                toBalance = CIMS.Helpers.Qty.Read(nb.Value);
+                            }
+
+                            using (var cmd = new SqlCommand(@"INSERT INTO CIMS.ScanTransactions (UserID, Quantity, TransactionType, TransactionDate, PartID, PartACode, ReferenceNo, StockID, BoxChange)
+                                                              VALUES (@UserId, @Qty, 'IN', GETDATE(), @PtId, @PtACode, @RefNo, @StkId, @Box);
+                                                              SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@UserId", userId);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@Qty", qty));
+                                cmd.Parameters.AddWithValue("@PtId", ptId);
+                                cmd.Parameters.AddWithValue("@PtACode", string.IsNullOrWhiteSpace(partACode) ? DBNull.Value : (object)partACode.Trim());
+                                string safeRefNo = string.IsNullOrWhiteSpace(refNo) ? null : (refNo.Length > RefNoMaxLength ? refNo.Substring(0, RefNoMaxLength) : refNo);
+                                cmd.Parameters.AddWithValue("@RefNo", (object)safeRefNo ?? DBNull.Value);
+                                cmd.Parameters.Add("@StkId", SqlDbType.Int).Value = stock.StkId;
+                                cmd.Parameters.Add("@Box", SqlDbType.Int).Value = boxMove;
+                                txId = Convert.ToInt32(cmd.ExecuteScalar());
+                            }
+                        }
+                        else
+                            using (var cmd = new SqlCommand(stock.IsMain ? "SELECT StockQuantity FROM CIMS.Parts WHERE PartID = @p"
+                                                                         : "SELECT Quantity FROM CIMS.PartStocks WHERE PartID = @p AND StockID = @s", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@p", ptId);
+                                cmd.Parameters.AddWithValue("@s", stock.StkId);
+                                toBalance = CIMS.Helpers.Qty.Read(cmd.ExecuteScalar());
+                            }
+                        result.TxId = txId;
+
                         if (result.Deducted > 0)
                         {
                             // คลังต้นทางนับ Coil: -1 Coil (ไม่ต่ำกว่า 0) ใน Statement เดียวกับ KG (Trigger จึงไม่คำนวณกล่องใหม่)
@@ -779,14 +851,28 @@ namespace CIMS.Services
                         // 🧲 Coil แม่ในคลังต้นทาง: หักน้ำหนักที่ตัดออก / เหลือ 0 = Coil แม่หมด (OUT) - บันทึก CoilMoves ผูกรายการสแกน (ยกเลิกแล้วคืนได้)
                         if (how == "MOTHER COIL" && result.Deducted > 0) ConsumeMotherCoil(conn, trans, coil.MotherCoil.Trim(), sourceStkId, srcPart, result.Deducted, txId, userId);
 
-                        // 🧲 ย้าย Coil ลูก (มีอยู่ในคลังต้นทาง) / เพิ่มใหม่ เข้าคลังที่รับ - น้ำหนักตามป้าย
-                        if (stock.CountCoil && !remainder) CoilReceive(conn, trans, coil, ptId, stock.StkId, qty, txId, userId);
+                        // 🧲 ย้าย Coil ลูก (มีอยู่ในคลังต้นทาง) / เพิ่มใหม่ เข้าคลังที่รับ - น้ำหนักตามป้าย (รายการเดิมที่รับไปแล้ว = ทำไปแล้ว)
+                        if (stock.CountCoil && !remainder && existingTxId == null) CoilReceive(conn, trans, coil, ptId, stock.StkId, qty, txId, userId);
 
                         // STOCK (COIL) ของต้นทาง = จำนวน Coil ในทะเบียน (เมื่อหาเจอผ่านทะเบียน Coil)
                         if (how != null && sourceCoil && srcPart > 0) CoilImportService.RecountCoils(conn, trans, srcPart, sourceStkId, false);
 
-                        // 📋 ตัดตาม Coil แม่ไม่ได้ / ได้ไม่ครบ -> เก็บไว้ในรายการ NOT DEDUCTED (ปุ่มหน้า Multi-Scanner)
-                        if (result.MotherCoil != null && result.Deducted < qty && !remainder && CIMS.Helpers.DbSchema.HasDeductMisses)
+                        // ✔ ปิดรายการ NOT DEDUCTED ที่ APPROVE / ลงทะเบียน -> ไปแสดงที่ DEDUCTED
+                        if (approveMissId.HasValue)
+                            using (var cmd = new SqlCommand(@"UPDATE CIMS.DeductMisses SET Status = @st, TransactionID = @tx, PartID = @p, Deducted = @d,
+                                                                     ActionBy = @u, ActionDate = GETDATE() WHERE MissID = @id", conn, trans))
+                            {
+                                cmd.Parameters.AddWithValue("@st", approveStatus);
+                                cmd.Parameters.AddWithValue("@tx", txId);
+                                cmd.Parameters.AddWithValue("@p", ptId);
+                                cmd.Parameters.Add(CIMS.Helpers.QtyParam.Of("@d", result.Deducted));
+                                cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@id", approveMissId.Value);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                        // 📋 ตัดตาม Coil แม่ไม่ได้ / ได้ไม่ครบ -> เก็บไว้ในรายการ NOT DEDUCTED (ปุ่มหน้า Multi-Scanner) - ฐานเดิมที่ยังไม่มีสถานะรอดำเนินการ
+                        if (approveMissId == null && !holdPending && result.MotherCoil != null && result.Deducted < qty && !remainder && CIMS.Helpers.DbSchema.HasDeductMisses)
                             using (var cmd = new SqlCommand(@"INSERT INTO CIMS.DeductMisses (TransactionID, StockID, SourceStockID, PartID, CoilNo, MotherCoil, LabelQty, Deducted, Reason, Barcode, UserID)
                                                               VALUES (@tx, @s, @src, @p, @c, @m, @q, @d, @why, @b, @u)", conn, trans))
                             {

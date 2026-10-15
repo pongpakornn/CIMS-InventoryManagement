@@ -40,6 +40,27 @@ namespace CIMS.Helpers
             }
         }
 
+        // Update_20261016b.sql: CIMS.DeductMisses.Status (PENDING = ยังไม่รับเข้า รอ APPROVE / RECEIVED / APPROVED / REGISTERED)
+        private static bool? _missStatus;
+        public static bool HasMissStatus
+        {
+            get
+            {
+                if (_missStatus.HasValue) return _missStatus.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH('CIMS.DeductMisses', 'Status') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _missStatus = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _missStatus.Value;
+            }
+        }
+
         private static bool? TableExists(string name)
         {
             try

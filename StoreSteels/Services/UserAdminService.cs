@@ -79,7 +79,7 @@ namespace CIMS.Services
         {
             ("DASHBOARD",   "Dashboard",                  "VIEW = open the page"),
             ("StoreMaxMin", "Store(Max-Min)",            "VIEW = open + stocks (read only)  •  ADD = add stock / barcode format  •  EDIT = stock settings / barcode formats  •  DEL = delete stock"),
-            ("MultiScanner", "Multi-Scanner",              "VIEW = open + scan (stocks + DISPLAY: ▸ SCAN STOCKS + DISPLAY below)  •  DEL = adjust scan / delete NOT DEDUCTED"),
+            ("MultiScanner", "Multi-Scanner",              "VIEW = open + scan (stocks + DISPLAY: ▸ SCAN STOCKS + DISPLAY below)  •  DEL = adjust scan  •  APPROVE = NOT DEDUCTED action (approve / register / delete)"),
             ("ProductControl", "ProductControl",     "VIEW = open + export QR  •  ADD = register / import  •  EDIT = edit / show-hide / image  •  DEL = delete"),
             ("PackingCard", "Pick List",                  "VIEW = open the page"),
             ("MAXMINCALC",  "Max-Min Calculator",         "VIEW = open  •  EDIT = edit / import / calculate"),

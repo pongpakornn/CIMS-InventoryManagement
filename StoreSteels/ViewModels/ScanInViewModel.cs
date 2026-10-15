@@ -1149,6 +1149,38 @@ namespace CIMS.ViewModels
                 }
             }
 
+            // ⏸ ป้ายที่ต้องตัดคลังต้นทาง (เช่น Panta -> STOCK-PANTA): ค้างอยู่ใน NOT DEDUCTED แล้ว = ไม่รับซ้ำ /
+            //    สินค้ายังไม่ลงทะเบียน = ไม่รับเข้า เก็บเป็น NOT DEDUCTED รอผู้มีสิทธิ์ APPROVE (ลงทะเบียนผ่านปุ่ม PRODUCT CONTROL)
+            if (isSupplierScan && !isOut && !IsTestMode && !IsRemainderMode && DbSchema.HasMissStatus && DeductSourceFor(supplierFmt) is int holdSrc)
+            {
+                string cNo = null, mom = null;
+                CoilFormatFor(supplierFmt)?.ReadCoil(supplierRaw, out cNo, out mom);
+                string rawCopy = rawBarcodeFull;
+                if (await Task.Run(() => _scanService.HasPendingMiss(cNo, rawCopy)))
+                {
+                    ScanError($"ป้ายนี้ค้างอยู่ที่ NOT DEDUCTED แล้ว (รอดำเนินการ)\nรอผู้มีสิทธิ์ APPROVE ของ Multi-Scanner\n\nCode: {rawBarcodeFull}");
+                    BarcodeInput = string.Empty;
+                    return;
+                }
+                var fmtCopy = supplierFmt; var codesCopy = supplierCodes;
+                var known = await Task.Run(() => FindPartByCodes(fmtCopy, codesCopy));
+                if (known == null)
+                {
+                    var target = multiScope ? ScopeStocks.FirstOrDefault(s => s.StkId != holdSrc && s.InSupplier && StockAcceptsLabel(s, supplierFmt)) : stock;
+                    if (target != null && target.StkId != holdSrc)
+                    {
+                        decimal q = Qty.Round(supplierQty ?? 0, target.AllowDecimal);
+                        var lbl = new ScanService.CoilLabel { CoilNo = cNo, MotherCoil = mom };
+                        await Task.Run(() => _scanService.AddPendingMiss(target.StkId, holdSrc, null, lbl, q, 0, "NO_PRODUCT", rawCopy, uid, fmtCopy.FmtId));
+                        LogService.WriteLog(uid, "NOT_DEDUCTED_PENDING", $"{target.Code} | NO PRODUCT | Coil {cNo} | Mother {mom} | Label {Qty.Plain(q)} | {rawBarcodeFull}", codesCopy.FirstOrDefault());
+                        ScanWarning($"⏸ ยังไม่รับเข้า {target.Code}\nไม่พบ PD CODE ของป้ายนี้ในระบบ\n\nเก็บไว้ที่ NOT DEDUCTED (รอดำเนินการ) แล้ว\nรอผู้มีสิทธิ์ APPROVE ของ Multi-Scanner ลงทะเบียน / รับเข้า\n\nCode: {rawBarcodeFull}", "NOT DEDUCTED");
+                        _ = RefreshNotDeductedAsync();
+                        BarcodeInput = string.Empty;
+                        return;
+                    }
+                }
+            }
+
             // 🏬 สแกนร่วมหลายคลัง / AUTO: ระบบหาคลังของสินค้านี้เอง (เด้งให้เลือกถ้าอยู่หลายคลัง)
             if (multiScope)
             {
@@ -1241,8 +1273,11 @@ namespace CIMS.ViewModels
                     bool isSaved;
                     if (useDeduct)
                     {
-                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, deductFrom.Value, remainder, coil);
+                        // ตัด Coil แม่ไม่ได้ / ไม่ครบ = ไม่รับเข้า ค้างไว้ที่ NOT DEDUCTED (Update_20261016b.sql)
+                        deductResult = _scanService.UpdateStockWithDeduct(part.PartId, part.PartCode, part.PartACode, originalQty, uid, rawBarcodeFull, stock, deductFrom.Value, remainder, coil,
+                                                                          holdPending: DbSchema.HasMissStatus, formatId: supplierFmt?.FmtId);
                         isSaved = deductResult.Saved;
+                        if (deductResult.Held) { part.Qty = originalQty; return part; }
                     }
                     else
                     {
@@ -1266,6 +1301,19 @@ namespace CIMS.ViewModels
                 });
 
                 if (remainderCancelled) return;   // กดยกเลิกตอนกรอกจำนวนเศษ -> ไม่บันทึก ไม่แจ้ง error
+
+                // ⏸ ตัด Coil แม่ในคลังต้นทางไม่ได้ / ไม่ครบ -> ไม่รับเข้า ค้างไว้ที่ NOT DEDUCTED รอผู้มีสิทธิ์ APPROVE
+                if (deductResult?.Held == true && result != null)
+                {
+                    string why = deductResult.MatchedHow == null
+                        ? $"ไม่พบ Coil แม่ {deductResult.MotherCoil} ใน {deductResult.SourceCode}"
+                        : $"Coil แม่ {deductResult.MotherCoil} ใน {deductResult.SourceCode} เหลือ {Qty.Plain(deductResult.MotherBefore ?? deductResult.SourceBefore)} KG (ป้าย {Qty.Plain(deductResult.RequestedQty)} KG)";
+                    LogService.WriteLog(uid, "NOT_DEDUCTED_PENDING", $"{stock.Code} <- {deductResult.SourceCode} | Coil {coil?.CoilNo} | {why} | {rawBarcodeFull}", result.PartCode);
+                    ScanWarning($"⏸ ยังไม่รับเข้า {stock.Code}\n{why}\n\n{result.PartCode}  Coil {coil?.CoilNo}\nจำนวนบนป้าย: {Qty.Plain(deductResult.RequestedQty)}\n\n" +
+                                "เก็บไว้ที่ NOT DEDUCTED (รอดำเนินการ) แล้ว\nรอผู้มีสิทธิ์ APPROVE ของ Multi-Scanner", "NOT DEDUCTED");
+                    _ = RefreshNotDeductedAsync();
+                    return;
+                }
                 if (zeroQtyPart != null)
                 {
                     ScanError($"[ไม่บันทึก] จำนวนเป็น 0\n{zeroQtyPart.PartCode}  {zeroQtyPart.PartName}\n(Pack Size = 0 หรือป้ายอ่านได้ไม่ครบ - กรุณาแสกนใหม่)\n\nCode: {rawBarcodeFull}");

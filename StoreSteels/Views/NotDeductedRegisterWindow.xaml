@@ -1,0 +1,92 @@
+<Window x:Class="CIMS.Views.NotDeductedRegisterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Product Control" Width="1500" Height="900"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 📋 NOT DEDUCTED > PRODUCT CONTROL: ป้ายที่สแกน (บนสุด) -> MAX / MIN / STOCK COIL / STOCK (KG) (ไม่บังคับ) ->
+         หน้า Inventory Registration (ค้นหา / ตาราง / ลงทะเบียน + เลือกคลัง) - ลงทะเบียน หรือเลือกสินค้าที่มีอยู่แล้ว = รับเข้าคลังตามป้าย -->
+    <Border Background="White" CornerRadius="22" Margin="12" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="#E65100" CornerRadius="21,21,0,0" Padding="24,12" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel Margin="0,0,50,0">
+                        <TextBlock Text="＋ PRODUCT CONTROL  •  REGISTER &amp; RECEIVE" Foreground="White" FontSize="19" FontWeight="Black"/>
+                        <TextBlock x:Name="txtSub" Foreground="#FFE0B2" FontSize="12" FontWeight="Bold" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Close_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <!-- 1) ป้ายที่สแกน -->
+            <Border Grid.Row="1" Background="#FFF8F0" BorderBrush="#FFCC80" BorderThickness="1.5" CornerRadius="12" Padding="14,8" Margin="20,12,20,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="SCANNED LABEL  (not in stock yet)" FontSize="11" FontWeight="Black" Foreground="#E65100"/>
+                        <TextBlock x:Name="txtBarcode" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="#2D2A32" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        <WrapPanel x:Name="pnlLabel" Margin="0,6,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock x:Name="txtReceive" FontSize="14" FontWeight="Black" Foreground="#2E7D32" HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="txtReason" FontSize="12" FontWeight="Bold" Foreground="#C62828" HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2) MAX / MIN / STOCK COIL / STOCK (KG) ของคลังที่รับ (ไม่บังคับ) + ปุ่มรับเข้าด้วยสินค้าที่เลือกในตาราง -->
+            <Border Grid.Row="2" Background="#F7F5FA" BorderBrush="#E4DDF0" BorderThickness="1.5" CornerRadius="12" Padding="14,8" Margin="20,8,20,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="txtStockHead" FontSize="11" FontWeight="Black" Foreground="#6750A4"/>
+                        <WrapPanel Margin="0,4,0,0">
+                            <StackPanel Margin="0,0,12,4">
+                                <TextBlock Text="MAX" FontSize="10" FontWeight="Bold" Foreground="#8A8490"/>
+                                <TextBox x:Name="txtMax" Style="{StaticResource StkInput}" Width="120" Height="36"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,12,4">
+                                <TextBlock Text="MIN" FontSize="10" FontWeight="Bold" Foreground="#8A8490"/>
+                                <TextBox x:Name="txtMin" Style="{StaticResource StkInput}" Width="120" Height="36"/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlCoil" Margin="0,0,12,4">
+                                <TextBlock Text="STOCK COIL" FontSize="10" FontWeight="Bold" Foreground="#8A8490"/>
+                                <TextBox x:Name="txtCoil" Style="{StaticResource StkInput}" Width="120" Height="36"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,12,4">
+                                <TextBlock x:Name="lblQty" Text="STOCK (KG)" FontSize="10" FontWeight="Bold" Foreground="#8A8490"/>
+                                <TextBox x:Name="txtQty" Style="{StaticResource StkInput}" Width="140" Height="36"/>
+                            </StackPanel>
+                            <TextBlock x:Name="txtHint" FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="520"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <Button x:Name="btnUseSelected" Content="✔ RECEIVE WITH SELECTED PRODUCT" Style="{StaticResource StkButton}" Background="#2E7D32" Click="UseSelected_Click"
+                                ToolTip="The product already exists: select it in the table below, then receive the label with it"/>
+                        <TextBlock Text="or fill in the form below and press REGISTER" FontSize="11" FontWeight="SemiBold" Foreground="#8A8490" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 3) หน้า Inventory Registration (ค้นหา / ตาราง / ฟอร์มลงทะเบียน + เลือกคลัง) -->
+            <Frame x:Name="frmProduct" Grid.Row="3" NavigationUIVisibility="Hidden" Margin="4,0,4,8"/>
+        </Grid>
+    </Border>
+</Window>

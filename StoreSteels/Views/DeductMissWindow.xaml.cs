@@ -13,8 +13,9 @@ using System.Windows.Threading;
 
 namespace CIMS.Views
 {
-    // ⚠ NOT DEDUCTED - ป้ายที่แสกนรับเข้าแล้วแต่ตัด Coil แม่ในคลังต้นทางไม่ได้ (เก็บให้เองตอนแสกน)
-    //    ค้นหาเบื้องหลัง (ผลเก่าที่มาช้าถูกทิ้ง) / ช่วงวันที่ / ติ๊กเลือกแล้ว EXPORT / DELETE (Admin Level 1 เท่านั้น)
+    // ⚠ NOT DEDUCTED - ป้ายที่ยังไม่รับเข้าคลัง (รอดำเนินการ) / ✔ DEDUCTED - เพิ่มอะไรเข้ามาแล้วตัดอะไรจากคลังต้นทาง
+    //    ค้นหาเบื้องหลัง (ผลเก่าที่มาช้าถูกทิ้ง) / ช่วงวันที่ / ติ๊กเลือกแล้ว EXPORT
+    //    ACTION (APPROVE ของ Multi-Scanner): ✔ APPROVE รับเข้า / ＋ PRODUCT ลงทะเบียนแล้วรับเข้า / 🗑 DEL ลบ (เก็บ Log)
     public partial class DeductMissWindow : Window
     {
         private readonly DeductMissService _service = new DeductMissService();
@@ -22,40 +23,40 @@ namespace CIMS.Views
         private readonly ObservableCollection<DeductMissRow> _rows = new ObservableCollection<DeductMissRow>();
         private DispatcherTimer _searchTimer;
         private int _version;
-        private bool _ready;
+        private bool _ready, _busy;
         public bool Changed { get; private set; }
 
-        // deducted = true -> ✔ DEDUCTED: ป้ายที่แสกนรับเข้าแล้วตัดคลังต้นทาง (STOCK-PANTA) ได้ (ดูอย่างเดียว ไม่มีปุ่มลบ)
         private readonly bool _deducted;
         private readonly List<int> _stockIds;   // คลังที่ผู้ใช้เห็นปุ่มนี้ (null = ทุกคลัง)
+        private readonly bool _canAct;           // ช่อง ACTION
 
         public DeductMissWindow(UserSession session, bool deducted = false, IEnumerable<int> stockIds = null)
         {
             _session = session;
             _deducted = deducted;
             _stockIds = stockIds?.ToList();
+            _canAct = !deducted && session?.CanApproveScan == true && DbSchema.HasMissStatus;
             InitializeComponent();
-            btnDelete.Visibility = !deducted && _session?.CanDeleteScan == true ? Visibility.Visible : Visibility.Collapsed;   // ลบ = DEL ของ Multi-Scanner
             if (deducted)
             {
                 Title = "Deducted";
                 hdrBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2E, 0x7D, 0x32));
                 txtTitle.Text = "✔ DEDUCTED";
-                txtSub.Text = "Labels received with SCAN IN that cut the source stock (e.g. STOCK-PANTA) - what was cut, from which mother coil / product, and what is left";
+                txtSub.Text = "What came in (PD CODE / coil) and what was cut from the source stock (source product / mother coil before / source balance)";
                 txtSub.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC8, 0xE6, 0xC9));
                 txtEmpty.Text = "NO DEDUCTION IN THIS RANGE";
-                colCut.Header = "CUT FROM SOURCE";
-                colMissing.Visibility = colReason.Visibility = colMotherNow.Visibility = Visibility.Collapsed;
-                colSrcPart.Visibility = colSrcAfter.Visibility = colHow.Visibility = colMotherDone.Visibility = Visibility.Visible;
+                colCut.Visibility = colSrcPart.Visibility = colSrcName.Visibility = colMotherBefore.Visibility = colSrcAfter.Visibility = Visibility.Visible;
+                colScanned.Visibility = colStatus.Visibility = Visibility.Collapsed;
             }
+            colAction.Visibility = _canAct ? Visibility.Visible : Visibility.Collapsed;
             var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) { Owner = owner; WindowStartupLocation = WindowStartupLocation.CenterOwner; }
-            // จอเล็ก (1366 x 768): ไม่ให้หน้าต่างล้นจอ
+            // ทุกขนาดจอ: ไม่ล้นจอ (จอเล็กตารางเลื่อนซ้าย-ขวาได้)
             var area = SystemParameters.WorkArea;
-            Width = Math.Min(Width, area.Width);
-            Height = Math.Min(Height, area.Height);
+            Width = Math.Min(Width, area.Width - 10);
+            Height = Math.Min(Height, area.Height - 10);
             dgMiss.ItemsSource = _rows;
-            dpFrom.SelectedDate = _deducted ? DateTime.Today : DateTime.Today.AddDays(-30);
+            dpFrom.SelectedDate = _deducted ? DateTime.Today : DateTime.Today.AddDays(-60);
             dpTo.SelectedDate = DateTime.Today;
             Loaded += async (s, e) => { _ready = true; await LoadAsync(); txtSearch.Focus(); };
         }
@@ -81,18 +82,17 @@ namespace CIMS.Views
             {
                 if (ver != _version) return;
                 txtStatus.Text = "";
-                NotificationManager.Show("Not deducted", "โหลดรายการไม่สำเร็จ: " + ex.Message, false);
+                NotificationManager.Show(_deducted ? "Deducted" : "Not deducted", "โหลดรายการไม่สำเร็จ: " + ex.Message, false);
             }
         }
 
         private void UpdateStatus()
         {
             int sel = _rows.Count(r => r.IsSelected);
-            decimal kg = _rows.Sum(r => r.Missing);
-            int foundNow = _rows.Count(r => r.MotherNow.HasValue);
             txtStatus.Text = _deducted
-                ? $"{_rows.Count:N0} LABELS  •  CUT FROM SOURCE {Qty.Plain(_rows.Sum(r => r.Deducted))} KG  •  BY MOTHER COIL {_rows.Count(r => r.How == "MOTHER COIL"):N0}  •  COIL MOVED {_rows.Count(r => r.How == "COIL"):N0}  •  {sel:N0} SELECTED"
-                : $"{_rows.Count:N0} LABELS  •  NOT DEDUCTED {Qty.Plain(kg)} KG  •  MOTHER COIL NOW IN SOURCE: {foundNow:N0}  •  {sel:N0} SELECTED";
+                ? $"{_rows.Count:N0} LABELS  •  CUT FROM SOURCE {Qty.Plain(_rows.Sum(r => r.Deducted))} KG  •  BY MOTHER COIL {_rows.Count(r => r.How == "MOTHER COIL"):N0}  •  NOT CUT YET {_rows.Count(r => r.How == "NONE"):N0}  •  {sel:N0} SELECTED"
+                : $"{_rows.Count:N0} LABELS  •  WAITING {_rows.Count(r => r.IsPending):N0} ({Qty.Plain(_rows.Where(r => r.IsPending).Sum(r => r.LabelQty))} KG NOT IN STOCK)  •  NO PD CODE {_rows.Count(r => !r.HasProduct):N0}  •  MOTHER COIL NOW IN SOURCE {_rows.Count(r => r.MotherNow.HasValue):N0}  •  {sel:N0} SELECTED" +
+                  (_canAct ? "" : "  •  ACTION = APPROVE of Multi-Scanner");
             txtEmpty.Visibility = _rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             chkAll.IsChecked = _rows.Count > 0 && sel == _rows.Count;
         }
@@ -138,22 +138,65 @@ namespace CIMS.Views
             finally { btnExport.IsEnabled = true; }
         }
 
-        private async void Delete_Click(object sender, RoutedEventArgs e)
+        // ===== ACTION (APPROVE ของ Multi-Scanner) =====
+
+        // ✔ APPROVE: รับเข้าคลังตามป้าย + ตัด Coil แม่ในคลังต้นทางเท่าที่ตัดได้ตอนนี้ -> ไปแสดงที่ DEDUCTED
+        private async void Approve_Click(object sender, RoutedEventArgs e)
         {
-            if (_session?.UserLevel != 1) return;
-            var rows = _rows.Where(r => r.IsSelected).ToList();
-            if (rows.Count == 0) { DialogHelper.ShowWarning("กรุณาติ๊กเลือกรายการที่ต้องการลบก่อนครับ"); return; }
-            if (!DialogHelper.ShowConfirm($"ลบ {rows.Count:N0} รายการออกจากรายการ NOT DEDUCTED\n\n(ไม่เปลี่ยนยอดสต็อก / รายการสแกน)\nลบแล้วกู้คืนไม่ได้ ยืนยันหรือไม่?", "DELETE")) return;
+            if (!_canAct || _busy || !((sender as FrameworkElement)?.Tag is DeductMissRow r)) return;
+            if (!r.HasProduct) { DialogHelper.ShowWarning("ยังไม่มี PD CODE ของป้ายนี้ในระบบ\nกด ＋ PRODUCT เพื่อลงทะเบียนสินค้าก่อน"); return; }
+            string what = r.Status == "RECEIVED"
+                ? $"รายการเดิม: รับเข้า {r.StockCode} ไปแล้ว\nAPPROVE = ตัด {r.SourceCode} ตามหลัง"
+                : $"รับเข้า {r.StockCode}  {r.PartCode}  {r.LabelQtyText}";
+            string cut = r.MotherNow.HasValue ? $"ตัด Coil แม่ {r.MotherCoil} ใน {r.SourceCode} (มี {Qty.Plain(r.MotherNow.Value)} KG)"
+                                              : $"Coil แม่ {r.MotherCoil} ยังไม่มีใน {r.SourceCode} • ยังไม่ตัด";
+            if (!DialogHelper.ShowConfirm($"{what}\nCoil {r.CoilNo}\n\n{cut}\n\nยืนยัน APPROVE หรือไม่?", "APPROVE")) return;
+            _busy = true;
             try
             {
-                var ids = rows.Select(r => r.MissId).ToList();
-                int n = await Task.Run(() => _service.Delete(ids));
-                LogService.WriteLog(_session?.UserId, "DELETE_NOT_DEDUCTED", $"Deleted {n} not-deducted labels: {string.Join(", ", rows.Take(20).Select(r => r.CoilNo))}{(rows.Count > 20 ? " ..." : "")}", "NOT_DEDUCTED");
-                NotificationManager.Show("Deleted", $"ลบแล้ว {n:N0} รายการ", true);
+                string uid = _session?.UserId;
+                var res = await Task.Run(() => _service.Receive(r, r.PartId.Value, r.LabelQty, uid, "APPROVED"));
+                if (!res.Ok) { DialogHelper.ShowError(res.Message); return; }
+                var d = res.Deduct;
+                NotificationManager.Show("Approved", $"{r.PartCode}  {r.LabelQtyText} → {r.StockCode}\n" +
+                    (d.Deducted > 0 ? $"ตัด {d.SourceCode} {Qty.Plain(d.Deducted)} ({d.SourcePartCode} เหลือ {Qty.Plain(d.SourceAfter)})" : $"ยังไม่ได้ตัด {r.SourceCode}") + "\nย้ายไปที่ DEDUCTED แล้ว", true);
+                Changed = true;
+                await LoadAsync();
+            }
+            catch (Exception ex) { DialogHelper.ShowError("APPROVE ไม่สำเร็จ\n" + ex.Message); }
+            finally { _busy = false; }
+        }
+
+        // ＋ PRODUCT: หน้าต่าง Inventory Registration (ข้อมูลจากป้าย) -> ลงทะเบียน / เลือกสินค้าที่มี -> รับเข้า -> ไปแสดงที่ DEDUCTED
+        private async void Register_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_canAct || _busy || !((sender as FrameworkElement)?.Tag is DeductMissRow r)) return;
+            if (r.Status == "RECEIVED") { DialogHelper.ShowWarning($"รายการเดิมนี้รับเข้า {r.StockCode} ไปแล้ว (มี PD CODE แล้ว)\nใช้ ✔ APPROVE เพื่อตัด {r.SourceCode} ตามหลัง"); return; }
+            var w = new NotDeductedRegisterWindow(_session, r);
+            w.ShowDialog();
+            if (w.Done) { Changed = true; await LoadAsync(); }
+        }
+
+        // 🗑 DEL: ยืนยันก่อน -> ลบรายการ (ไม่บันทึกเข้าคลัง) / รายการเดิมที่รับเข้าไปแล้ว = ยกเลิกรายการสแกนนั้น (คืนยอด) - เก็บ Log
+        private async void DeleteRow_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_canAct || _busy || !((sender as FrameworkElement)?.Tag is DeductMissRow r)) return;
+            string extra = r.Status == "RECEIVED"
+                ? $"\n\nรายการเดิมนี้รับเข้า {r.StockCode} ไปแล้ว {r.LabelQtyText}\nลบ = ยกเลิกรายการสแกนนั้น ยอด {r.StockCode} ลดลงตามป้าย"
+                : "\n\nป้ายนี้ยังไม่ได้เข้าคลัง - ลบแล้วไม่มีการบันทึกเข้าคลังใดๆ";
+            if (!DialogHelper.ShowConfirm($"ต้องการลบรายการนี้จริงๆ ใช่หรือไม่?\n\n{r.PartCodeText}  {r.PartNameText}\nCoil {r.CoilNo}  •  Mother {r.MotherCoil}  •  {r.LabelQtyText}{extra}\n\nลบแล้วกู้คืนไม่ได้", "DELETE")) return;
+            _busy = true;
+            try
+            {
+                string uid = _session?.UserId;
+                var res = await Task.Run(() => _service.Delete(r, uid));
+                if (!res.Ok) { DialogHelper.ShowError(res.Message); return; }
+                NotificationManager.Show("Deleted", $"ลบแล้ว  Coil {r.CoilNo}", true);
                 Changed = true;
                 await LoadAsync();
             }
             catch (Exception ex) { DialogHelper.ShowError("ลบไม่สำเร็จ\n" + ex.Message); }
+            finally { _busy = false; }
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
