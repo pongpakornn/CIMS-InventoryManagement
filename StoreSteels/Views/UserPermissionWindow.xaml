@@ -69,6 +69,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -91,7 +92,24 @@
                            FontWeight="Bold" FontSize="12" Foreground="#E65100" TextWrapping="Wrap"/>
             </Border>
 
-            <Grid Grid.Row="3" Margin="26,12,26,0">
+            <!-- 🔔 การแจ้งเตือน: ผู้ติดต่อ Admin ที่หน้าสแกนแสดงให้ผู้ใช้ที่ยังไม่ได้เลือกคลัง (เพิ่ม / แก้ไขได้ที่ปุ่มขวา) -->
+            <Border x:Name="pnlAlert" Grid.Row="3" Background="#FFF5F5" BorderBrush="#F5C6C6" BorderThickness="1.5" CornerRadius="12"
+                    Padding="14,8" Margin="26,12,26,0" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="🔔 ALERT CONTACT  (shown on the scan page when a user has no scan stock)" FontWeight="Black" FontSize="12" Foreground="#C62828"/>
+                        <TextBlock x:Name="txtAlert" FontWeight="Bold" FontSize="13" Foreground="#B71C1C" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button x:Name="btnAlert" Grid.Column="1" Content="🔔 SET ALERT CONTACT" Style="{StaticResource StkButton}" Background="#C62828"
+                            Click="Alert_Click" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="4" Margin="26,12,26,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -151,6 +169,53 @@
                                             <CheckBox Grid.Column="5" Style="{StaticResource PermCheck}" IsChecked="{Binding Approve, Mode=TwoWay}"/>
                                         </Grid>
                                     </Border>
+
+                                    <!-- 📡 แถว Multi-Scanner: กดแล้วขยายรายการย่อย เลือกคลังที่ UserID นี้สแกนได้ + ★ คลังที่ตัดก่อน + DISPLAY ของแต่ละคลัง -->
+                                    <Border Visibility="{Binding ScannerVisibility}" Margin="14,2,14,8" Padding="12,8" Background="#F7F5FA"
+                                            CornerRadius="10" BorderBrush="#E4DDF0" BorderThickness="1">
+                                        <StackPanel DataContext="{Binding Scanner}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button Content="{Binding ExpandText}" Click="ScannerToggle_Click" Tag="{Binding}" Style="{StaticResource StkButton}"
+                                                        Background="#6750A4" Height="32" FontSize="12" Padding="12,0" ToolTip="Scan stocks + DISPLAY of this user"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="{Binding SummaryBrush}" FontWeight="Bold" FontSize="12"
+                                                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/>
+                                            </Grid>
+                                            <ItemsControl ItemsSource="{Binding Items}" Visibility="{Binding ItemsVisibility}" Margin="0,8,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Padding="6,5" BorderBrush="#ECE9F1" BorderThickness="0,0,0,1">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="60"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="120"/>
+                                                                    <ColumnDefinition Width="300"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <CheckBox Style="{StaticResource PermCheck}" IsChecked="{Binding IsChecked, Mode=TwoWay}" HorizontalAlignment="Left"/>
+                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" Foreground="#8A8490" TextTrimming="CharacterEllipsis"/>
+                                                                </StackPanel>
+                                                                <Button Grid.Column="2" Content="{Binding PriorityText}" Foreground="{Binding PriorityBrush}" Click="ScanPriority_Click" Tag="{Binding}"
+                                                                        Style="{StaticResource StkCardButton}" IsEnabled="{Binding CanPriority}" HorizontalAlignment="Left"
+                                                                        ToolTip="★ = stock used first for SCAN OUT when an item is in several stocks"/>
+                                                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <TextBlock Text="DISPLAY" FontSize="10" FontWeight="Black" Foreground="#8A8490" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                    <ComboBox Width="230" Height="32" Style="{StaticResource StkCombo}" ItemsSource="{Binding Options}"
+                                                                              DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding SelectedDisplay, Mode=TwoWay}"
+                                                                              IsEnabled="{Binding IsChecked}" ToolTip="What this stock shows as PRODUCT CODE on the scan page"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -158,7 +223,7 @@
                 </ScrollViewer>
             </Grid>
 
-            <Grid Grid.Row="4" Margin="26,12,26,20">
+            <Grid Grid.Row="5" Margin="26,12,26,20">
                 <StackPanel x:Name="pnlQuick" Orientation="Horizontal">
                     <Button Content="VIEW ALL" Style="{StaticResource StkButton}" Background="#49454F" Click="ViewAll_Click" Margin="0,0,8,0"/>
                     <Button Content="SELECT ALL" Style="{StaticResource StkButton}" Background="#49454F" Click="All_Click" Margin="0,0,8,0"/>

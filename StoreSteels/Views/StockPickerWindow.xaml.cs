@@ -18,6 +18,7 @@ namespace CIMS.Views
         private readonly PickMode _mode;
         private readonly List<PickItem> _items;
         private bool _auto;
+        private bool _allowEmpty;   // Admin ตั้งให้ผู้ใช้: ไม่เลือกคลังเลยได้ (= ยกเลิก)
 
         // ผลลัพธ์
         public bool IsAuto => _auto;
@@ -40,19 +41,27 @@ namespace CIMS.Views
         #region === [ เปิดหน้าต่างแต่ละแบบ ] ===
 
         // เลือกคลังที่สแกนร่วมกัน: คืน true ถ้ากด SAVE
-        public static StockPickerWindow ShowScanStocks(IEnumerable<StockModel> stocks, bool auto, ICollection<int> checkedIds, int? priorityId)
+        // forUserId: Admin ตั้งคลังสแกนให้ผู้ใช้คนนั้น (หน้า User Management) - ไม่มี AUTO (กำหนดเป็นรายคลังเท่านั้น)
+        public static StockPickerWindow ShowScanStocks(IEnumerable<StockModel> stocks, bool auto, ICollection<int> checkedIds, int? priorityId, string forUserId = null)
         {
             var w = new StockPickerWindow(PickMode.ScanStocks, stocks);
-            w.txtTitle.Text = "SCAN STOCKS";
-            w.txtSubtitle.Text = "Select one or more stocks to scan together, or AUTO for every stock.  ★ = stock used first for SCAN OUT";
-            w.cardAuto.Visibility = Visibility.Visible;
-            w._auto = auto;
+            var active = Application.Current?.Windows.OfType<Window>().FirstOrDefault(x => x.IsActive && x != w);
+            if (active != null) w.Owner = active;
+            bool admin = !string.IsNullOrEmpty(forUserId);
+            w.txtTitle.Text = admin ? $"SCAN STOCKS • {forUserId}" : "SCAN STOCKS";
+            w.txtSubtitle.Text = admin
+                ? "Tick the stocks this user may scan (several = scan together).  ★ = stock used first for SCAN OUT"
+                : "Select one or more stocks to scan together, or AUTO for every stock.  ★ = stock used first for SCAN OUT";
+            w.cardAuto.Visibility = admin ? Visibility.Collapsed : Visibility.Visible;
+            w._allowEmpty = admin;
+            w._auto = !admin && auto;
             foreach (var i in w._items)
             {
-                i.IsChecked = !auto && checkedIds != null && checkedIds.Contains(i.Stock.StkId);
+                i.IsChecked = !w._auto && checkedIds != null && checkedIds.Contains(i.Stock.StkId);
                 i.IsPriority = priorityId.HasValue && i.Stock.StkId == priorityId.Value;
             }
-            w.txtHint.Text = "Several stocks: the system finds the stock of each scanned item. If an item is in more than one of them, " +
+            w.txtHint.Text = (admin ? "Only stocks with a scan channel open are listed. " : "") +
+                             "Several stocks: the system finds the stock of each scanned item. If an item is in more than one of them, " +
                              "SCAN IN asks which stock, SCAN OUT uses the ★ stock (or asks when the ★ stock does not have it).";
             w.txtHint.Visibility = Visibility.Visible;
             w.RefreshAuto();
@@ -134,7 +143,12 @@ namespace CIMS.Views
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (_mode == PickMode.ScanStocks && !_auto && !_items.Any(i => i.IsChecked))
+            // Admin ตั้งให้ผู้ใช้: ไม่ติ๊กเลย = ยกเลิกคลังสแกนของผู้ใช้นั้น (สแกนไม่ได้จนกว่าจะกำหนดใหม่)
+            if (_mode == PickMode.ScanStocks && !_auto && !_items.Any(i => i.IsChecked) && _allowEmpty)
+            {
+                if (!DialogHelper.ShowConfirm("ไม่ได้เลือกคลังเลย\nผู้ใช้นี้จะสแกนไม่ได้จนกว่าจะกำหนดคลังให้ใหม่\n\nยืนยันหรือไม่?", "SCAN STOCKS")) return;
+            }
+            else if (_mode == PickMode.ScanStocks && !_auto && !_items.Any(i => i.IsChecked))
             {
                 DialogHelper.ShowWarning("กรุณาเลือกคลังอย่างน้อย 1 คลัง หรือเลือก AUTO (ALL STOCKS)");
                 return;

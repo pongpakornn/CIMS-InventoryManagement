@@ -392,10 +392,32 @@ namespace CIMS.ViewModels
             CurrentUser?.CanViewScanIn == true || CurrentUser?.CanViewScanOut == true ? Visibility.Visible : Visibility.Collapsed;
         // ✏️ ADJUST SCAN: สิทธิ์ DEL ของ Multi-Scanner
         public Visibility AdjustButtonVisibility => CurrentUser?.CanDeleteScan == true ? Visibility.Visible : Visibility.Collapsed;
-        // 🏷️ DISPLAY: เลือกค่าที่แสดงแทนรหัสต่อคลัง (ของผู้ใช้คนนั้น) = EDIT ของ Multi-Scanner
-        public Visibility DisplayButtonVisibility => CurrentUser?.CanEditScanner == true ? Visibility.Visible : Visibility.Collapsed;
-        // 🏬 เลือกคลังที่สแกน (STOCK) = EDIT ของ Multi-Scanner / ไม่มีสิทธิ์ = สแกนตามคลังที่ตั้งไว้ในเครื่องนี้
-        public bool CanChangeScope => CurrentUser?.CanEditScanner == true;
+        // 🏬 คลังที่สแกน + 🏷️ DISPLAY: Admin กำหนดให้แต่ละ UserID (User Management > PERMISSION > SCANNER SETUP)
+        //    ผู้ใช้ทั่วไปเปลี่ยนเองไม่ได้ / Level 1 เปลี่ยนของตัวเองที่หน้านี้ได้ (บันทึกเป็นค่าของ UserID ตัวเอง)
+        //    ฐานที่ยังไม่รัน Update_20261015.sql = แบบเดิม (EDIT ของ Multi-Scanner เลือกเอง / จำคลังไว้ในเครื่อง)
+        private bool _assignMode;
+        private bool _notAssigned;
+        private readonly ScannerSetupService _setup = new ScannerSetupService();
+        private string _assignToken;
+
+        private bool IsAdminUser => CurrentUser?.UserLevel == 1;
+        public bool CanChangeScope => _assignMode ? IsAdminUser : CurrentUser?.CanEditScanner == true;
+        public Visibility DisplayButtonVisibility => (_assignMode ? IsAdminUser : CurrentUser?.CanEditScanner == true) ? Visibility.Visible : Visibility.Collapsed;
+
+        // 🔒 ยังไม่ได้กำหนดคลังสแกน (หรือคลังที่กำหนดสแกนไม่ได้แล้ว) -> ปุ่มทั้งหมดใช้ไม่ได้ / สแกนไม่ได้จนกว่า Admin จะกำหนด
+        public bool IsScannerReady => !_notAssigned;
+        public bool IsNotAssigned => _notAssigned;
+        public Visibility NotAssignedVisibility => _notAssigned ? Visibility.Visible : Visibility.Collapsed;
+        public System.Windows.Media.Brush ScopeButtonBackground => _notAssigned
+            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28))
+            : (System.Windows.Media.Brush)Application.Current.FindResource("MainPurple");
+        public string ScopeButtonTip => _notAssigned ? "ยังไม่ได้กำหนดคลังสแกน กรุณาติดต่อ Admin"
+            : _assignMode && !IsAdminUser ? "Stocks are set by the Admin (User Management)" : "Choose the stocks to scan";
+
+        // หน้าจอ (ScanInView) แสดงหน้าต่างติดต่อ Admin
+        public event Action ScannerLocked;
+        // Admin กำหนดคลังให้แล้ว (เปิดหน้านี้ค้างไว้) -> หน้าจอแจ้งว่าใช้งานได้แล้ว
+        public event Action ScannerUnlocked;
 
         public ICommand ToggleRemainderModeCommand { get; }
         #endregion
@@ -452,9 +474,9 @@ namespace CIMS.ViewModels
             OnPropertyChanged(nameof(ReturnButtonVisibility));
             OnPropertyChanged(nameof(RemainderButtonVisibility));
             OnPropertyChanged(nameof(AdjustButtonVisibility));
+            LoadStocks();
             OnPropertyChanged(nameof(DisplayButtonVisibility));
             OnPropertyChanged(nameof(CanChangeScope));
-            LoadStocks();
         }
         #endregion
 
@@ -489,7 +511,7 @@ namespace CIMS.ViewModels
             {
                 if (_scopeAuto) return "⚡ AUTO ( ALL STOCKS )";
                 var list = ScopeStocks;
-                if (list.Count == 0) return "SELECT STOCK";
+                if (list.Count == 0) return _assignMode ? $"⛔ ยังไม่ได้เลือกคลังของ {CurrentUser?.UserId}" : "SELECT STOCK";
                 if (list.Count == 1) return list[0].DisplayName;
                 string names = string.Join(" + ", list.Select(s => s.Code));
                 return names.Length <= 34 ? names : $"{list.Count} STOCKS";
@@ -523,7 +545,9 @@ namespace CIMS.ViewModels
         {
             _scopeAuto = auto;
             _scopeIds = (ids ?? new List<int>()).Where(id => Stocks.Any(s => s.StkId == id)).Distinct().ToList();
-            if (!_scopeAuto && _scopeIds.Count == 0)
+            // คลังที่ Admin กำหนด: ไม่มี = ล็อก (ไม่ใช้คลังหลักแทน กันสแกนผิดคลังโดยไม่รู้ตัว)
+            if (_assignMode) SetNotAssigned(!_scopeAuto && _scopeIds.Count == 0);
+            if (!_scopeAuto && _scopeIds.Count == 0 && !_assignMode)
             {
                 var fallback = Stocks.FirstOrDefault(s => s.IsMain) ?? Stocks.FirstOrDefault();
                 if (fallback != null) _scopeIds.Add(fallback.StkId);
@@ -540,6 +564,53 @@ namespace CIMS.ViewModels
             ApplyStockModes();
             if (save) SaveScope();
             LoadTodayData();
+        }
+
+        private void SetNotAssigned(bool locked)
+        {
+            // ล็อก: ออกจากทุกโหมด + ล้างตารางวันนี้ (ไม่มีคลังให้แสดง)
+            if (locked)
+            {
+                if (IsScanOutMode) IsScanOutMode = false;
+                if (IsReturnMode) IsReturnMode = false;
+                if (IsRemainderMode) IsRemainderMode = false;
+                if (IsTestMode) IsTestMode = false;
+                ScannedItems.Clear();
+                RefreshModeFilter();
+            }
+            _notAssigned = locked;
+            if (locked) LoadAdminContact();
+            OnPropertyChanged(nameof(IsScannerReady));
+            OnPropertyChanged(nameof(IsNotAssigned));
+            OnPropertyChanged(nameof(NotAssignedVisibility));
+            OnPropertyChanged(nameof(ScopeButtonBackground));
+            OnPropertyChanged(nameof(ScopeButtonTip));
+        }
+
+
+        // ☎ ผู้ติดต่อ Admin ที่ตั้งไว้ใน User Management (ชื่อ - เบอร์ (ชื่อเล่น))
+        public List<ScannerSetupService.AdminContact> AdminContacts { get; private set; } = new List<ScannerSetupService.AdminContact>();
+        public string AdminContactText => ScannerSetupService.ContactText(AdminContacts);
+        private void LoadAdminContact()
+        {
+            try { AdminContacts = _setup.GetAdminContacts(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Admin contact: {ex.Message}"); }
+            OnPropertyChanged(nameof(AdminContactText));
+        }
+
+        // ⚡ Admin เปลี่ยนคลัง / DISPLAY ของ UserID นี้ (เปิดหน้านี้ค้างไว้) -> ใช้ค่าใหม่เลย ไม่ต้องเข้าหน้าใหม่
+        private async Task CheckAssignmentAsync()
+        {
+            if (!_assignMode || CurrentUser == null) return;
+            string token;
+            try { token = await Task.Run(() => _setup.AssignmentToken(CurrentUser.UserId)); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Assignment token: {ex.Message}"); return; }
+            if (token == _assignToken) return;
+            bool wasLocked = _notAssigned;
+            LoadStocks();
+            OnPropertyChanged(nameof(DisplayButtonVisibility));
+            if (wasLocked && !_notAssigned) ScannerUnlocked?.Invoke();
+            else if (!wasLocked && _notAssigned) ScannerLocked?.Invoke();
         }
 
         private static bool SupportsReturn(StockModel s) => s != null && (s.InSysQr || s.InSupplier);
@@ -621,8 +692,19 @@ namespace CIMS.ViewModels
                     if (visible && scannable) Stocks.Add(s);
                 }
 
-                ReadScope(out bool auto, out List<int> ids, out int? prio);
-                ApplyScope(auto, ids, prio, save: false);
+                _assignMode = DbSchema.HasUserScanStocks;
+                if (_assignMode)
+                {
+                    // คลังที่ Admin กำหนดให้ UserID นี้ (เฉพาะคลังที่ยังสแกนได้ + มีสิทธิ์ VIEW คลังนั้น)
+                    var a = _setup.GetAssignment(CurrentUser?.UserId);
+                    _assignToken = _setup.AssignmentToken(CurrentUser?.UserId);
+                    ApplyScope(false, a.StockIds, a.PriorityId, save: false);
+                }
+                else
+                {
+                    ReadScope(out bool auto, out List<int> ids, out int? prio);
+                    ApplyScope(auto, ids, prio, save: false);
+                }
             }
             catch (Exception ex)
             {
@@ -668,6 +750,17 @@ namespace CIMS.ViewModels
 
         private void SaveScope()
         {
+            // คลังที่ Admin กำหนด: Level 1 เปลี่ยนที่หน้านี้ = บันทึกเป็นค่าของ UserID ตัวเอง (ไม่ใช่ของเครื่อง)
+            if (_assignMode)
+            {
+                try
+                {
+                    _setup.SaveAssignment(CurrentUser?.UserId, _scopeAuto ? Stocks.Select(s => s.StkId) : _scopeIds, _priorityId, CurrentUser?.UserId);
+                    _assignToken = _setup.AssignmentToken(CurrentUser?.UserId);
+                }
+                catch (Exception ex) { DialogHelper.ShowError("บันทึกคลังที่สแกนไม่สำเร็จ\n" + ex.Message); }
+                return;
+            }
             try
             {
                 string text = (_scopeAuto ? "AUTO" : string.Join(",", _scopeIds)) + (_priorityId.HasValue ? ";" + _priorityId.Value : "");
@@ -837,9 +930,13 @@ namespace CIMS.ViewModels
 
         private async Task LiveRefreshAsync()
         {
-            if (_liveBusy || IsTestMode || (DateTime.Now - _lastScanAt).TotalSeconds < 3) return;
+            if (_liveBusy || (DateTime.Now - _lastScanAt).TotalSeconds < 3) return;
             _liveBusy = true;
-            try { await LoadTodayDataAsync(onlyIfChanged: true); await RefreshNotDeductedAsync(); }
+            try
+            {
+                await CheckAssignmentAsync();   // Admin เปลี่ยนคลัง / DISPLAY ให้ -> ใช้เลย
+                if (!IsTestMode && IsScannerReady) { await LoadTodayDataAsync(onlyIfChanged: true); await RefreshNotDeductedAsync(); }
+            }
             finally { _liveBusy = false; }
         }
 
@@ -945,6 +1042,9 @@ namespace CIMS.ViewModels
         public async Task ProcessScan(string inputCode)
         {
             if (string.IsNullOrWhiteSpace(inputCode) || CurrentUser == null) return;
+
+            // 🔒 ยังไม่ได้กำหนดคลังสแกน -> ไม่บันทึกอะไร แจ้งให้ติดต่อ Admin
+            if (_notAssigned) { BarcodeInput = string.Empty; ScannerLocked?.Invoke(); return; }
             _lastScanAt = DateTime.Now;
 
             // 🔄 โหมดคืนเหล็ก: ตัดออกจาก flow ปกติทั้งหมด ใช้ QR รูปแบบ Export จากหน้า ProductControl

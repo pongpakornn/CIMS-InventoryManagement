@@ -14,6 +14,26 @@ namespace CIMS.Helpers
         private static bool? _columnOrder;
         private static bool? _coilRegister;
 
+        // Update_20261015.sql: CIMS.UserScanStocks (คลังสแกนที่ Admin กำหนดให้แต่ละ UserID) / CIMS.AdminContacts (ผู้ติดต่อ Admin)
+        private static bool? _userScanStocks, _adminContacts;
+        public static bool HasUserScanStocks => _userScanStocks ?? (_userScanStocks = TableExists("CIMS.UserScanStocks")) ?? false;
+        public static bool HasAdminContacts => _adminContacts ?? (_adminContacts = TableExists("CIMS.AdminContacts")) ?? false;
+
+        private static bool? TableExists(string name)
+        {
+            try
+            {
+                using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                using (var cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID(@n, 'U') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                {
+                    cmd.Parameters.AddWithValue("@n", name);
+                    conn.Open();
+                    return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                }
+            }
+            catch { return null; }   // ต่อฐานไม่ได้ = ถามใหม่รอบหน้า
+        }
+
         // Update_20261014.sql: CIMS.PickListPrintLogs.PrintCount / LastPrintedBy / LastPrintedDate (นับการพิมพ์ซ้ำ)
         private static bool? _printCount;
         public static bool HasPickListPrintCount

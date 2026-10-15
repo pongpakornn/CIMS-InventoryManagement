@@ -41,6 +41,14 @@ namespace CIMS.Services
         public string StatusText => IsLocked ? "LOCKED" : IsOnline ? "ONLINE" : "OFFLINE";
         public string SubText => string.Join("  •  ", new[] { Position, Department }.Where(x => !string.IsNullOrWhiteSpace(x)));
         public string SubText2 => string.Join("  •  ", new[] { Section, Division }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+        // 📡 Multi-Scanner: คลังที่ Admin กำหนดให้สแกน (Update_20261015.sql) - แสดงบนการ์ดเฉพาะผู้ใช้ที่ใช้หน้าสแกนได้
+        public bool HasScanner { get; set; }
+        public string ScanStocks { get; set; }
+        public bool ScanSetupKnown { get; set; }
+        public bool ScanNotSet => HasScanner && ScanSetupKnown && string.IsNullOrWhiteSpace(ScanStocks);
+        public string ScanChipText => ScanNotSet ? "📡 SCAN STOCK NOT SET" : "📡 " + ScanStocks;
+        public System.Windows.Visibility ScanChipVisibility => HasScanner && ScanSetupKnown ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
     }
 
     // สิทธิ์ 1 ระบบของผู้ใช้ (CIMS.Permissions 1 แถว)
@@ -56,6 +64,10 @@ namespace CIMS.Services
         public bool Edit { get; set; }
         public bool Delete { get; set; }
         public bool Approve { get; set; }
+
+        // 📡 แถว Multi-Scanner: รายการย่อยคลังสแกน + DISPLAY (หน้าต่าง PERMISSION ใส่ให้ / แถวอื่น = null)
+        public object Scanner { get; set; }
+        public System.Windows.Visibility ScannerVisibility => Scanner != null ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
     }
 
     public class UserAdminService
@@ -67,7 +79,7 @@ namespace CIMS.Services
         {
             ("DASHBOARD",   "Dashboard",                  "VIEW = open the page"),
             ("StoreMaxMin", "Store(Max-Min)",            "VIEW = open + stocks (read only)  •  ADD = add stock / barcode format  •  EDIT = stock settings / barcode formats  •  DEL = delete stock"),
-            ("MultiScanner", "Multi-Scanner",              "VIEW = open / history / test mode  •  ADD = scan in + return  •  EDIT = scan out"),
+            ("MultiScanner", "Multi-Scanner",              "VIEW = open + scan (stocks + DISPLAY: ▸ SCAN STOCKS + DISPLAY below)  •  DEL = adjust scan / delete NOT DEDUCTED"),
             ("ProductControl", "ProductControl",     "VIEW = open + export QR  •  ADD = register / import  •  EDIT = edit / show-hide / image  •  DEL = delete"),
             ("PackingCard", "Pick List",                  "VIEW = open the page"),
             ("MAXMINCALC",  "Max-Min Calculator",         "VIEW = open  •  EDIT = edit / import / calculate"),
@@ -80,11 +92,17 @@ namespace CIMS.Services
         public List<UserAccount> GetUsers()
         {
             var list = new List<UserAccount>();
+            bool scan = CIMS.Helpers.DbSchema.HasUserScanStocks;
+            string scanCols = scan ? @",
+                       CASE WHEN ISNULL(u.UserLevel, 3) = 1 OR EXISTS (SELECT 1 FROM CIMS.Permissions p WHERE p.UserID = u.UserID AND p.SystemID = 'MultiScanner' AND p.CanView = 'Y') THEN 1 ELSE 0 END AS HAS_SCAN,
+                       STUFF((SELECT ', ' + s.StockCode + CASE WHEN x.IsPriority = 1 THEN ' ★' ELSE '' END
+                              FROM CIMS.UserScanStocks x JOIN CIMS.Stocks s ON s.StockID = x.StockID
+                              WHERE x.UserID = u.UserID ORDER BY s.StockID FOR XML PATH(''), TYPE).value('.', 'nvarchar(max)'), 1, 2, '') AS SCAN_STOCKS" : "";
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand(@"
+            using (var cmd = new SqlCommand($@"
                 SELECT u.UserID, u.FullName, u.Position, u.Department, u.Section, u.Division, ISNULL(u.UserLevel, 3) AS LVL, ISNULL(u.IsOnline, 0) AS ONL,
                        ISNULL(u.IsLocked, 0) AS LCK, ISNULL(u.IsMasterAdmin, 0) AS MA, u.LastLogin,
-                       (SELECT COUNT(*) FROM CIMS.Permissions p WHERE p.UserID = u.UserID AND p.CanView = 'Y') AS PERMS
+                       (SELECT COUNT(*) FROM CIMS.Permissions p WHERE p.UserID = u.UserID AND p.CanView = 'Y') AS PERMS{scanCols}
                 FROM CIMS.Users u ORDER BY ISNULL(u.UserLevel, 3), u.UserID", conn))
             {
                 conn.Open();
@@ -103,7 +121,10 @@ namespace CIMS.Services
                             IsLocked = Convert.ToBoolean(r["LCK"]),
                             IsMasterAdmin = Convert.ToBoolean(r["MA"]),
                             LastLogin = r["LastLogin"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["LastLogin"]),
-                            PermCount = Convert.ToInt32(r["PERMS"])
+                            PermCount = Convert.ToInt32(r["PERMS"]),
+                            ScanSetupKnown = scan,
+                            HasScanner = scan && Convert.ToInt32(r["HAS_SCAN"]) == 1,
+                            ScanStocks = scan && r["SCAN_STOCKS"] != DBNull.Value ? r["SCAN_STOCKS"].ToString() : null
                         });
             }
             return list;
@@ -505,8 +526,12 @@ namespace CIMS.Services
                 }
                 using (var tr = conn.BeginTransaction())
                 {
+                    // คลังสแกน / DISPLAY ของผู้ใช้ลบไปด้วย (ตารางที่ยังไม่มีในฐานนั้นข้าม)
+                    string extra = (CIMS.Helpers.DbSchema.HasUserScanStocks ? "DELETE FROM CIMS.UserScanStocks WHERE UserID = @u;\n" : "") +
+                                   (CIMS.Helpers.DbSchema.HasUserScanDisplays ? "DELETE FROM CIMS.UserScanDisplays WHERE UserID = @u;\n" : "");
                     using (var cmd = new SqlCommand(@"UPDATE CIMS.SystemLogs SET UserID = NULL WHERE UserID = @u;
                                                       DELETE FROM CIMS.Permissions WHERE UserID = @u;
+                                                      " + extra + @"
                                                       DELETE FROM CIMS.Users WHERE UserID = @u;", conn, tr))
                     {
                         cmd.Parameters.AddWithValue("@u", userId);

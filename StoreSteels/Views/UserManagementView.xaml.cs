@@ -27,12 +27,15 @@ namespace CIMS.Views
             btnAdd.Visibility = session?.CanAddUser == true ? Visibility.Visible : Visibility.Collapsed;
             btnImport.Visibility = session?.CanAddUser == true && session.CanEditUser ? Visibility.Visible : Visibility.Collapsed;
             btnTemplate.Visibility = btnImport.Visibility;
+            btnContact.Visibility = session?.CanSetPermissions == true && DbSchema.HasAdminContacts ? Visibility.Visible : Visibility.Collapsed;
             Loaded += async (s, e) => await ReloadAsync();
 
             // ⚡ เรียลไทม์: เครื่องอื่นเพิ่ม / แก้ / ล็อกผู้ใช้ / สิทธิ์ / ออนไลน์ -> อัพเดทเอง (คงคำค้นไว้)
             LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
-                () => LiveRefresh.DbToken("SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Users",
-                                          "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Permissions"),
+                () => LiveRefresh.DbToken(new[] { "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Users",
+                                                  "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.Permissions" }
+                                          .Concat(DbSchema.HasUserScanStocks ? new[] { "SELECT COUNT(*), CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM CIMS.UserScanStocks" } : new string[0])
+                                          .ToArray()),
                 async () => { _all = await Task.Run(() => _service.GetUsers()); ApplyFilter(); });
         }
 
@@ -83,7 +86,7 @@ namespace CIMS.Views
             List<UserPermRow> perms;
             try { perms = _service.GetPermissions(u.UserId); }
             catch (Exception ex) { DialogHelper.ShowError("โหลดสิทธิ์ไม่สำเร็จ\n" + ex.Message); return; }
-            new UserPermissionWindow(u, perms, readOnly: true).ShowDialog();
+            new UserPermissionWindow(u, perms, readOnly: true, session: _session).ShowDialog();
         }
 
         private async void Add_Click(object sender, RoutedEventArgs e)
@@ -131,7 +134,7 @@ namespace CIMS.Views
             try { perms = await Task.Run(() => _service.GetPermissions(u.UserId)); }
             catch (Exception ex) { DialogHelper.ShowError("โหลดสิทธิ์ไม่สำเร็จ\n" + ex.Message); return; }
             var before = perms.Select(p => $"{p.SysId}:{p.View}{p.Add}{p.Edit}{p.Delete}{p.Approve}").ToList();
-            var w = new UserPermissionWindow(u, perms, readOnly: false);
+            var w = new UserPermissionWindow(u, perms, readOnly: false, session: _session);
             if (w.ShowDialog() != true) return;
             try
             {
@@ -140,12 +143,31 @@ namespace CIMS.Views
                 string Flags(UserPermRow p) => (p.View ? "V" : "") + (p.Add ? "A" : "") + (p.Edit ? "E" : "") + (p.Delete ? "D" : "") + (p.Approve ? "P" : "");
                 var changed = rows.Where((p, i) => $"{p.SysId}:{p.View}{p.Add}{p.Edit}{p.Delete}{p.Approve}" != before[i]).Select(p => $"{p.SysId}={(Flags(p).Length == 0 ? "-" : Flags(p))}");
                 LogService.WriteLog(_session?.UserId, "USER_PERMISSION", $"Permissions of {u.UserId} | {string.Join(", ", changed)}", u.UserId);
+
+                // 📡 MULTI-SCANNER SETUP: คลังที่สแกนได้ + DISPLAY (มีผลที่หน้าสแกนภายในไม่กี่วินาที ไม่ต้อง Login ใหม่)
+                string scanNote = "";
+                if (w.HasScannerSetup && (w.ScanStocksChanged || w.DisplayChanges.Count > 0))
+                {
+                    var ids = w.ScanStockIds; var prio = w.ScanPriorityId; var disp = w.DisplayChanges;
+                    await Task.Run(() =>
+                    {
+                        if (w.ScanStocksChanged) new ScannerSetupService().SaveAssignment(u.UserId, ids, prio, _session?.UserId);
+                        if (disp.Count > 0) new ScanService().SaveScanDisplayMap(disp, u.UserId);
+                    });
+                    LogService.WriteLog(_session?.UserId, "SCANNER_SETUP",
+                        $"Multi-Scanner of {u.UserId} | Stocks: {(ids.Count == 0 ? "NONE" : string.Join(",", ids))}{(prio.HasValue ? $" | ★ {prio}" : "")}" +
+                        (disp.Count > 0 ? " | Display: " + string.Join(",", disp.Select(kv => $"{kv.Key}={kv.Value}")) : ""), u.UserId);
+                    scanNote = "\nคลังสแกน / DISPLAY มีผลที่หน้าสแกนทันที";
+                }
                 NotificationManager.Show("Saved", $"บันทึกสิทธิ์ของ {u.UserId} แล้ว" +
-                    (string.Equals(u.UserId, _session?.UserId, StringComparison.OrdinalIgnoreCase) ? "\nสิทธิ์ของคุณเองมีผลเมื่อ Login ครั้งถัดไป" : "\nมีผลเมื่อผู้ใช้ Login ครั้งถัดไป"), true);
+                    (string.Equals(u.UserId, _session?.UserId, StringComparison.OrdinalIgnoreCase) ? "\nสิทธิ์ของคุณเองมีผลเมื่อ Login ครั้งถัดไป" : "\nมีผลเมื่อผู้ใช้ Login ครั้งถัดไป") + scanNote, true);
                 await ReloadAsync();
             }
             catch (Exception ex) { DialogHelper.ShowError("บันทึกสิทธิ์ไม่สำเร็จ\n" + ex.Message); }
         }
+
+        // 🔔 ตั้งค่าการแจ้งเตือน: ผู้ติดต่อ Admin (แสดงให้ผู้ใช้ที่ยังไม่ได้กำหนดคลังสแกน หน้า Multi-Scanner)
+        private void Contact_Click(object sender, RoutedEventArgs e) => AdminContactWindow.EditAndSave(_session?.UserId);
 
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {

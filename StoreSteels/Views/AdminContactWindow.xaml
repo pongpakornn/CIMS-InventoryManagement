@@ -1,0 +1,80 @@
+<Window x:Class="CIMS.Views.AdminContactWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Alert Contact" Width="860" SizeToContent="Height" MaxHeight="760"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 🔔 ตั้งค่าการแจ้งเตือน: ผู้ติดต่อ Admin (ชื่อ - เบอร์ (ชื่อเล่น)) เพิ่ม / แก้ไข / ลบ / เลื่อนลำดับได้
+         แสดงที่หน้า Multi-Scanner เมื่อผู้ใช้ยังไม่ได้กำหนดคลังสแกน -->
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <DockPanel>
+            <Border DockPanel.Dock="Top" Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel>
+                    <TextBlock Text="🔔 ALERT CONTACT" Foreground="White" FontSize="20" FontWeight="Black"/>
+                    <TextBlock Text="Who users should contact for help - shown on the scan page when a user has no scan stock" Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <StackPanel DockPanel.Dock="Bottom">
+                <Border Background="#FFEBEE" CornerRadius="10" Padding="12,8" Margin="28,12,28,0">
+                    <StackPanel>
+                        <TextBlock Text="PREVIEW (scan page)" FontSize="10" FontWeight="Black" Foreground="#8A8490"/>
+                        <TextBlock x:Name="txtPreview" FontSize="13" FontWeight="Bold" Foreground="#C62828" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock x:Name="txtError" Foreground="#C62828" FontWeight="Bold" FontSize="12" Margin="30,6,28,0" Visibility="Collapsed" TextWrapping="Wrap"/>
+                <Grid Margin="28,14,28,22">
+                    <Button Content="＋ ADD CONTACT" Style="{StaticResource StkButton}" Background="#1976D2" Click="Add_Click" HorizontalAlignment="Left"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                        <Button Content="SAVE" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Save_Click"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel Margin="28,16,28,0">
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="1.4*"/>
+                        <ColumnDefinition Width="1.2*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="1" Text="NAME  (ชื่อ - นามสกุล) *" FontSize="11" FontWeight="Bold" Foreground="#8A8490"/>
+                    <TextBlock Grid.Column="2" Text="PHONE  (เบอร์ติดต่อ) *" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="10,0,0,0"/>
+                    <TextBlock Grid.Column="3" Text="NICKNAME  (ชื่อเล่น)" FontSize="11" FontWeight="Bold" Foreground="#8A8490" Margin="10,0,0,0"/>
+                </Grid>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="380">
+                    <ItemsControl x:Name="icContacts">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28"/>
+                                        <ColumnDefinition Width="2*"/>
+                                        <ColumnDefinition Width="1.4*"/>
+                                        <ColumnDefinition Width="1.2*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding No}" FontWeight="Black" Foreground="#6750A4" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Style="{StaticResource StkInput}" Height="40" MaxLength="100" Text="{Binding FullName, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBox Grid.Column="2" Style="{StaticResource StkInput}" Height="40" MaxLength="30" Margin="10,0,0,0" Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBox Grid.Column="3" Style="{StaticResource StkInput}" Height="40" MaxLength="50" Margin="10,0,0,0" Text="{Binding Nickname, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="▲" Style="{StaticResource StkCardButton}" Click="Up_Click" Tag="{Binding}" ToolTip="Move up" Margin="0,0,4,0"/>
+                                        <Button Content="🗑" Style="{StaticResource StkCardButton}" Foreground="#C62828" Background="#FDECEC" Click="Delete_Click" Tag="{Binding}" ToolTip="Delete"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</Window>

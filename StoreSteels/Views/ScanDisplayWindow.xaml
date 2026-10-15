@@ -20,7 +20,7 @@
             <Border Background="{StaticResource MainPurple}" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="🏷️ SCAN DISPLAY" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock x:Name="txtTitle" Text="🏷️ SCAN DISPLAY" Foreground="White" FontSize="20" FontWeight="Black"/>
                         <TextBlock Text="Choose what each stock shows as PRODUCT CODE in the scan tables and HISTORY (display only - nothing else changes)"
                                    Foreground="#D0BCFF" FontSize="12" FontWeight="Bold" Margin="0,3,0,0" TextWrapping="Wrap"/>
                     </StackPanel>

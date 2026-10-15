@@ -33,6 +33,11 @@ namespace CIMS.Views
             _viewModel.ApplyPermissions();
             this.DataContext = _viewModel;
 
+            // 🔒 ยังไม่ได้กำหนดคลังสแกน (เข้าหน้า / ยิงป้าย) -> แจ้งติดต่อ Admin / Admin กำหนดให้แล้ว -> แจ้งว่าใช้ได้
+            _viewModel.ScannerLocked += () => ShowLockedDialogs(force: false);
+            _viewModel.ScannerUnlocked += () =>
+                NotificationManager.Show("Scanner ready", $"Admin กำหนดคลังสแกนให้แล้ว\n{_viewModel.ScopeText}\nใช้งานหน้าสแกนได้เลย", true);
+
             // สลับโหมด (สแกนออก / คืนเหล็ก / Test) แล้วโฟกัสกลับช่องสแกนทันที ยิงต่อได้เลยไม่ต้องคลิก
             _viewModel.PropertyChanged += (s, e) =>
             {
@@ -72,6 +77,38 @@ namespace CIMS.Views
             if (_hostWindow != null) { _hostWindow.Activated += HostWindow_Activated; _hostWindow.PreviewTextInput += Page_PreviewTextInput; }
             _viewModel.StartLive();
             FocusScanBox();
+            // เข้าหน้ามาแล้วยังไม่ได้กำหนดคลัง -> แจ้งหลังหน้าจอแสดงเสร็จ
+            if (_viewModel.IsNotAssigned)
+                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => ShowLockedDialogs(force: true)));
+        }
+
+        // 🔒 แจ้งติดต่อ Admin (ค้างไว้จนกด OK) -> แจ้งอีกครั้งให้รอ Admin ติดต่อกลับ
+        //    ยิงป้ายรัว ๆ ตอนถูกล็อก: แจ้งไม่เกิน 1 ครั้งต่อ 15 วินาที (ไม่ซ้อนหน้าต่าง)
+        private bool _lockDialogOpen;
+        private DateTime _lastLockDialog = DateTime.MinValue;
+
+        private void ShowLockedDialogs(bool force)
+        {
+            if (_lockDialogOpen || !IsLoaded) return;
+            if (!force && (DateTime.Now - _lastLockDialog).TotalSeconds < 15) return;
+            _lockDialogOpen = true;
+            try
+            {
+                string uid = _viewModel.CurrentUser?.UserId;
+                DialogHelper.ShowError(
+                    $"ไม่มีสิทธิ์ใช้งานหน้าสแกน\nยังไม่ได้เลือกคลังของ UserID {uid}\n\n" +
+                    $"กรุณาติดต่อ Admin เพื่อขอความช่วยเหลือ\n{_viewModel.AdminContactText}\n\n" +
+                    "จดรายละเอียดแล้วกด CLOSE", "NO SCAN STOCK");
+                DialogHelper.ShowInfo(
+                    "กรุณารอสักครู่\nAdmin จะติดต่อกลับเมื่อกำหนดคลังสแกนให้เรียบร้อยแล้ว\n\n" +
+                    "เมื่อกำหนดแล้ว หน้านี้จะใช้งานได้เองโดยไม่ต้องเข้าหน้าใหม่", "PLEASE WAIT");
+            }
+            finally
+            {
+                _lockDialogOpen = false;
+                _lastLockDialog = DateTime.Now;
+                FocusScanBox();
+            }
         }
 
         private void ScanInView_Unloaded(object sender, RoutedEventArgs e)
@@ -112,7 +149,7 @@ namespace CIMS.Views
         // 🏷️ DISPLAY: ค่าที่แสดงในช่อง PRODUCT CODE ต่อคลัง -> บันทึกแล้วใช้กับตารางวันนี้ทันที
         private void ScanDisplay_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel.CurrentUser?.CanEditScanner != true) return;
+            if (_viewModel.DisplayButtonVisibility != Visibility.Visible) return;
             List<StockModel> stocks;
             try { stocks = new CIMS.Services.StockService().GetStocks().Where(s => _viewModel.CurrentUser.CanViewStock(s)).ToList(); }
             catch { stocks = _viewModel.Stocks.ToList(); }
@@ -142,7 +179,13 @@ namespace CIMS.Views
         // 🏬 เลือกคลังที่สแกน (การ์ดคลัง: 1 คลัง / หลายคลังสแกนร่วมกัน / AUTO) -> กลับไปโฟกัสช่องสแกนทันที
         private void ScanStocks_Click(object sender, RoutedEventArgs e)
         {
-            if (!_viewModel.CanChangeScope) { DialogHelper.ShowWarning("ต้องมีสิทธิ์ EDIT ของ Multi-Scanner จึงเลือกคลังที่สแกนได้", "ACCESS DENIED"); FocusScanBox(); return; }
+            if (!_viewModel.CanChangeScope)
+            {
+                if (_viewModel.IsNotAssigned) ShowLockedDialogs(force: true);
+                else DialogHelper.ShowWarning("คลังที่สแกนและ DISPLAY กำหนดโดย Admin ตาม UserID\nหากต้องการเปลี่ยน กรุณาติดต่อ Admin", "SCAN STOCKS");
+                FocusScanBox();
+                return;
+            }
             var w = StockPickerWindow.ShowScanStocks(_viewModel.Stocks, _viewModel.ScopeAuto, _viewModel.ScopeIds.ToList(), _viewModel.PriorityStockId);
             if (w != null)
             {

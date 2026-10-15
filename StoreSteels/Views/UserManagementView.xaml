@@ -55,6 +55,8 @@
                     <Border Background="#FFEBEE" CornerRadius="12" Padding="14,6" Margin="0,0,16,0">
                         <TextBlock x:Name="txtLocked" FontWeight="Black" Foreground="#C62828"/>
                     </Border>
+                    <Button x:Name="btnContact" Content="🔔 ALERT CONTACT" Style="{StaticResource StkButton}" Background="#C62828" Click="Contact_Click" Margin="0,0,8,0"
+                            ToolTip="Who users should contact for help (name - phone (nickname)), e.g. a user with no scan stock"/>
                     <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource StkButton}" Background="#49454F" Click="Template_Click" Margin="0,0,8,0" ToolTip="Excel template for importing users and permissions"/>
                     <Button x:Name="btnImport" Content="📥 IMPORT USER / PERMISSION" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,0,8,0"/>
                     <Button x:Name="btnAdd" Content="＋ ADD USER" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Add_Click"/>
@@ -111,6 +113,11 @@
                                         <Border CornerRadius="8" Padding="8,3" Background="#F4F4F9">
                                             <TextBlock Text="{Binding PermCount, StringFormat={}{0} SYSTEMS}" FontSize="10" FontWeight="Black" Foreground="#49454F"/>
                                         </Border>
+                                        <!-- 📡 คลังสแกนที่ Admin กำหนด (แดง = ใช้หน้าสแกนได้แต่ยังไม่ได้กำหนดคลัง) -->
+                                        <Border x:Name="scanChip" CornerRadius="8" Padding="8,3" Margin="6,0,0,0" Background="#E8F5E9" Visibility="{Binding ScanChipVisibility}"
+                                                MaxWidth="290" ToolTip="{Binding ScanChipText}">
+                                            <TextBlock x:Name="scanChipText" Text="{Binding ScanChipText}" FontSize="10" FontWeight="Black" Foreground="#2E7D32" TextTrimming="CharacterEllipsis"/>
+                                        </Border>
                                     </WrapPanel>
 
                                     <StackPanel Grid.Row="2" Margin="0,10,0,0">
@@ -137,6 +144,10 @@
                                     <Setter TargetName="avatar" Property="Background" Value="#1976D2"/>
                                     <Setter TargetName="lvl" Property="Background" Value="#E3F2FD"/>
                                     <Setter TargetName="lvlText" Property="Foreground" Value="#1565C0"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ScanNotSet}" Value="True">
+                                    <Setter TargetName="scanChip" Property="Background" Value="#FFEBEE"/>
+                                    <Setter TargetName="scanChipText" Property="Foreground" Value="#C62828"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsOnline}" Value="True">
                                     <Setter TargetName="status" Property="Background" Value="#2E7D32"/>

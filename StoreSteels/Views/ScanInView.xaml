@@ -641,6 +641,12 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="btnBorder" Property="Opacity" Value="0.8"/>
                             </Trigger>
+                            <!-- 🔒 ยังไม่ได้กำหนดคลังสแกน = ปุ่มเป็นสีเทา กดไม่ได้ -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="btnBorder" Property="Background" Value="#BDBDBD"/>
+                                <Setter Property="Foreground" Value="#F5F5F5"/>
+                                <Setter Property="Cursor" Value="No"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -716,7 +722,7 @@
 
                     <!-- ปุ่มสลับโหมด สแกนออก / คืนเหล็ก / Test (Focusable=False: กดแล้วโฟกัสยังอยู่ที่ช่องสแกน ยิงต่อได้ทันที) -->
                     <!-- จอเล็ก: ชื่อหน้าแสดงเต็มเสมอ ปุ่มขึ้นแถวใหม่เองเมื่อที่ไม่พอ (จอ Full HD อยู่แถวเดียวเหมือนเดิม) -->
-                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" IsEnabled="{Binding IsScannerReady}">
                         <Button Content="{Binding ScanOutButtonText}"
                                 Command="{Binding ToggleScanOutModeCommand}"
                                 Background="{Binding ScanOutButtonBackground}"
@@ -787,13 +793,14 @@
                                  HorizontalContentAlignment="Center" FontSize="18" FontWeight="Bold" MaxLength="0"/>
                     </StackPanel>
 
-                    <!-- 🏬 เลือกคลังที่แสกน: กดแล้วเด้งการ์ดคลัง (1 คลัง / หลายคลังสแกนร่วมกัน / AUTO) - จำค่าไว้ในเครื่อง -->
+                    <!-- 🏬 คลังที่แสกน: Admin กำหนดให้แต่ละ UserID (User Management > PERMISSION > SCANNER SETUP)
+                         ผู้ใช้ทั่วไปกดแล้วแจ้งว่า Admin เป็นผู้กำหนด / Level 1 เลือกของตัวเองได้ / ยังไม่กำหนด = ปุ่มสีแดง + ติดต่อ Admin -->
                     <StackPanel Grid.Column="1" Margin="20,0,0,0" HorizontalAlignment="Left">
                         <TextBlock Text="STOCK" FontWeight="Bold" Foreground="#999" Margin="5,10,0,6" FontSize="13"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button x:Name="btnScanStocks" Width="360" Height="42" Focusable="False" Click="ScanStocks_Click" IsEnabled="{Binding CanChangeScope}"
-                                    ToolTip="Choose the stocks to scan (EDIT of Multi-Scanner)" ToolTipService.ShowOnDisabled="True"
-                                    Style="{StaticResource StkButton}" Background="{StaticResource MainPurple}" HorizontalContentAlignment="Left">
+                            <Button x:Name="btnScanStocks" Width="360" Height="42" Focusable="False" Click="ScanStocks_Click"
+                                    ToolTip="{Binding ScopeButtonTip}"
+                                    Style="{StaticResource StkButton}" Background="{Binding ScopeButtonBackground}" HorizontalContentAlignment="Left">
                                 <Grid Width="326">
                                     <TextBlock Text="{Binding ScopeText}" FontWeight="Black" FontSize="14" TextTrimming="CharacterEllipsis" Margin="0,0,24,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="▾" HorizontalAlignment="Right" FontSize="14" VerticalAlignment="Center"/>
@@ -801,6 +808,14 @@
                             </Button>
                             <TextBlock Text="{Binding ScopeSubText}" Visibility="{Binding ScopeSubVisibility}" FontSize="12" FontWeight="Bold"
                                        Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                            <!-- 🔒 ยังไม่ได้กำหนดคลังสแกน: แจ้งค้างไว้ + ชื่อ / เบอร์ติดต่อ Admin -->
+                            <Border Visibility="{Binding NotAssignedVisibility}" Background="#FFEBEE" BorderBrush="#E57373" BorderThickness="1.5"
+                                    CornerRadius="10" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center">
+                                <StackPanel>
+                                    <TextBlock Text="⛔ ไม่มีสิทธิ์ใช้งานหน้าสแกน • ยังไม่ได้เลือกคลังของ UserID นี้ กรุณาติดต่อ Admin" FontSize="12" FontWeight="Black" Foreground="#C62828"/>
+                                    <TextBlock Text="{Binding AdminContactText}" FontSize="12" FontWeight="Bold" Foreground="#B71C1C"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
