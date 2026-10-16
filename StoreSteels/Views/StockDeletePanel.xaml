@@ -1,0 +1,77 @@
+﻿<UserControl x:Class="CIMS.Views.StockDeletePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 🗑 STOCK DELETE (หน้าต่าง ADMIN): เลือกคลัง -> ลบรายการที่ติ๊กในตาราง หรือลบทั้งหมดในคลัง (ลบสินค้าออกจากระบบ แม้ยังมียอด) -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="🗑 STOCK DELETE" FontSize="20" FontWeight="Black" Foreground="#B3261E"/>
+            <TextBlock Text="Delete the ticked products, or every product of the chosen stock(s), from the whole system (all stocks, scan history, Max-Min and coils) - even if they still have stock."
+                       Foreground="#8A8490" FontSize="12" FontWeight="SemiBold" Margin="0,3,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,16,0,6">
+            <TextBlock Text="1. SELECT STOCK" FontWeight="Black" FontSize="13" Foreground="#6750A4"/>
+            <TextBlock Text="Only products that are in the selected stock(s) are deleted." FontSize="12" Foreground="#8A8490" FontWeight="SemiBold"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="2" Margin="0,4,0,0" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="icStocks">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border CornerRadius="12" BorderThickness="1.5" Padding="14,10" Margin="0,0,10,10" Width="216" Cursor="Hand" MouseLeftButtonUp="Card_Click">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="#E2DEEA"/>
+                                    <Setter Property="Background" Value="#FFFFFF"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                                            <Setter Property="BorderBrush" Value="#B3261E"/>
+                                            <Setter Property="Background" Value="#FFF4F2"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="14" Foreground="#2D2A32"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding CountText}" FontSize="12" Foreground="#B3261E" FontWeight="Bold" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Top" IsHitTestVisible="False"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="3" Margin="0,10,0,0">
+            <TextBlock Text="2. WHAT TO DELETE" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,6"/>
+            <RadioButton x:Name="rbSelected" GroupName="delmode" FontWeight="Bold" Margin="0,0,0,4" Checked="Mode_Changed"/>
+            <RadioButton x:Name="rbAll" GroupName="delmode" Content="DELETE ALL PRODUCTS IN THE SELECTED STOCK(S)" FontWeight="Bold" Checked="Mode_Changed"/>
+            <TextBlock Text="3. REASON (required)" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,12,0,6"/>
+            <TextBox x:Name="txtReason" Height="42" Style="{StaticResource StkInput}" Tag="Why are these products being deleted?" TextChanged="Reason_Changed"/>
+            <TextBlock x:Name="txtSummary" FontWeight="Bold" FontSize="13" Foreground="#B3261E" Margin="0,10,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="btnDelete" Content="🗑 DELETE" Style="{StaticResource StkButton}" Background="#C62828" Click="Delete_Click" IsEnabled="False"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

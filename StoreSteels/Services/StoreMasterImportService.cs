@@ -23,6 +23,7 @@ namespace CIMS.Services
         public string QrCode { get; set; }
         public string Customer { get; set; }
         public string PartA { get; set; }
+        public string PartB { get; set; }
         public string PartNo { get; set; }
         public string Model { get; set; }
         public string Remark { get; set; }
@@ -76,6 +77,7 @@ namespace CIMS.Services
             ["QRCODE"] = new[] { "QRCODE", "QR" },
             ["CUSTOMER"] = new[] { "CUSTOMER", "CUST", "CUSTOMERCODE", "ลูกค้า" },
             ["PARTA"] = new[] { "PARTA", "PARTACODE" },
+            ["PARTB"] = new[] { "PARTB", "PARTBCODE" },
             ["PARTNO"] = new[] { "PARTNO", "PARTNUMBER" },
             ["MODEL"] = new[] { "MODEL", "MODELCODE", "โมเดล" },
             ["SHOWHIDE"] = new[] { "SHOW/HIDE", "SHOWHIDE", "SHOW", "HIDE", "แสดง/ซ่อน" },
@@ -119,7 +121,7 @@ namespace CIMS.Services
                     object Num(string v) => CIMS.Helpers.Qty.TryParse(D(v), out decimal d) ? (object)d : D(v);
                     Set("NO", r - 1);
                     Set("PRODUCT CODE", p.PartCode); Set("PRODUCT NAME", p.PartName); Set("CUSTOMER", p.Customer);
-                    Set("PART A", p.PartA); Set("PART NO", p.PartNo); Set("MODEL", p.Model); Set("IMAGE", p.ImageFileName);
+                    Set("PART A", p.PartA); Set("PART B", p.PartB); Set("PART NO", p.PartNo); Set("MODEL", p.Model); Set("IMAGE", p.ImageFileName);
                     Set(stock.MaxHeader, Num(p.Max)); Set(stock.MinHeader, Num(p.Min));
                     Set(stock.QtyHeader, list.Count > 0 ? (object)list[0].WeightKG : Num(p.Qty));
                     if (!stock.CountCoil) { Set("STOCK (BOX)", Num(p.StockBox)); Set("STOCK (PCS)", Num(p.StockPcs)); }
@@ -220,7 +222,7 @@ namespace CIMS.Services
                     {
                         RowNumber = r, Code = Get(r, "CODE"), Name = Opt(r, "NAME"),
                         Supplier = Opt(r, "SUPPLIER"), Category = Opt(r, "CATEGORY"), Bin = Opt(r, "BIN"), QrCode = Opt(r, "QRCODE"),
-                        Customer = Opt(r, "CUSTOMER"), PartA = Opt(r, "PARTA"), PartNo = Opt(r, "PARTNO"), Model = Opt(r, "MODEL"),
+                        Customer = Opt(r, "CUSTOMER"), PartA = Opt(r, "PARTA"), PartB = Opt(r, "PARTB"), PartNo = Opt(r, "PARTNO"), Model = Opt(r, "MODEL"),
                         Image = Opt(r, "IMAGE") == "-" ? null : Opt(r, "IMAGE"),
                         CoilNo = Opt(r, "COILNO") is string cn && cn != "-" ? cn.ToUpperInvariant() : null,
                         MotherCoil = Opt(r, "MOTHERCOIL") is string mc && mc != "-" ? mc.ToUpperInvariant() : null,
@@ -370,13 +372,14 @@ namespace CIMS.Services
                     foreach (var x in valid)
                     {
                         bool inMain = x.Stocks.Any(s => s.IsMain);
+                        bool hasB = CIMS.Helpers.DbSchema.HasPartB;
                         if (x.IsNew)
                         {
-                            using (var cmd = new SqlCommand(@"
+                            using (var cmd = new SqlCommand($@"
                                 INSERT INTO CIMS.Parts (PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category, Bin, StockQuantity, IsActive, IsShowInMaster,
-                                                      ImageFileName, Supplier, Customer, PartA, PartNumber, Model)
+                                                      ImageFileName, Supplier, Customer, PartA, PartNumber, Model{(hasB ? ", PartB" : "")})
                                 VALUES (@code, @name, ISNULL(@psz, 0), ISNULL(@qr, @code), 0, 0, ISNULL(@cat, 'GENERAL'), ISNULL(@bin, 'N/A'), 0, 1, @show,
-                                        @img, @sup, @cust, @parta, @partno, @model);
+                                        @img, @sup, @cust, @parta, @partno, @model{(hasB ? ", @partb" : "")});
                                 SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, tr))
                             {
                                 AddPart(cmd, x);
@@ -388,11 +391,11 @@ namespace CIMS.Services
                         }
                         else
                         {
-                            using (var cmd = new SqlCommand(@"
+                            using (var cmd = new SqlCommand($@"
                                 UPDATE CIMS.Parts SET Description = ISNULL(@name, Description), PackSize = ISNULL(@psz, PackSize), QRCode = ISNULL(@qr, QRCode),
                                        Category = ISNULL(@cat, Category), Bin = ISNULL(@bin, Bin), Supplier = ISNULL(@sup, Supplier),
                                        Customer = ISNULL(@cust, Customer), PartA = ISNULL(@parta, PartA), PartNumber = ISNULL(@partno, PartNumber),
-                                       Model = ISNULL(@model, Model), ImageFileName = ISNULL(@img, ImageFileName), IsActive = 1,
+                                       Model = ISNULL(@model, Model), ImageFileName = ISNULL(@img, ImageFileName), IsActive = 1,{(hasB ? " PartB = ISNULL(@partb, PartB)," : "")}
                                        IsShowInMaster = CASE WHEN @inMain = 1 THEN ISNULL(@show, 1) ELSE IsShowInMaster END
                                 WHERE PartID = @id", conn, tr))
                             {
@@ -464,6 +467,7 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@sup", V(x.Supplier));
             cmd.Parameters.AddWithValue("@cust", V(x.Customer));
             cmd.Parameters.AddWithValue("@parta", V(x.PartA));
+            cmd.Parameters.AddWithValue("@partb", V(x.PartB));
             cmd.Parameters.AddWithValue("@partno", V(x.PartNo));
             cmd.Parameters.AddWithValue("@model", V(x.Model));
             cmd.Parameters.AddWithValue("@img", V(x.Image));

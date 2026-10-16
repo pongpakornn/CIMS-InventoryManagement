@@ -137,14 +137,14 @@ namespace CIMS.Services
         // ---------------------------------------------------------------- Inventory Registration (IMPORT EXCEL)
         public static readonly string[] PartHeads =
         {
-            "NO", "PRODUCT CODE", "PRODUCT NAME", "SUPPLIER", "CUSTOMER", "CATEGORY", "PART A", "PART NO", "MODEL",
+            "NO", "PRODUCT CODE", "PRODUCT NAME", "SUPPLIER", "CUSTOMER", "CATEGORY", "PART A", "PART B", "PART NO", "MODEL",
             "PACK SIZE", "BIN", "COIL NO", "MOTHER COIL", "QR CODE", "IMAGE", "STOCK1", "STOCK2", "STOCK3", "SHOW/HIDE", "MAX", "MIN",
             "STOCK (UNIT)", "STOCK (BOX)", "STOCK (COIL)", "STOCK (PCS)", "REMARK"
         };
 
         private static readonly Dictionary<string, double> PartWidths = new Dictionary<string, double>
         {
-            ["NO"] = 6.4, ["PRODUCT CODE"] = 18, ["PRODUCT NAME"] = 34, ["SUPPLIER"] = 14, ["CUSTOMER"] = 14, ["CATEGORY"] = 14, ["PART A"] = 16,
+            ["NO"] = 6.4, ["PRODUCT CODE"] = 18, ["PRODUCT NAME"] = 34, ["SUPPLIER"] = 14, ["CUSTOMER"] = 14, ["CATEGORY"] = 14, ["PART A"] = 16, ["PART B"] = 16,
             ["PART NO"] = 18, ["MODEL"] = 14, ["PACK SIZE"] = 10, ["BIN"] = 14, ["COIL NO"] = 16, ["MOTHER COIL"] = 16, ["QR CODE"] = 16,
             ["IMAGE"] = 28, ["STOCK1"] = 14, ["STOCK2"] = 14, ["STOCK3"] = 14, ["SHOW/HIDE"] = 11, ["REMARK"] = 24
         };
@@ -167,6 +167,7 @@ namespace CIMS.Services
                     case "CUSTOMER": if (s.ColCustomer) heads.Add("CUSTOMER"); break;
                     case "CODE": heads.Add("PRODUCT CODE"); break;
                     case "PARTA": if (s.ColPartA) heads.Add("PART A"); break;
+                    case "PARTB": if (s.ColPartB) heads.Add("PART B"); break;
                     case "PARTNO": if (s.ColPartNo) heads.Add("PART NO"); break;
                     case "MODEL": if (s.ColModel) heads.Add("MODEL"); break;
                     case "NAME": heads.Add("PRODUCT NAME"); break;
@@ -201,7 +202,7 @@ namespace CIMS.Services
                 for (int r = 2; r <= lastRow; r++) ws.Cell(r, 1).Value = r - 1;
                 int stockCol = Array.IndexOf(heads, "STOCK1") + 1;
                 if (forStock != null && stockCol > 0) ws.Range(2, stockCol, lastRow, stockCol).Value = forStock.Code;
-                foreach (var h in new[] { "PRODUCT CODE", "BIN", "COIL NO", "MOTHER COIL", "QR CODE", "PART A", "PART NO" })
+                foreach (var h in new[] { "PRODUCT CODE", "BIN", "COIL NO", "MOTHER COIL", "QR CODE", "PART A", "PART B", "PART NO" })
                 {
                     int c = Array.IndexOf(heads, h) + 1;
                     if (c > 0) ws.Range(2, c, lastRow, c).Style.NumberFormat.Format = "@";   // เลขรหัสขึ้นต้น 0 ไม่หาย

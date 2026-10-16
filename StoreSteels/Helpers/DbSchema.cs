@@ -61,6 +61,28 @@ namespace CIMS.Helpers
             }
         }
 
+        // Update_20261016c.sql: CIMS.Parts.PartB + CIMS.Stocks.ShowColPartB (PART B) / CIMS.ProductControlSettings (ตารางหน้า Inventory Registration + QR ต่อคลัง)
+        private static bool? _partB, _pcSettings;
+        public static bool HasPartB
+        {
+            get
+            {
+                if (_partB.HasValue) return _partB.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH('CIMS.Parts', 'PartB') IS NOT NULL AND COL_LENGTH('CIMS.Stocks', 'ShowColPartB') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _partB = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _partB.Value;
+            }
+        }
+        public static bool HasProductControlSettings => _pcSettings ?? (_pcSettings = TableExists("CIMS.ProductControlSettings")) ?? false;
+
         private static bool? TableExists(string name)
         {
             try

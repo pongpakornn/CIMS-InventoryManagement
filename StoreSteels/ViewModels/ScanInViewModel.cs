@@ -623,7 +623,26 @@ namespace CIMS.ViewModels
         public int? SummaryStkId
         {
             get => _summaryStkId;
-            set { if (_summaryStkId == value) return; _summaryStkId = value; OnPropertyChanged(); RefreshModeFilter(); }
+            set { if (_summaryStkId == value) return; _summaryStkId = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryCodeHeader)); RefreshModeFilter(); }
+        }
+
+        // 🏷️ หัวตารางช่อง PRODUCT CODE ตาม DISPLAY ของคลังที่สแกน (เช่น BARCODE Panta-2 #1 = COIL NO / PART A = PART A)
+        //   หลายคลังเลือกแสดงต่างกัน = รวมชื่อ (PRODUCT CODE / COIL NO)
+        public string CodeHeader => HeaderOf(ScopeStocks);
+        public string SummaryCodeHeader => HeaderOf(_summaryStkId.HasValue ? ScopeStocks.Where(s => s.StkId == _summaryStkId.Value).ToList() : ScopeStocks);
+
+        private string HeaderOf(List<StockModel> stocks)
+        {
+            var names = (stocks ?? new List<StockModel>())
+                .Select(s => ScanDisplay.HeaderFor(_displayMap.TryGetValue(s.StkId, out string k) ? k : ScanDisplay.Default, _displayFormats))
+                .Distinct().ToList();
+            return names.Count == 0 ? "PRODUCT CODE" : string.Join(" / ", names);
+        }
+
+        private void RaiseCodeHeaders()
+        {
+            OnPropertyChanged(nameof(CodeHeader));
+            OnPropertyChanged(nameof(SummaryCodeHeader));
         }
         public Visibility SummaryPickerVisibility => IsMultiScope && ScopeStocks.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -636,6 +655,7 @@ namespace CIMS.ViewModels
             _summaryStkId = keep.HasValue && SummaryStocks.Any(x => x.Id == keep) ? keep : null;
             OnPropertyChanged(nameof(SummaryStkId));
             OnPropertyChanged(nameof(SummaryPickerVisibility));
+            RaiseCodeHeaders();
         }
 
         // 🏷️ ค่าที่แสดงแทนรหัสต่อคลัง (ปุ่ม DISPLAY) - แสดงผลอย่างเดียว ไม่มีผลกับการบันทึก
@@ -650,6 +670,7 @@ namespace CIMS.ViewModels
                 _displayFormats = _displayMap.Values.Any(v => v.StartsWith("FIELD:")) ? _stockService.GetFormats() : new List<BarcodeFormatModel>();
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"LoadDisplaySettings: {ex.Message}"); }
+            RaiseCodeHeaders();
         }
 
         // หลังบันทึกการตั้งค่าในหน้าต่าง DISPLAY -> ใช้ค่าใหม่กับตารางวันนี้ทันที

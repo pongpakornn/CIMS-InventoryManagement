@@ -79,6 +79,64 @@
             </Setter>
         </Style>
 
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="UltraBold"/>
+            <Setter Property="Foreground" Value="{StaticResource CyberPurple}"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <Style x:Key="WrapCell" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="4,0"/>
+        </Style>
+
+        <!-- หัวกลุ่มของตาราง แบบเดียวกับหน้า Store (Max-Min) -->
+        <Style x:Key="GroupHeaderStyle" TargetType="{x:Type GroupItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                        <Expander IsExpanded="True" Background="Transparent" BorderThickness="0" Margin="0,0,0,5">
+                            <Expander.Template>
+                                <ControlTemplate TargetType="{x:Type Expander}">
+                                    <DockPanel>
+                                        <ToggleButton DockPanel.Dock="Top" Focusable="False" Cursor="Hand" HorizontalContentAlignment="Stretch"
+                                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                            <ToggleButton.Template>
+                                                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                                    <ContentPresenter Content="{Binding Header, RelativeSource={RelativeSource AncestorType={x:Type Expander}}}" HorizontalAlignment="Stretch"/>
+                                                </ControlTemplate>
+                                            </ToggleButton.Template>
+                                        </ToggleButton>
+                                        <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed"/>
+                                    </DockPanel>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsExpanded" Value="True">
+                                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Expander.Template>
+                            <Expander.Header>
+                                <Border Background="#F3E5F5" CornerRadius="5" Height="38" BorderBrush="{StaticResource MainPurple}" BorderThickness="2,0,0,0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
+                                        <TextBlock Text="{Binding DataContext.GroupLabel, RelativeSource={RelativeSource AncestorType=DataGrid}, StringFormat='{}{0} : '}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource MainPurple}" FontSize="14"/>
+                                        <TextBlock Text="{Binding Name}" FontWeight="ExtraBold" VerticalAlignment="Center" Foreground="{StaticResource MainPurple}" FontSize="15" Margin="5,0,0,0"/>
+                                        <Border Background="{StaticResource MainPurple}" CornerRadius="12" Padding="12,6" Margin="15,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding ItemCount, StringFormat='{}{0} ITEMS'}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </Expander.Header>
+                            <ItemsPresenter Margin="0,5,0,5"/>
+                        </Expander>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="CenterCellStyle" TargetType="DataGridCell">
             <Setter Property="Template">
                 <Setter.Value>
@@ -136,8 +194,11 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <!-- ลำดับช่องกรอก: SUPPLIER, CUSTOMER, CATEGORY, PART A, PART B, MODEL, PRODUCT CODE, PART NO, PRODUCT NAME, PACKSIZE, BIN, MOTHER COIL, COIL NO, QR CODE
+                         SUPPLIER / CUSTOMER / CATEGORY: พิมพ์แล้วขึ้นค่าที่มีในระบบให้เลือก (SuggestBox) -->
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
@@ -152,65 +213,82 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0" Grid.Column="0" Margin="5">
-                            <TextBlock Text="SUPPLIER" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBlock Text="SUPPLIER" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="txtSupplier" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.CustomerCode, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="0" Grid.Column="1" Margin="5">
-                            <TextBlock Text="CATEGORY" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtCategory" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.Category, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="CUSTOMER" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtCustomer" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.Customer, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="0" Grid.Column="2" Margin="5">
-                            <TextBlock Text="PRODUCT CODE" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtProductCode" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PartCode, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="CATEGORY" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtCategory" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.Category, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="0" Grid.Column="3" Margin="5">
-                            <TextBlock Text="PRODUCT NAME" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtProductName" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PartName, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="PART A" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtPartA" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartA, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="4" Margin="5">
+                            <TextBlock Text="PART B" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtPartB" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartB, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="1" Grid.Column="0" Margin="5">
-                            <TextBlock Text="PACKSIZE" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                            <TextBlock Text="MODEL" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtModel" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.Model, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="5">
+                            <TextBlock Text="PRODUCT CODE" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtProductCode" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PartCode, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="5">
+                            <TextBlock Text="PART NO" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtPartNo" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartNo, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="3" Margin="5">
+                            <TextBlock Text="PRODUCT NAME" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtProductName" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PartName, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="4" Margin="5">
+                            <TextBlock Text="PACKSIZE" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="txtPcs" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.PackSize, UpdateSourceTrigger=PropertyChanged}"
                                      PreviewTextInput="txtPcs_PreviewTextInput" DataObject.Pasting="txtPcs_Pasting" InputMethod.IsInputMethodEnabled="False" MaxLength="9"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="5">
-                            <TextBlock Text="BIN" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="5">
+                            <TextBlock Text="BIN" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="txtBin" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.Location, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="5">
-                            <TextBlock Text="QRCODE" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtQRCode" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.QRCodeData, UpdateSourceTrigger=PropertyChanged}"/>
-                        </StackPanel>
-
-                        <!-- ข้อมูลเสริม: แสดง/จัดกลุ่มในหน้า Store (Max-Min) ตามที่ตั้งค่าคลังไว้ -->
-                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="5">
-                            <TextBlock Text="CUSTOMER" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtCustomer" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.Customer, UpdateSourceTrigger=PropertyChanged}"/>
-                        </StackPanel>
-
+                        <!-- 🧲 Coil ในคลังของสินค้า (ทะเบียน Coil) - แสดงอย่างเดียว: Coil รับเข้าด้วยการสแกน / IMPORT EXCEL -->
                         <StackPanel Grid.Row="2" Grid.Column="1" Margin="5">
-                            <TextBlock Text="PART A" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtPartA" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartA, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="MOTHER COIL" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtMotherCoil" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" IsReadOnly="True" Background="#ECEAF1"
+                                     ToolTip="Mother coils of this product in stock (read only - coils come in by scanning or IMPORT EXCEL)"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="2" Grid.Column="2" Margin="5">
-                            <TextBlock Text="PART NO" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtPartNo" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.PartNo, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="COIL NO" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtCoilNo" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" IsReadOnly="True" Background="#ECEAF1"
+                                     ToolTip="Coil numbers of this product in stock (read only - coils come in by scanning or IMPORT EXCEL)"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Row="3" Grid.Column="0" Margin="5">
-                            <TextBlock Text="MODEL" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
-                            <TextBox x:Name="txtModel" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" MaxLength="100" Text="{Binding SelectedProduct.Model, UpdateSourceTrigger=PropertyChanged}"/>
+                        <StackPanel Grid.Row="2" Grid.Column="3" Margin="5">
+                            <TextBlock Text="QR CODE" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtQRCode" FontSize="13" FontWeight="Bold" Style="{StaticResource ModernInput}" Text="{Binding SelectedProduct.QRCodeData, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
-                        <!-- 🏬 สินค้านี้อยู่คลังไหนบ้าง (Stock-CHR = แสดงในตารางคลังหลัก / คลังอื่น = เพิ่มเข้าคลังนั้น ยอดเริ่ม 0) -->
-                        <StackPanel Grid.Row="1" Grid.RowSpan="2" Grid.Column="3" Margin="5">
-                            <TextBlock Text="STOCK" FontSize="14" FontWeight="UltraBold" Foreground="{StaticResource CyberPurple}" Margin="0,0,0,5"/>
+                        <!-- 🏬 สินค้านี้อยู่คลังไหนบ้าง (คลังหลัก = แสดงในตารางคลังหลัก / คลังอื่น = เพิ่มเข้าคลังนั้น ยอดเริ่ม 0) -->
+                        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="5" Margin="5">
+                            <TextBlock Text="STOCK" Style="{StaticResource FieldLabel}"/>
                             <WrapPanel x:Name="wpStocks"/>
                         </StackPanel>
                     </Grid>
@@ -251,9 +329,9 @@
                             ToolTip="Excel file to fill in for IMPORT EXCEL (many products at once)"/>
                     <Button Content="📥 IMPORT EXCEL" Style="{StaticResource CyberButton}" Background="{StaticResource MainPurple}" Width="170" Height="45" Margin="0,0,10,0" Click="Import_Click" Visibility="{Binding AddVisibility}" FontSize="12" FontWeight="ExtraBold" />
                     <Button Content="EXPORT QR SELECT" Style="{StaticResource CyberButton}" Width="200" Height="45" Click="Export_Click" FontSize="12" FontWeight="ExtraBold" />
-                    <!-- 🗑 ลบสินค้าในคลัง: Level 1 / ผู้ที่มี DEL ของ Product Control + DEL ของคลัง -> เลือกคลัง -> ลบที่ติ๊ก / ลบทั้งหมดในคลัง -->
-                    <Button x:Name="btnStockDelete" Content="🗑 STOCK DELETE" Style="{StaticResource CyberButton}" Background="#B3261E" Width="170" Height="45" Margin="10,0,0,0"
-                            Click="AdminDelete_Click" Visibility="Collapsed" FontSize="12" FontWeight="ExtraBold" ToolTip="Delete the ticked products or every product in a stock you have DEL rights on"/>
+                    <!-- 🛠 ADMIN (Level 1 เท่านั้น): STOCK DELETE / ตารางของแต่ละคลัง / รูปแบบ QR Code -->
+                    <Button x:Name="btnAdmin" Content="🛠 ADMIN" Style="{StaticResource CyberButton}" Background="#2D2A32" Width="130" Height="45" Margin="10,0,0,0"
+                            Click="Admin_Click" Visibility="Collapsed" FontSize="12" FontWeight="ExtraBold" ToolTip="Admin tools: STOCK DELETE, table columns of each stock, QR code format"/>
                 </StackPanel>
             </Grid>
 
@@ -266,6 +344,7 @@
                           HorizontalScrollBarVisibility="Disabled"
                           ScrollViewer.CanContentScroll="True"
                           ScrollViewer.ScrollChanged="dgQRHistory_ScrollChanged"
+                          VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                           ItemsSource="{Binding Products}"
                           HeadersVisibility="Column" IsReadOnly="True" 
                           AutoGenerateColumns="False" 
@@ -290,8 +369,13 @@
                         </Style>
                     </DataGrid.ColumnHeaderStyle>
 
+                    <!-- หัวกลุ่ม (CATEGORY / CUSTOMER / SUPPLIER ตามที่ตั้งต่อคลัง) แบบเดียวกับหน้า Store (Max-Min) - คลิกเพื่อพับ / ขยาย -->
+                    <DataGrid.GroupStyle>
+                        <GroupStyle ContainerStyle="{StaticResource GroupHeaderStyle}"/>
+                    </DataGrid.GroupStyle>
+
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Width="60">
+                        <DataGridTemplateColumn x:Name="colSelect" Width="60">
                             <DataGridTemplateColumn.HeaderTemplate>
                                 <DataTemplate>
                                     <CheckBox x:Name="chkSelectAll" 
@@ -309,7 +393,7 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTemplateColumn Header="IMAGE" Width="100">
+                        <DataGridTemplateColumn x:Name="colImage" Header="IMAGE" Width="100">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Background="White" Width="75" Height="75" CornerRadius="6" BorderBrush="#F0F0F0" BorderThickness="1" Margin="5">
@@ -319,15 +403,23 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn Header="SUPPLIER" Binding="{Binding CustomerCode}" Width="1*"/>
-                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="1*"/>
-                        <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.2*"/>
-                        <DataGridTextColumn Header="PRODUCT NAME" Binding="{Binding PartName}" Width="2*"/>
-                        <DataGridTextColumn Header="PACKSIZE" Binding="{Binding PackSize}" Width="0.8*"/>
-                        <DataGridTextColumn Header="BIN" Binding="{Binding Location}" Width="1*"/>
-                        <DataGridTextColumn Header="QRCODE" Binding="{Binding QRCodeData}" Width="1.2*"/>
+                        <!-- คอลัมน์ทั้งหมดที่เลือกแสดงได้ - คลังไหนแสดงคอลัมน์ไหน / ลำดับไหน ตั้งที่ปุ่ม ADMIN (CIMS.ProductControlSettings) -->
+                        <DataGridTextColumn x:Name="colSupplier" Header="SUPPLIER" Binding="{Binding CustomerCode}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colCustomer" Header="CUSTOMER" Binding="{Binding Customer}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colCategory" Header="CATEGORY" Binding="{Binding Category}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colPartA" Header="PART A" Binding="{Binding PartA}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colPartB" Header="PART B" Binding="{Binding PartB}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colModel" Header="MODEL" Binding="{Binding Model}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colCode" Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.2*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colPartNo" Header="PART NO" Binding="{Binding PartNo}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colName" Header="PRODUCT NAME" Binding="{Binding PartName}" Width="2*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colPackSize" Header="PACKSIZE" Binding="{Binding PackSize}" Width="0.8*"/>
+                        <DataGridTextColumn x:Name="colBin" Header="BIN" Binding="{Binding Location}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colMother" Header="MOTHER COIL" Binding="{Binding MotherCoil}" Width="1.1*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colCoilNo" Header="COIL NO" Binding="{Binding CoilNo}" Width="1.2*" ElementStyle="{StaticResource WrapCell}"/>
+                        <DataGridTextColumn x:Name="colQr" Header="QR CODE" Binding="{Binding QRCodeData}" Width="1.2*" ElementStyle="{StaticResource WrapCell}"/>
 
-                        <DataGridTemplateColumn Header="ACTION" Width="260">
+                        <DataGridTemplateColumn x:Name="colAction" Header="ACTION" Width="260">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">

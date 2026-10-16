@@ -21,6 +21,7 @@ namespace CIMS.Models
         // คอลัมน์เสริมที่คลังเลือกแสดงได้ (CUSTOMER / PART A / PART NO / STOCK (BOX) / STOCK (PCS))
         public string Customer { get; set; }
         public string PartA { get; set; }
+        public string PartB { get; set; }   // PART B (CIMS.Parts.PartB)
         public string PartNo { get; set; }
         public string Model { get; set; }
 

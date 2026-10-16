@@ -920,7 +920,7 @@
                         </DataGrid.ColumnHeaderStyle>
 
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding CodeLabel}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn x:Name="colTodayCode" Header="PRODUCT CODE" Binding="{Binding CodeLabel}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <!-- สถานะ: IN (ปกติ) / RETURN (คืนเหล็ก) / OUT (สแกนออก) - แยกสีให้ดูออกชัดเจน -->
                             <DataGridTemplateColumn Header="STATUS" Width="0.8*">
@@ -987,7 +987,7 @@
                         </DataGrid.ColumnHeaderStyle>
 
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding CodeLabel}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn x:Name="colTestCode" Header="PRODUCT CODE" Binding="{Binding CodeLabel}" Width="1.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <DataGridTextColumn Header="QTY" Binding="{Binding Qty}" Width="0.8*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <DataGridTemplateColumn Header="STATUS" Width="0.8*">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -1029,7 +1029,7 @@
                             </Style>
                         </DataGrid.ColumnHeaderStyle>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding CodeLabel}" Width="1.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
+                            <DataGridTextColumn x:Name="colSumCode" Header="PRODUCT CODE" Binding="{Binding CodeLabel}" Width="1.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <DataGridTextColumn Header="IN (FREQ.)" Binding="{Binding InCount}" Width="0.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <DataGridTextColumn Header="OUT (FREQ.)" Binding="{Binding OutCount}" Width="1.1*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>
                             <DataGridTextColumn Header="IN (QTY)" Binding="{Binding TotalInQty}" Width="0.9*" ElementStyle="{StaticResource CenterBoldColumnStyle}"/>

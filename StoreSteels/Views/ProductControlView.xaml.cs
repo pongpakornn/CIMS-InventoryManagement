@@ -39,7 +39,10 @@
                 // --- ปลดล็อกทุกปุ่มให้ทุกคน ---
                 //btnGenerate.IsEnabled = true;
                 btnRegister.Visibility = session?.CanAddProduct == true ? Visibility.Visible : Visibility.Collapsed;
+                // 🛠 ADMIN: Level 1 เท่านั้น (ผู้ใช้อื่นไม่เห็นปุ่ม)
+                btnAdmin.Visibility = session?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
 
+                SetupSuggestions();
                 LoadStocks();
                 RunEntryAnimation();
 
@@ -47,8 +50,8 @@
                 //    ดูเฉพาะข้อมูลที่หน้านี้แสดง (ยอดคงคลังเปลี่ยนจากการสแกนไม่ทำให้โหลดใหม่)
                 LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                     () => LiveRefresh.DbToken(
-                        @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, PackSize, Bin, QRCode, Category, Supplier, Customer,
-                                                                 PartA, PartNumber, Model, ImageFileName, IsActive, IsShowInMaster)) FROM CIMS.Parts",
+                        $@"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, PackSize, Bin, QRCode, Category, Supplier, Customer,
+                                                                 PartA, PartNumber, Model, ImageFileName, IsActive, IsShowInMaster{(DbSchema.HasPartB ? ", PartB" : "")})) FROM CIMS.Parts",
                         "SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, StockID, IsShow)) FROM CIMS.PartStocks"),
                     async () =>
                     {
@@ -111,7 +114,7 @@
                     _stocks = new List<StockModel>();
                 }
                 SetDefaultStockChips();
-                btnStockDelete.Visibility = DeletableStocks().Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                LoadLayouts();
 
                 // ช่องกรองตารางตามคลัง: ALL STOCKS + ทุกคลัง
                 _loadingFilter = true;
@@ -122,7 +125,9 @@
                 string savedFilter = UserSettings.Get(_userId, KeyFilter, "");
                 var savedItem = cbStockFilter.Items.OfType<ComboBoxItem>().FirstOrDefault(i => i.Tag is int id && id.ToString() == savedFilter);
                 cbStockFilter.SelectedItem = savedItem ?? cbStockFilter.Items[0];
-                if (savedItem != null) { _viewModel.FilterStkId = (int)savedItem.Tag; _viewModel.LoadData(txtSearch.Text); }
+                if (savedItem != null) _viewModel.FilterStkId = (int)savedItem.Tag;
+                ApplyLayout();
+                if (savedItem != null || _viewModel.Layout.Columns.Contains("MOTHER") || _viewModel.Layout.Columns.Contains("COILNO")) _viewModel.LoadData(txtSearch.Text);
                 cbStockFilter.Visibility = _stocks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
                 _loadingFilter = false;
 
@@ -157,8 +162,98 @@
                 if (_loadingFilter || _viewModel == null) return;
                 _viewModel.FilterStkId = (cbStockFilter.SelectedItem as ComboBoxItem)?.Tag as int?;
                 UserSettings.Set(_userId, KeyFilter, _viewModel.FilterStkId?.ToString() ?? "");   // เลือกค้างไว้ (ตาม UserID)
+                ApplyLayout();
                 _viewModel.LoadData(txtSearch.Text);
             }
+
+            #region === [ ตารางของแต่ละคลัง (ตั้งที่ปุ่ม ADMIN) ] ===
+            private Dictionary<int, ProductControlLayout> _layouts = new Dictionary<int, ProductControlLayout>();
+
+            private void LoadLayouts()
+            {
+                try { _layouts = new ProductControlLayoutService().GetAll(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"LoadLayouts: {ex.Message}"); _layouts = new Dictionary<int, ProductControlLayout>(); }
+            }
+
+            // คลังในช่องกรอง (ALL STOCKS = 0) -> คอลัมน์ตามลำดับที่ตั้งไว้ + จัดกลุ่ม / ยังไม่ได้ตั้ง = ตารางเดิม
+            private ProductControlLayout CurrentLayout()
+            {
+                int id = _viewModel.FilterStkId ?? 0;
+                return _layouts.TryGetValue(id, out var l) ? l : ProductControlColumns.Default(id);
+            }
+
+            private Dictionary<string, DataGridColumn> ColumnMap() => new Dictionary<string, DataGridColumn>
+            {
+                ["IMAGE"] = colImage, ["SUPPLIER"] = colSupplier, ["CUSTOMER"] = colCustomer, ["CATEGORY"] = colCategory,
+                ["PARTA"] = colPartA, ["PARTB"] = colPartB, ["MODEL"] = colModel, ["CODE"] = colCode, ["PARTNO"] = colPartNo,
+                ["NAME"] = colName, ["PACKSIZE"] = colPackSize, ["BIN"] = colBin, ["MOTHER"] = colMother, ["COILNO"] = colCoilNo, ["QRCODE"] = colQr
+            };
+
+            private void ApplyLayout()
+            {
+                var layout = CurrentLayout();
+                var map = ColumnMap();
+                // ช่องติ๊กเลือกหน้าสุด -> คอลัมน์ที่เลือกตามลำดับ -> คอลัมน์ที่ไม่แสดง -> ACTION ท้ายสุด
+                var order = new List<DataGridColumn> { colSelect };
+                order.AddRange(layout.Columns.Where(map.ContainsKey).Select(k => map[k]));
+                order.AddRange(map.Values.Where(c => !order.Contains(c)));
+                order.Add(colAction);
+                for (int i = 0; i < order.Count; i++) order[i].DisplayIndex = i;
+                foreach (var kv in map) kv.Value.Visibility = layout.Columns.Contains(kv.Key) ? Visibility.Visible : Visibility.Collapsed;
+                _viewModel.Layout = layout;
+                ResetWidthsLater();
+            }
+
+            // ตารางว่าง (คลังยังไม่มีสินค้า) แล้วเปลี่ยนคอลัมน์ -> DataGrid คำนวณความกว้างแบบ * เป็น 0 (หัวตารางหาย)
+            //   ตั้งความกว้างเดิมของทุกคอลัมน์ใหม่หลังจัดหน้าเสร็จ / ตอนตารางว่างได้แถวแรก
+            private Dictionary<DataGridColumn, DataGridLength> _widths;
+            private bool _hookedRows;
+
+            private void ResetWidthsLater()
+            {
+                if (_widths == null) _widths = dgQRHistory.Columns.ToDictionary(c => c, c => c.Width);
+                if (!_hookedRows)
+                {
+                    _hookedRows = true;
+                    _viewModel.Products.CollectionChanged += (s, e) => { if (_viewModel.Products.Count == 1) ResetWidthsLater(); };
+                }
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    foreach (var kv in _widths) { kv.Key.Width = new DataGridLength(0); kv.Key.Width = kv.Value; }
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            #endregion
+
+            #region === [ SUPPLIER / CUSTOMER / CATEGORY : พิมพ์แล้วขึ้นค่าที่มีในระบบให้เลือก ] ===
+            private SuggestBox _sgSupplier, _sgCustomer, _sgCategory;
+
+            private void SetupSuggestions()
+            {
+                _sgSupplier = SuggestBox.Attach(txtSupplier);
+                _sgCustomer = SuggestBox.Attach(txtCustomer);
+                _sgCategory = SuggestBox.Attach(txtCategory);
+                LoadSuggestions();
+            }
+
+            private async void LoadSuggestions()
+            {
+                try
+                {
+                    var v = await Task.Run(() => new ProductControlLayoutService().GetSuggestions());
+                    _sgSupplier.SetValues(v.Suppliers);
+                    _sgCustomer.SetValues(v.Customers);
+                    _sgCategory.SetValues(v.Categories);
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"LoadSuggestions: {ex.Message}"); }
+            }
+
+            private void RememberSuggestions(ProductControlModel m)
+            {
+                _sgSupplier?.Add(m.CustomerCode);
+                _sgCustomer?.Add(m.Customer);
+                _sgCategory?.Add(m.Category);
+            }
+            #endregion
 
             // คลังที่ติ๊กไว้ตอนลงทะเบียนสินค้าใหม่: จำค่าที่ผู้ใช้ติ๊กครั้งล่าสุด "main|id,id" (ยังไม่เคยเลือก = คลังหลัก)
             private void SetDefaultStockChips()
@@ -398,6 +493,7 @@
 
                 if (result)
                 {
+                    RememberSuggestions(newModel);
                     await ApplyStockSelection(newModel.PartACode, inMain, otherIds, newModel.PtId);
                     if (PartRegistered != null)
                     {
@@ -435,6 +531,7 @@
 
                 if (result)
                 {
+                    RememberSuggestions(editModel);
                     await ApplyStockSelection(editModel.PartACode, inMain, otherIds, _editPtId);
                     _editPtId = 0;
                     DialogHelper.ShowSuccess("แก้ไขข้อมูลเรียบร้อยแล้ว!");
@@ -555,6 +652,7 @@
                     QRCodeData = txtQRCode.Text.Trim(),
                     Customer = txtCustomer.Text.Trim(),
                     PartA = txtPartA.Text.Trim(),
+                    PartB = txtPartB.Text.Trim(),
                     PartNo = txtPartNo.Text.Trim(),
                     Model = txtModel.Text.Trim(),
                     ImageFileName = _viewModel.SelectedProduct?.ImageFileName
@@ -579,8 +677,11 @@
             txtQRCode.Clear();
             txtCustomer.Clear();
             txtPartA.Clear();
+            txtPartB.Clear();
             txtPartNo.Clear();
             txtModel.Clear();
+            txtMotherCoil.Clear();
+            txtCoilNo.Clear();
 
             // 🎯 หัวใจสำคัญ: สร้างตัวใหม่ไปเลย เพื่อตัดความสัมพันธ์กับ Row เดิมในตาราง
             _viewModel.SelectedProduct = new ProductControlModel();
@@ -612,17 +713,36 @@
                 QRCodeData = model.QRCodeData,
                 Customer = model.Customer,
                 PartA = model.PartA,
+                PartB = model.PartB,
                 PartNo = model.PartNo,
                 Model = model.Model,
                 ImageFileName = model.ImageFileName
                 // ถ้ามี Field อื่นให้เพิ่มตรงนี้
             };
+            FillCoils(model);
 
             // แสดงคลังที่สินค้านี้อยู่ตอนนี้
             List<int> otherIds = null;
             try { if (_stocks.Count > 0) otherIds = _partService.GetPartStockIds(model.PartCode, model.PtId); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GetPartStockIds: {ex.Message}"); }
             SetStockChips(model.IsShowMain, otherIds);
+        }
+
+        // 🧲 MOTHER COIL / COIL NO ของสินค้าที่กด VIEW / EDIT (Coil ในคลังตอนนี้ ตามคลังในช่องกรอง / ALL STOCKS = ทุกคลัง) - แสดงอย่างเดียว
+        private async void FillCoils(ProductControlModel model)
+        {
+            txtMotherCoil.Clear(); txtCoilNo.Clear();
+            if (model == null || model.PtId <= 0) return;
+            int ptId = model.PtId; int? stk = _viewModel.FilterStkId;
+            try
+            {
+                var map = await Task.Run(() => new ProductControlLayoutService().GetCoils(stk, ptId));
+                if (_viewModel.SelectedProduct?.PartCode != model.PartCode || !map.TryGetValue(ptId, out var c)) return;
+                txtMotherCoil.Text = string.Join(", ", c.Mothers);
+                txtCoilNo.Text = c.Coils.Count == 0 ? "" : $"{c.Coils.Count:N0} COIL: " + string.Join(", ", c.Coils);
+                txtCoilNo.ToolTip = string.Join("\n", c.Coils.Take(60)) + (c.Coils.Count > 60 ? $"\n+{c.Coils.Count - 60:N0}" : "");
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"FillCoils: {ex.Message}"); }
         }
 
                 private void SetEditMode(bool isEdit)
@@ -691,28 +811,15 @@
                 // ไว้สำหรับจัดการ Infinite Scroll หรือโหลดหน้าเพิ่มในกรณีที่เปิดใช้งาน Virtualization
             }
 
-            // ✅ นำฟังก์ชันกลับเข้ามาอยู่ก่อนปีกกาปิดคลาสอันแรกแล้วครับ
-            // 🗑 ADMIN DELETE (Level 1): เลือกคลังในหน้าต่าง แล้วลบรายการที่ติ๊ก / ลบทั้งหมดในคลัง
-            // คลังที่ลบได้: Level 1 = ทุกคลัง / ผู้ใช้อื่น = DEL ของ Product Control + DEL ของคลังนั้น
-            private List<StockModel> DeletableStocks()
+            // 🛠 ADMIN (Level 1 เท่านั้น): หน้าต่างจัดการ - STOCK DELETE / ตารางของแต่ละคลัง / รูปแบบ QR Code
+            private void Admin_Click(object sender, RoutedEventArgs e)
             {
-                var u = _viewModel.CurrentUser;
-                if (u == null) return new List<StockModel>();
-                if (u.UserLevel == 1) return _stocks;
-                return u.CanDeleteProduct ? _stocks.Where(u.CanDeleteInStock).ToList() : new List<StockModel>();
-            }
-
-            private void AdminDelete_Click(object sender, RoutedEventArgs e)
-            {
-                var allowed = DeletableStocks();
-                if (allowed.Count == 0)
-                {
-                    DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ลบสินค้าในคลังใด (ต้องมี DEL ของ Inventory Registration และ DEL ของคลัง)", "ACCESS DENIED");
-                    return;
-                }
+                if (_viewModel.CurrentUser?.UserLevel != 1) { DialogHelper.ShowWarning("เฉพาะ Admin (Level 1) เท่านั้น", "ACCESS DENIED"); return; }
                 var ticked = _viewModel.Products.Where(x => x.IsSelected && x.PtId > 0).Select(x => x.PtId).Distinct().ToList();
-                var w = new AdminDeleteWindow(_viewModel.CurrentUser, allowed, ticked);
-                if (w.ShowDialog() == true) _viewModel.LoadData(txtSearch.Text);
+                var w = new ProductControlAdminWindow(_viewModel.CurrentUser, _stocks, ticked);
+                w.ShowDialog();
+                if (w.LayoutChanged) { LoadLayouts(); ApplyLayout(); }
+                if (w.LayoutChanged || w.DeletedCount > 0) _viewModel.LoadData(txtSearch.Text);
             }
 
             private async void Export_Click(object sender, RoutedEventArgs e)
@@ -729,11 +836,14 @@
                 {
                     string currentUserId = _viewModel.CurrentUser?.UserId ?? "Unknown";
 
-                    string pdf = await Task.Run(() => new ExportService().GenerateA4Pdf(selectedItems));
+                    // QR ตามที่ Admin ตั้งต่อคลังในช่องกรอง (ALL STOCKS = ค่าของ ALL STOCKS): PRODUCT CODE อย่างเดียว / PRODUCT CODE|PRODUCT NAME
+                    LoadLayouts();
+                    bool codeOnly = CurrentLayout().QrCodeOnly;
+                    string pdf = await Task.Run(() => new ExportService().GenerateA4Pdf(selectedItems, codeOnly));
 
                     foreach (var item in selectedItems)
                     {
-                        LogService.WriteLog(currentUserId, "EXPORT_QR_PDF", $"Exported QR Code to PDF for Part: {item.PartName}", item.PartCode);
+                        LogService.WriteLog(currentUserId, "EXPORT_QR_PDF", $"Exported QR Code to PDF for Part: {item.PartName} | QR: {(codeOnly ? "PRODUCT CODE" : "PRODUCT CODE|PRODUCT NAME")}", item.PartCode);
                     }
 
                     DialogHelper.ShowSuccess($"ส่งออกไฟล์ QR เรียบร้อยแล้ว!\n{ImportTemplateService.ShortPath(pdf)}");

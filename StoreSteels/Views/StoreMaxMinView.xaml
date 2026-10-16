@@ -617,6 +617,17 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+                    <DataGridTextColumn x:Name="colPartB" Header="PART B" Binding="{Binding PartB}" IsReadOnly="True" Width="1*" MinWidth="100" Visibility="Collapsed">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="TextWrapping" Value="Wrap"/>
+                                <Setter Property="TextAlignment" Value="Center"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                     <DataGridTextColumn x:Name="colPartNo" Header="PART NO" Binding="{Binding PartNo}" IsReadOnly="True" Width="1*" MinWidth="100" Visibility="Collapsed">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">

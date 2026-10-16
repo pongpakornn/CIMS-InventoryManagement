@@ -26,6 +26,7 @@ namespace CIMS.Services
         public string ShowHide { get; set; }              // SHOW / HIDE (แสดงในตารางคลังหลัก) - ว่าง = ตามคลังที่ใส่
         public string Customer { get; set; }
         public string PartA { get; set; }
+        public string PartB { get; set; }
         public string PartNo { get; set; }
         public string Model { get; set; }
 
@@ -80,6 +81,7 @@ namespace CIMS.Services
             ["STOCK"] = new[] { "STOCK", "STOCKCODE", "คลัง" },
             ["CUSTOMER"] = new[] { "CUSTOMER", "CUST", "CUSTOMERCODE", "ลูกค้า" },
             ["PARTA"] = new[] { "PARTA", "PARTACODE" },
+            ["PARTB"] = new[] { "PARTB", "PARTBCODE" },
             ["PARTNO"] = new[] { "PARTNO", "PARTNUMBER" },
             ["MODEL"] = new[] { "MODEL", "MODELCODE", "รหัสโมเดล", "โมเดล" },
             ["SHOWHIDE"] = new[] { "SHOW/HIDE", "SHOWHIDE", "SHOW", "HIDE", "SHOW/HIDDEN", "แสดง/ซ่อน" },
@@ -176,6 +178,7 @@ namespace CIMS.Services
                         StockText = Get(r, "STOCK"),
                         Customer = Get(r, "CUSTOMER"),
                         PartA = Get(r, "PARTA"),
+                        PartB = Get(r, "PARTB"),
                         PartNo = Get(r, "PARTNO"),
                         Model = Get(r, "MODEL"),
                         ShowHide = Get(r, "SHOWHIDE")
@@ -374,12 +377,13 @@ namespace CIMS.Services
                     foreach (var r in valid)
                     {
                         int ptId;
-                        using (var cmd = new SqlCommand(@"
+                        bool hasB = CIMS.Helpers.DbSchema.HasPartB;
+                        using (var cmd = new SqlCommand($@"
                             INSERT INTO CIMS.Parts (PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category,
                                                   Bin, StockQuantity, IsActive, IsShowInMaster, ImageFileName, Supplier,
-                                                  Customer, PartA, PartNumber, Model)
+                                                  Customer, PartA, PartNumber, Model{(hasB ? ", PartB" : "")})
                             VALUES (@code, @name, @psz, @qr, @mmax, @mmin, @cat, @bin, @mqty, 1, @show, @img, @sup,
-                                    @cust, @parta, @partno, @model);
+                                    @cust, @parta, @partno, @model{(hasB ? ", @partb" : "")});
                             IF @inMain = 1 AND @rmk IS NOT NULL UPDATE CIMS.Parts SET Remark = @rmk WHERE PartID = SCOPE_IDENTITY();
                             SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, trans))
                         {
@@ -394,6 +398,7 @@ namespace CIMS.Services
                             cmd.Parameters.AddWithValue("@sup", string.IsNullOrWhiteSpace(r.Supplier) ? (object)DBNull.Value : r.Supplier);
                             cmd.Parameters.AddWithValue("@cust", string.IsNullOrWhiteSpace(r.Customer) ? (object)DBNull.Value : r.Customer);
                             cmd.Parameters.AddWithValue("@parta", string.IsNullOrWhiteSpace(r.PartA) ? (object)DBNull.Value : r.PartA);
+                            cmd.Parameters.AddWithValue("@partb", string.IsNullOrWhiteSpace(r.PartB) ? (object)DBNull.Value : r.PartB);
                             cmd.Parameters.AddWithValue("@partno", string.IsNullOrWhiteSpace(r.PartNo) ? (object)DBNull.Value : r.PartNo);
                             cmd.Parameters.AddWithValue("@model", string.IsNullOrWhiteSpace(r.Model) ? (object)DBNull.Value : r.Model);
                             cmd.Parameters.AddWithValue("@img", string.IsNullOrWhiteSpace(r.Image) || r.Image.Trim() == "-" ? (object)DBNull.Value : r.Image.Trim());

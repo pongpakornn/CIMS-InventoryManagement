@@ -56,6 +56,7 @@ namespace CIMS.Views
             InitSubOrder(s);
             chkColCustomer.IsChecked = s.ColCustomer;
             chkColPartA.IsChecked = s.ColPartA;
+            chkColPartB.IsChecked = s.ColPartB;
             chkColPartNo.IsChecked = s.ColPartNo;
             chkColStockBox.IsChecked = s.ColStockBox;
             chkColStockPcs.IsChecked = s.ColStockPcs;
@@ -105,7 +106,7 @@ namespace CIMS.Views
 
         private (CheckBox Box, string Key)[] ColumnChips() => new[]
         {
-            (chkColNo, "NO"), (chkColImage, "IMAGE"), (chkColCustomer, "CUSTOMER"), (chkColCode, "CODE"), (chkColPartA, "PARTA"),
+            (chkColNo, "NO"), (chkColImage, "IMAGE"), (chkColCustomer, "CUSTOMER"), (chkColCode, "CODE"), (chkColPartA, "PARTA"), (chkColPartB, "PARTB"),
             (chkColPartNo, "PARTNO"), (chkColModel, "MODEL"), (chkColName, "NAME"), (chkMaxMin, "MAXMIN"), (chkColQty, "QTY"),
             (chkColStockBox, "BOX"), (chkCountCoil, "COIL"), (chkColStockPcs, "PCS"), (chkColRemark, "REMARK")
         };
@@ -225,7 +226,7 @@ namespace CIMS.Views
 
             if (chkColImage.IsChecked != true && chkColCode.IsChecked != true && chkColName.IsChecked != true &&
                 chkMaxMin.IsChecked != true && chkColQty.IsChecked != true && chkColRemark.IsChecked != true &&
-                chkColCustomer.IsChecked != true && chkColPartA.IsChecked != true && chkColPartNo.IsChecked != true &&
+                chkColCustomer.IsChecked != true && chkColPartA.IsChecked != true && chkColPartB.IsChecked != true && chkColPartNo.IsChecked != true &&
                 chkColStockBox.IsChecked != true && chkColStockPcs.IsChecked != true && chkCountCoil.IsChecked != true &&
                 chkColNo.IsChecked != true && chkColModel.IsChecked != true)
             {
@@ -260,6 +261,7 @@ namespace CIMS.Views
             s.ColumnOrder = string.Join(",", _colOrder);
             s.ColCustomer = chkColCustomer.IsChecked == true;
             s.ColPartA = chkColPartA.IsChecked == true;
+            s.ColPartB = chkColPartB.IsChecked == true;
             s.ColPartNo = chkColPartNo.IsChecked == true;
             s.ColStockBox = chkColStockBox.IsChecked == true;
             s.ColStockPcs = chkColStockPcs.IsChecked == true;

@@ -24,6 +24,22 @@ namespace CIMS.Helpers
 
         public static string FieldKey(int fmtId, int n) => $"FIELD:{fmtId}:{n}";
 
+        // หัวตารางช่อง PRODUCT CODE ตามค่าที่เลือกแสดง: คอลัมน์สินค้า = ชื่อคอลัมน์ (PART A ...) / ช่องของป้าย = ชื่อช่องนั้นในรูปแบบบาร์โค้ด
+        //   (ช่องเลข Coil ลูก = COIL NO / Coil แม่ = MOTHER COIL / ช่องรหัส = PRODUCT CODE / อื่น ๆ = BARCODE #n)
+        public static string HeaderFor(string key, IEnumerable<BarcodeFormatModel> formats)
+        {
+            if (string.IsNullOrWhiteSpace(key)) key = Default;
+            foreach (var c in Columns) if (c.Key == key) return c.Label;
+            if (!TryParseField(key, out int fmtId, out int n)) return "PRODUCT CODE";
+            var f = formats?.FirstOrDefault(x => x.FmtId == fmtId);
+            if (f == null) return $"BARCODE #{n}";
+            if (f.CoilNoPos == n) return "COIL NO";
+            if (f.MotherCoilPos == n) return "MOTHER COIL";
+            if (f.CodePos == n || f.AltCodePos == n) return "PRODUCT CODE";
+            if (f.QtyPos == n) return "QTY";
+            return $"BARCODE #{n}";
+        }
+
         public static bool TryParseField(string key, out int fmtId, out int n)
         {
             fmtId = 0; n = 0;

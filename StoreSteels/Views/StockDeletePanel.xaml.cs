@@ -8,14 +8,15 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace CIMS.Views
 {
-    // 🗑 ADMIN DELETE (Level 1 เท่านั้น) หน้า Product Control
+    // 🗑 STOCK DELETE (หน้าต่าง ADMIN ของ Inventory Registration - Level 1 เท่านั้น)
     //   เลือกคลัง -> ลบรายการที่ติ๊กในตาราง หรือลบสินค้าทั้งหมดในคลังที่เลือก
-    //   ลบสินค้าออกจากระบบทั้งตัว (ทุกคลัง / ประวัติสแกน / Max-Min) แม้ยังมียอดคงเหลือ - ต้องใส่เหตุผล + ยืนยันอีกครั้ง
-    public partial class AdminDeleteWindow : Window
+    //   ลบสินค้าออกจากระบบทั้งตัว (ทุกคลัง / ประวัติสแกน / Max-Min / Coil) แม้ยังมียอดคงเหลือ - ต้องใส่เหตุผล + ยืนยันอีกครั้ง
+    public partial class StockDeletePanel : UserControl
     {
         public class StockCard : INotifyPropertyChanged
         {
@@ -36,13 +37,11 @@ namespace CIMS.Views
         private readonly ProductControlService _service = new ProductControlService();
         public int DeletedCount { get; private set; }
 
-        public AdminDeleteWindow(UserSession session, List<StockModel> stocks, List<int> tickedPartIds)
+        public StockDeletePanel(UserSession session, List<StockModel> stocks, List<int> tickedPartIds)
         {
             InitializeComponent();
             _session = session;
             _tickedIds = tickedPartIds ?? new List<int>();
-            var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
-            if (owner != null) Owner = owner; else WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
             Dictionary<int, int> counts;
             try { counts = _service.GetStockPartCounts(stocks); }
@@ -62,7 +61,7 @@ namespace CIMS.Views
         }
 
         private void Mode_Changed(object sender, RoutedEventArgs e) => UpdateSummary();
-        private void Reason_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e) => UpdateSummary();
+        private void Reason_Changed(object sender, TextChangedEventArgs e) => UpdateSummary();
 
         private List<StockCard> Chosen() => _cards?.Where(c => c.IsChecked).ToList() ?? new List<StockCard>();
 
@@ -80,19 +79,14 @@ namespace CIMS.Views
 
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
+            if (_session?.UserLevel != 1) return;
             var chosen = Chosen();
-            // Level 1 = ทุกคลัง / ผู้ใช้อื่น = ต้องมี DEL ของ Inventory Registration + DEL ของทุกคลังที่เลือก
-            bool admin = _session?.UserLevel == 1;
-            if (_session == null || (!admin && (!_session.CanDeleteProduct || chosen.Any(c => !_session.CanDeleteInStock(c.Stock))))) return;
             string reason = (txtReason.Text ?? "").Trim();
             if (chosen.Count == 0 || reason.Length == 0) return;
             bool all = rbAll.IsChecked == true;
 
             string what = all ? $"สินค้าทั้งหมดในคลัง {string.Join(", ", chosen.Select(c => c.Code))}" : $"สินค้าที่ติ๊กไว้ {_tickedIds.Count:N0} รายการ (เฉพาะที่อยู่ในคลัง {string.Join(", ", chosen.Select(c => c.Code))})";
-            string how = admin
-                ? "สินค้าจะถูกลบออกจากระบบทั้งหมด (ทุกคลัง ประวัติสแกน ค่า Max-Min และ Coil) แม้ยังมียอดคงเหลือ"
-                : "สินค้าที่อยู่แค่ในคลังที่เลือก = ลบออกจากระบบ (ประวัติสแกน ค่า Max-Min และ Coil)\nสินค้าที่ยังอยู่คลังอื่น = เอาออกเฉพาะคลังที่เลือก (ข้อมูลคลังอื่นไม่เปลี่ยน)";
-            if (!DialogHelper.ShowConfirm($"ยืนยันการลบ{what}\n\n{how}\nลบแล้วกู้คืนไม่ได้\n\nเหตุผล: {reason}", "CONFIRM DELETE"))
+            if (!DialogHelper.ShowConfirm($"ยืนยันการลบ{what}\n\nสินค้าจะถูกลบออกจากระบบทั้งหมด (ทุกคลัง ประวัติสแกน ค่า Max-Min และ Coil) แม้ยังมียอดคงเหลือ\nลบแล้วกู้คืนไม่ได้\n\nเหตุผล: {reason}", "CONFIRM DELETE"))
                 return;
 
             btnDelete.IsEnabled = false;
@@ -100,25 +94,31 @@ namespace CIMS.Views
             {
                 var stocks = chosen.Select(c => c.Stock).ToList();
                 var ids = all ? null : _tickedIds.ToList();
-                var res = await Task.Run(() => _service.DeleteInStocks(stocks, ids, admin));
+                var res = await Task.Run(() => _service.DeleteInStocks(stocks, ids, true));
                 var deleted = res.Deleted;
-                DeletedCount = deleted.Count + res.Removed.Count;
-                LogService.WriteLog(_session.UserId, admin ? "ADMIN_DELETE_PART" : "STOCK_DELETE_PART",
-                    $"{(all ? "Delete ALL" : "Delete ticked")} in {string.Join(", ", stocks.Select(s => s.Code))} | Deleted: {deleted.Count} | Removed from stock only: {res.Removed.Count} | Reason: {reason} | Codes: {string.Join(", ", deleted.Concat(res.Removed).Take(100))}{(DeletedCount > 100 ? " ..." : "")}",
+                int count = deleted.Count + res.Removed.Count;
+                DeletedCount += count;
+                LogService.WriteLog(_session.UserId, "ADMIN_DELETE_PART",
+                    $"{(all ? "Delete ALL" : "Delete ticked")} in {string.Join(", ", stocks.Select(s => s.Code))} | Deleted: {deleted.Count} | Removed from stock only: {res.Removed.Count} | Reason: {reason} | Codes: {string.Join(", ", deleted.Concat(res.Removed).Take(100))}{(count > 100 ? " ..." : "")}",
                     string.Join(",", stocks.Select(s => s.Code)));
-                if (DeletedCount == 0) DialogHelper.ShowWarning("ไม่พบสินค้าที่ตรงกับคลังที่เลือก ไม่มีรายการใดถูกลบ");
-                else DialogHelper.ShowSuccess($"ลบสินค้าออกจากระบบแล้ว {deleted.Count:N0} รายการ" + (res.Removed.Count > 0 ? $"\nเอาออกเฉพาะคลังที่เลือก (ยังอยู่คลังอื่น) {res.Removed.Count:N0} รายการ" : ""));
-                DialogResult = DeletedCount > 0;
+                if (count == 0) DialogHelper.ShowWarning("ไม่พบสินค้าที่ตรงกับคลังที่เลือก ไม่มีรายการใดถูกลบ");
+                else
+                {
+                    DialogHelper.ShowSuccess($"ลบสินค้าออกจากระบบแล้ว {deleted.Count:N0} รายการ" + (res.Removed.Count > 0 ? $"\nเอาออกเฉพาะคลังที่เลือก (ยังอยู่คลังอื่น) {res.Removed.Count:N0} รายการ" : ""));
+                    // จำนวนสินค้าในการ์ดคลังใหม่ / รายการที่ติ๊กถูกลบไปแล้ว
+                    var counts = _service.GetStockPartCounts(_cards.Select(c => c.Stock).ToList());
+                    foreach (var c in _cards) c.Count = counts.TryGetValue(c.Stock.StkId, out int n) ? n : 0;
+                    icStocks.Items.Refresh();
+                    if (!all) { _tickedIds.Clear(); rbSelected.Content = "DELETE THE TICKED PRODUCTS IN THE TABLE (0 ticked)"; rbSelected.IsEnabled = false; rbAll.IsChecked = true; }
+                    txtReason.Clear();
+                }
+                UpdateSummary();
             }
             catch (Exception ex)
             {
                 DialogHelper.ShowError("ลบไม่สำเร็จ (ยกเลิกทั้งหมด ไม่มีรายการใดถูกลบ)\n" + ex.Message);
-                btnDelete.IsEnabled = true;
+                UpdateSummary();
             }
         }
-
-        private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
-        private void Window_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Escape) DialogResult = false; }
-        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); }
     }
 }

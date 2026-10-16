@@ -43,6 +43,7 @@ namespace CIMS.Models
         public bool ColRemark { get; set; } = true;
         public bool ColCustomer { get; set; }
         public bool ColPartA { get; set; }
+        public bool ColPartB { get; set; }   // PART B (CIMS.Stocks.ShowColPartB)
         public bool ColPartNo { get; set; }
         public bool ColStockBox { get; set; }
 
@@ -95,9 +96,9 @@ namespace CIMS.Models
         public bool ShowBoxColumn => ColStockBox || CountCoil;
 
         // ลำดับคอลัมน์ในตาราง Store ตามลำดับที่ติ๊กเลือก (คั่นด้วย ,) เช่น "CODE,NAME,MAXMIN,QTY,COIL"
-        //   คีย์: NO IMAGE CUSTOMER CODE PARTA PARTNO MODEL NAME MAXMIN QTY BOX COIL PCS REMARK - ว่าง = ลำดับเดิม
+        //   คีย์: NO IMAGE CUSTOMER CODE PARTA PARTB PARTNO MODEL NAME MAXMIN QTY BOX COIL PCS REMARK - ว่าง = ลำดับเดิม
         public string ColumnOrder { get; set; }
-        public static readonly string[] DefaultColumnOrder = { "NO", "IMAGE", "CUSTOMER", "CODE", "PARTA", "PARTNO", "MODEL", "NAME", "MAXMIN", "QTY", "BOX", "COIL", "PCS", "REMARK" };
+        public static readonly string[] DefaultColumnOrder = { "NO", "IMAGE", "CUSTOMER", "CODE", "PARTA", "PARTB", "PARTNO", "MODEL", "NAME", "MAXMIN", "QTY", "BOX", "COIL", "PCS", "REMARK" };
         public List<string> ColumnOrderList()
         {
             var list = new List<string>();

@@ -99,10 +99,10 @@ namespace CIMS.Views
 
             if (stock.IsLiveView) return;
             string sql = stock.IsMain
-                ? @"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, Category, Customer, Supplier, PartA, PartNumber, Model, Bin,
-                                                         ImageFileName, IsShowInMaster, IsActive)) FROM CIMS.Parts WHERE IsShowInMaster = 1"
+                ? $@"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(PartID, PartCode, Description, Category, Customer, Supplier, PartA, PartNumber, Model, Bin,
+                                                         ImageFileName, IsShowInMaster, IsActive{(DbSchema.HasPartB ? ", PartB" : "")})) FROM CIMS.Parts WHERE IsShowInMaster = 1"
                 : $@"SELECT COUNT(*), CHECKSUM_AGG(CHECKSUM(ps.PartID, ps.IsShow, p.PartCode, p.Description, p.Category, p.Customer, p.Supplier, p.PartA,
-                                                          p.PartNumber, p.Model, p.Bin, p.ImageFileName, p.IsActive))
+                                                          p.PartNumber, p.Model, p.Bin, p.ImageFileName, p.IsActive{(DbSchema.HasPartB ? ", p.PartB" : "")}))
                      FROM CIMS.PartStocks ps JOIN CIMS.Parts p ON p.PartID = ps.PartID WHERE ps.StockID = {stock.StkId}";
             LiveRefresh.Attach(this, TimeSpan.FromSeconds(3),
                 () => LiveRefresh.DbToken(sql),
@@ -253,6 +253,7 @@ namespace CIMS.Views
             Set(colCustomer, _stock.ColCustomer);
             Set(colCode, _stock.ColCode);
             Set(colPartA, _stock.ColPartA);
+            Set(colPartB, _stock.ColPartB);
             Set(colPartNo, _stock.ColPartNo);
             Set(colModel, _stock.ColModel);
             Set(colName, _stock.ColName);
@@ -273,7 +274,7 @@ namespace CIMS.Views
             var byKey = new Dictionary<string, DataGridColumn[]>
             {
                 ["NO"] = new DataGridColumn[] { colNo }, ["IMAGE"] = new DataGridColumn[] { colImage }, ["CUSTOMER"] = new DataGridColumn[] { colCustomer },
-                ["CODE"] = new DataGridColumn[] { colCode }, ["PARTA"] = new DataGridColumn[] { colPartA }, ["PARTNO"] = new DataGridColumn[] { colPartNo },
+                ["CODE"] = new DataGridColumn[] { colCode }, ["PARTA"] = new DataGridColumn[] { colPartA }, ["PARTB"] = new DataGridColumn[] { colPartB }, ["PARTNO"] = new DataGridColumn[] { colPartNo },
                 ["MODEL"] = new DataGridColumn[] { colModel }, ["NAME"] = new DataGridColumn[] { colName }, ["MAXMIN"] = new DataGridColumn[] { colMax, colMin },
                 ["QTY"] = new DataGridColumn[] { colQty }, ["BOX"] = new DataGridColumn[] { colStockBox }, ["COIL"] = new DataGridColumn[] { colStockBox },
                 ["PCS"] = new DataGridColumn[] { colStockPcs }, ["REMARK"] = new DataGridColumn[] { colRemark }
@@ -1326,6 +1327,7 @@ namespace CIMS.Views
             string titlePath = _stock.ColPartNo ? nameof(StoreProductModel.PartNo)
                              : _stock.ColCode ? nameof(StoreProductModel.PartCode)
                              : _stock.ColPartA ? nameof(StoreProductModel.PartA)
+                             : _stock.ColPartB ? nameof(StoreProductModel.PartB)
                              : nameof(StoreProductModel.PartCode);
 
             var root = new Border

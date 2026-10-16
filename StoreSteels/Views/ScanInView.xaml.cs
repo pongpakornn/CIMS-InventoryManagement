@@ -48,7 +48,10 @@ namespace CIMS.Views
                 {
                     FocusScanBox();
                 }
+                if (e.PropertyName == nameof(ScanInViewModel.CodeHeader) || e.PropertyName == nameof(ScanInViewModel.SummaryCodeHeader))
+                    Dispatcher.BeginInvoke(new Action(ApplyCodeHeaders));
             };
+            ApplyCodeHeaders();
 
             // ช่องสแกนใช้แป้นภาษาอังกฤษเสมอ (สแกนเนอร์ส่งเป็นปุ่มกด แป้นไทยจะได้ตัวอักษรผิด) + ปิด IME
             System.Windows.Input.InputLanguageManager.SetInputLanguage(txtBarcodeInput, System.Globalization.CultureInfo.GetCultureInfo("en-US"));
@@ -65,6 +68,14 @@ namespace CIMS.Views
             _fastTimer = new DispatcherTimer(DispatcherPriority.Send);
             _fastTimer.Interval = TimeSpan.FromMilliseconds(300);
             _fastTimer.Tick += FastTimer_Tick;
+        }
+
+        // 🏷️ หัวตารางช่อง PRODUCT CODE เปลี่ยนตาม DISPLAY ของคลัง (COIL NO / PART A / PRODUCT CODE ...)
+        private void ApplyCodeHeaders()
+        {
+            colTodayCode.Header = _viewModel.CodeHeader;
+            colTestCode.Header = _viewModel.CodeHeader;
+            colSumCode.Header = _viewModel.SummaryCodeHeader;
         }
 
         #region === [ Auto Focus ช่องสแกน ] ===

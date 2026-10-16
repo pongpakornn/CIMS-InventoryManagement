@@ -33,7 +33,8 @@ namespace CIMS.Services
             + (CIMS.Helpers.DbSchema.HasColumnOrder ? ", s.ColumnOrder" : ", CAST(NULL AS NVARCHAR(300)) AS ColumnOrder")
             + (CIMS.Helpers.DbSchema.HasCoilRows ? ", s.ShowCoilRows, s.CoilRowColumns" : ", CAST(NULL AS BIT) AS ShowCoilRows, CAST(NULL AS NVARCHAR(200)) AS CoilRowColumns")
             + (CIMS.Helpers.DbSchema.HasMaxMinDecimal ? ", s.MaxMinDecimal" : ", CAST(NULL AS BIT) AS MaxMinDecimal")
-            + (CIMS.Helpers.DbSchema.HasCardStyle ? ", s.CardStyle" : ", CAST(NULL AS NVARCHAR(10)) AS CardStyle");
+            + (CIMS.Helpers.DbSchema.HasCardStyle ? ", s.CardStyle" : ", CAST(NULL AS NVARCHAR(10)) AS CardStyle")
+            + (CIMS.Helpers.DbSchema.HasPartB ? ", s.ShowColPartB" : ", CAST(0 AS BIT) AS ShowColPartB");
 
         // คลังทั้งหมด (คลังหลักอยู่บนสุด) พร้อมจำนวนรายการสินค้าในแต่ละคลัง
         public List<StockModel> GetStocks()
@@ -132,6 +133,7 @@ namespace CIMS.Services
                 MaxMinBasis = rdr["MaxMinBasis"].ToString(),
                 ColCustomer = Convert.ToBoolean(rdr["ShowColCustomer"]),
                 ColPartA = Convert.ToBoolean(rdr["ShowColPartA"]),
+                ColPartB = Convert.ToBoolean(rdr["ShowColPartB"]),
                 ColPartNo = Convert.ToBoolean(rdr["ShowColPartNumber"]),
                 ColStockBox = Convert.ToBoolean(rdr["ShowColStockBox"]),
                 ColStockPcs = Convert.ToBoolean(rdr["ShowColStockPcs"]),
@@ -187,12 +189,12 @@ namespace CIMS.Services
                         INSERT INTO CIMS.Stocks (StockCode, StockName, Unit, IsMain, UseMaxMin,
                             ShowColImage, ShowColCode, ShowColName, ShowColQuantity, ShowColRemark,
                             InPickList, InSupplier, InSystemQR, InExcel, OutPickList, OutSupplier, OutSystemQR,
-                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel, AllowDecimal, CountCoil, ColumnOrder, ShowCoilRows, CoilRowColumns, MaxMinDecimal, CardStyle,
+                            GroupBy, MaxMinBasis, ShowColCustomer, ShowColPartA, ShowColPartB, ShowColPartNumber, ShowColStockBox, ShowColStockPcs, ShowColNo, ShowColModel, OutExcel, AllowDecimal, CountCoil, ColumnOrder, ShowCoilRows, CoilRowColumns, MaxMinDecimal, CardStyle,
                             SortNo, CreatedBy)
                         VALUES (@code, @name, @unit, 0, @maxmin,
                             @cimg, @ccode, @cname, @cqty, @crmk,
                             @ipl, @isup, @isys, @ixls, @opl, @osup, @osys,
-                            @grp, @mmb, @ccust, @cparta, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls, @dec, @coil, @corder, @csub, @ccols, @mmdec, @card,
+                            @grp, @mmb, @ccust, @cparta, @cpartb, @cpartno, @cbox, @cpcs, @cno, @cmodel, @oxls, @dec, @coil, @corder, @csub, @ccols, @mmdec, @card,
                             (SELECT ISNULL(MAX(SortNo), 0) + 1 FROM CIMS.Stocks), @uid);
                         SELECT CAST(SCOPE_IDENTITY() AS INT);";
                     if (!CIMS.Helpers.DbSchema.HasAllowDecimal) sql = sql.Replace(" AllowDecimal,", "").Replace(" @dec,", "");
@@ -201,6 +203,7 @@ namespace CIMS.Services
                     if (!CIMS.Helpers.DbSchema.HasCoilRows) sql = sql.Replace(" ShowCoilRows, CoilRowColumns,", "").Replace(" @csub, @ccols,", "");
                     if (!CIMS.Helpers.DbSchema.HasMaxMinDecimal) sql = sql.Replace(" MaxMinDecimal,", "").Replace(" @mmdec,", "");
                     if (!CIMS.Helpers.DbSchema.HasCardStyle) sql = sql.Replace(" CardStyle,", "").Replace(" @card,", "");
+                    if (!CIMS.Helpers.DbSchema.HasPartB) sql = sql.Replace(" ShowColPartB,", "").Replace(" @cpartb,", "");
 
                     int newId;
                     using (var cmd = new SqlCommand(sql, conn, trans))
@@ -249,7 +252,7 @@ namespace CIMS.Services
                             ShowColImage = @cimg, ShowColCode = @ccode, ShowColName = @cname, ShowColQuantity = @cqty, ShowColRemark = @crmk,
                             InPickList = @ipl, InSupplier = @isup, InSystemQR = @isys, InExcel = @ixls,
                             OutPickList = @opl, OutSupplier = @osup, OutSystemQR = @osys,
-                            GroupBy = @grp, MaxMinBasis = @mmb, ShowColCustomer = @ccust, ShowColPartA = @cparta,
+                            GroupBy = @grp, MaxMinBasis = @mmb, ShowColCustomer = @ccust, ShowColPartA = @cparta, ShowColPartB = @cpartb,
                             ShowColPartNumber = @cpartno, ShowColStockBox = @cbox, ShowColStockPcs = @cpcs,
                                  ShowColNo = @cno, ShowColModel = @cmodel, OutExcel = @oxls, AllowDecimal = @dec, CountCoil = @coil, ColumnOrder = @corder, ShowCoilRows = @csub, CoilRowColumns = @ccols, MaxMinDecimal = @mmdec, CardStyle = @card,
                             UpdatedBy = @uid, UpdatedDate = GETDATE()
@@ -260,6 +263,7 @@ namespace CIMS.Services
                     if (!CIMS.Helpers.DbSchema.HasCoilRows) sql = sql.Replace(" ShowCoilRows = @csub, CoilRowColumns = @ccols,", "");
                     if (!CIMS.Helpers.DbSchema.HasMaxMinDecimal) sql = sql.Replace(" MaxMinDecimal = @mmdec,", "");
                     if (!CIMS.Helpers.DbSchema.HasCardStyle) sql = sql.Replace(" CardStyle = @card,", "");
+                    if (!CIMS.Helpers.DbSchema.HasPartB) sql = sql.Replace(" ShowColPartB = @cpartb,", "");
 
                     using (var cmd = new SqlCommand(sql, conn, trans))
                     {
@@ -314,6 +318,7 @@ namespace CIMS.Services
             cmd.Parameters.AddWithValue("@mmb", s.MaxMinInBox ? "BOX" : s.MaxMinInCoil ? "COIL" : "UNIT");
             cmd.Parameters.AddWithValue("@ccust", s.ColCustomer);
             cmd.Parameters.AddWithValue("@cparta", s.ColPartA);
+            cmd.Parameters.AddWithValue("@cpartb", s.ColPartB);
             cmd.Parameters.AddWithValue("@cpartno", s.ColPartNo);
             cmd.Parameters.AddWithValue("@cbox", s.ColStockBox);
             cmd.Parameters.AddWithValue("@cpcs", s.ColStockPcs);

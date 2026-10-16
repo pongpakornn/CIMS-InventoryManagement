@@ -1,0 +1,135 @@
+﻿<UserControl x:Class="CIMS.Views.TableLayoutPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ▦ TABLE COLUMNS (หน้าต่าง ADMIN): เลือกคลัง -> จัดกลุ่ม + คอลัมน์ที่แสดงในตาราง Inventory Registration ตามลำดับที่เลือก -->
+    <UserControl.Resources>
+        <Style x:Key="StockItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="#FFFFFF" BorderBrush="#E2DEEA" BorderThickness="1.5">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#F3EEFB"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#6750A4"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#B9A9DD"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SmallBtn" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="#00000000" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="▦ TABLE COLUMNS" FontSize="20" FontWeight="Black" Foreground="#6750A4"/>
+            <TextBlock Text="Choose a stock, how its table is grouped, and which columns show - in the order you pick them. The table shows this layout when the stock is chosen in the stock filter. The tick box is always first and ACTION always last."
+                       Foreground="#8A8490" FontSize="12" FontWeight="SemiBold" Margin="0,3,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- คลัง -->
+            <DockPanel Margin="0,0,16,0">
+                <TextBlock DockPanel.Dock="Top" Text="1. STOCK" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,8"/>
+                <ListBox x:Name="lbStocks" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource StockItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Stocks_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                    <TextBlock Text="{Binding Summary}" FontSize="10.5" Foreground="#8A8490" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="●" Foreground="#E8833A" FontSize="12" VerticalAlignment="Top" ToolTip="Changed - not saved yet"
+                                           Visibility="{Binding ChangedVisibility}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="2. GROUP BY" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,8"/>
+                    <WrapPanel x:Name="wpGroup"/>
+
+                    <TextBlock Text="3. COLUMNS  (tick in the order to show - tick first = show first)" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,16,0,8"/>
+                    <WrapPanel x:Name="wpColumns"/>
+
+                    <TextBlock Text="4. ORDER IN THE TABLE  (◀ ▶ to move · ✕ to hide)" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,16,0,8"/>
+                    <WrapPanel x:Name="wpOrder"/>
+
+                    <TextBlock Text="PREVIEW" FontWeight="Black" FontSize="12" Foreground="#8A8490" Margin="0,16,0,6"/>
+                    <Border CornerRadius="10" Background="#FDFDFD" BorderBrush="#ECE9F1" BorderThickness="1" ClipToBounds="True">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <StackPanel x:Name="spPreviewHead" Orientation="Horizontal"/>
+                                <Border x:Name="bdPreviewGroup" Background="#F3E5F5" BorderBrush="#6750A4" BorderThickness="2,0,0,0" Padding="12,6" Margin="0,4,0,0">
+                                    <TextBlock x:Name="txtPreviewGroup" FontWeight="ExtraBold" Foreground="#6750A4" FontSize="12"/>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="0,14,0,0">
+            <TextBlock x:Name="txtStatus" VerticalAlignment="Center" FontWeight="Bold" FontSize="12" Foreground="#8A8490"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="↺ DEFAULT" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Default_Click" Margin="0,0,10,0"
+                        ToolTip="Back to the original table of this page (IMAGE, SUPPLIER, CATEGORY, PRODUCT CODE, PRODUCT NAME, PACKSIZE, BIN, QR CODE)"/>
+                <Button x:Name="btnSave" Content="💾 SAVE" Style="{StaticResource StkButton}" Background="#6750A4" Click="Save_Click" IsEnabled="False"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

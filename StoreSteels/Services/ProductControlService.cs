@@ -56,6 +56,7 @@ namespace CIMS.Services
                                 Customer = rdr["Customer"]?.ToString() ?? "",
                                 PartA = rdr["PartA"]?.ToString() ?? "",
                                 Model = rdr["Model"]?.ToString() ?? "",
+                                PartB = HasColumn(rdr, "PartB") ? rdr["PartB"]?.ToString() ?? "" : "",
 
                                 ImageFileName = rdr["ImageFileName"] != DBNull.Value ? rdr["ImageFileName"].ToString() : null,
                                 // เลือกคลังอื่นในช่องกรอง = SHOW/HIDE ของคลังนั้น / ทุกคลัง หรือคลังหลัก = แสดงในคลังหลัก
@@ -160,7 +161,8 @@ namespace CIMS.Services
     string partA = null,
     string partNo = null,
     string model = null,
-    int ptId = 0          // แถวที่แก้ (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - 0 = หาจากรหัสเดิมแบบเดิม
+    int ptId = 0,
+    string partB = null          // แถวที่แก้ (PRODUCT CODE ซ้ำได้ถ้า PART A ต่างกัน) - 0 = หาจากรหัสเดิมแบบเดิม
 )
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -173,7 +175,7 @@ namespace CIMS.Services
                         // schema ใหม่ตัด PartACode/Model/PT_NO ออกจาก CIMS.Parts แล้ว PartCode เป็นตัวระบุหลัก
                         // ตัวเดียว (ค่าที่ ViewModel ส่งมาเป็น "newACode"/"oldACode" คือค่า PartACode ซึ่งมิเรอร์
                         // มาจาก PartCode ตอนโหลดข้อมูล จึงยังคงอ้างอิง/แก้ไข PartCode ผ่านค่านี้ได้ถูกต้อง)
-                        string updateSql = @"UPDATE CIMS.Parts SET
+                        string updateSql = $@"UPDATE CIMS.Parts SET
                                      PartCode = @NewACode,
                                      Description = @Name,
                                      PackSize = @Psz,
@@ -185,7 +187,7 @@ namespace CIMS.Services
                                      Customer = @Cust,
                                      PartA = @PartA,
                                      PartNumber = @PartNo,
-                                     Model = @Model
+                                     Model = @Model{(CIMS.Helpers.DbSchema.HasPartB ? ", PartB = @PartB" : "")}
                                      WHERE (@PtId > 0 AND PartID = @PtId) OR (@PtId = 0 AND PartCode = @OldACode)";
 
                         using (SqlCommand cmd = new SqlCommand(updateSql, conn, trans))
@@ -204,6 +206,7 @@ namespace CIMS.Services
                             AddOptional(cmd, "@PartA", partA);
                             AddOptional(cmd, "@PartNo", partNo);
                             AddOptional(cmd, "@Model", model);
+                            AddOptional(cmd, "@PartB", partB);
 
                             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                         }
@@ -224,7 +227,7 @@ namespace CIMS.Services
         // เพิ่มข้อมูลใหม่ (INSERT)
         // คืน PartID ของสินค้าใหม่ (0 = ไม่สำเร็จ)
         public async Task<int> InsertNewPartAsync(string code, string name, int psz, string qrContent, decimal max, decimal min, string category, string imageFileName, string customerCode, string location,
-                                                   string customer = null, string partA = null, string partNo = null, string model = null)
+                                                   string customer = null, string partA = null, string partNo = null, string model = null, string partB = null)
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
@@ -235,15 +238,16 @@ namespace CIMS.Services
                     {
                         // schema ใหม่ตัด Model/PartACode/PT_NO ออกจาก CIMS.Parts แล้ว - ใช้ค่า @Code (model.PartCode)
                         // เป็นค่า PartCode เพียงตัวเดียว, PT_LOC เปลี่ยนชื่อเป็น Bin, QTY_STK เปลี่ยนเป็น StockQuantity
-                        string insertSql = @"INSERT INTO CIMS.Parts (
+                        bool hasB = CIMS.Helpers.DbSchema.HasPartB;
+                        string insertSql = $@"INSERT INTO CIMS.Parts (
                                         PartCode, Description, PackSize, QRCode, MaxQuantity, MinQuantity, Category,
                                         Bin, StockQuantity, IsActive, IsShowInMaster, ImageFileName,
-                                        Supplier, Customer, PartA, PartNumber, Model
+                                        Supplier, Customer, PartA, PartNumber, Model{(hasB ? ", PartB" : "")}
                                      )
                                      VALUES (
                                         @Code, @Name, @Psz, @QR, @Max, @Min, @Cat,
                                         @Location, 0, 1, 1, @ImageFileName,
-                                        @CustomerCode, @Cust, @PartA, @PartNo, @Model
+                                        @CustomerCode, @Cust, @PartA, @PartNo, @Model{(hasB ? ", @PartB" : "")}
                                      ); SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
                         using (SqlCommand cmd = new SqlCommand(insertSql, conn, trans))
@@ -262,6 +266,7 @@ namespace CIMS.Services
                             AddOptional(cmd, "@PartA", partA);
                             AddOptional(cmd, "@PartNo", partNo);
                             AddOptional(cmd, "@Model", model);
+                            AddOptional(cmd, "@PartB", partB);
 
                             int newId = Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
                             trans.Commit();

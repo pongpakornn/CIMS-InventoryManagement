@@ -133,19 +133,67 @@ namespace CIMS.ViewModels
             };
         }
 
+        // 🧩 ตารางของคลังที่เลือก (คอลัมน์ / จัดกลุ่ม / QR) - หน้าจอตั้งให้ทุกครั้งที่เปลี่ยนคลังในช่องกรอง
+        private ProductControlLayout _layout = ProductControlColumns.Default(0);
+        public ProductControlLayout Layout
+        {
+            get => _layout;
+            set { _layout = value ?? ProductControlColumns.Default(0); ApplyGrouping(); OnPropertyChanged(); OnPropertyChanged(nameof(GroupLabel)); }
+        }
+        public string GroupLabel => _layout.GroupBy;
+        private bool NeedsCoils => _layout.Columns.Contains("MOTHER") || _layout.Columns.Contains("COILNO");
+
+        private string GroupValue(ProductControlModel p)
+        {
+            string v = _layout.GroupBy == "CUSTOMER" ? p.Customer : _layout.GroupBy == "SUPPLIER" ? p.CustomerCode : p.Category;
+            return string.IsNullOrWhiteSpace(v) ? "-" : v.Trim();
+        }
+
+        // ข้อมูลเสริมของแถว: หัวกลุ่ม + Coil ที่อยู่ในคลัง (ทำเบื้องหลังก่อนใส่ตาราง)
+        private void Decorate(List<ProductControlModel> rows)
+        {
+            Dictionary<int, (List<string> Mothers, List<string> Coils)> coils = null;
+            if (NeedsCoils)
+                try { coils = new ProductControlLayoutService().GetCoils(FilterStkId); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GetCoils: {ex.Message}"); }
+            foreach (var p in rows)
+            {
+                p.GroupKey = GroupValue(p);
+                if (coils != null && coils.TryGetValue(p.PtId, out var c))
+                {
+                    p.MotherCoil = Short(c.Mothers, 3);
+                    p.CoilNo = c.Coils.Count == 0 ? "" : $"{c.Coils.Count:N0} COIL\n" + Short(c.Coils, 2);
+                }
+                else if (coils != null) { p.MotherCoil = ""; p.CoilNo = ""; }
+            }
+        }
+
+        // แสดงไม่เกิน max รายการ (บรรทัดละ 1) ที่เหลือ = +N
+        private static string Short(List<string> list, int max) =>
+            list.Count <= max ? string.Join("\n", list) : string.Join("\n", list.Take(max)) + $"\n+{list.Count - max:N0}";
+
+        private void ApplyGrouping()
+        {
+            if (GroupedProducts == null) return;
+            foreach (var p in Products) p.GroupKey = GroupValue(p);
+            using (GroupedProducts.DeferRefresh())
+            {
+                GroupedProducts.GroupDescriptions.Clear();
+                GroupedProducts.SortDescriptions.Clear();
+                if (_layout.GroupBy != "NONE")
+                {
+                    GroupedProducts.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ProductControlModel.GroupKey)));
+                    GroupedProducts.SortDescriptions.Add(new SortDescription(nameof(ProductControlModel.GroupKey), ListSortDirection.Ascending));
+                }
+            }
+        }
+
         private void InitializeGrouping()
         {
             if (GroupedProducts == null)
             {
                 GroupedProducts = CollectionViewSource.GetDefaultView(Products);
-                if (GroupedProducts.GroupDescriptions.Count == 0)
-                {
-                    GroupedProducts.GroupDescriptions.Add(new PropertyGroupDescription("Category"));
-                }
-                if (GroupedProducts.SortDescriptions.Count == 0)
-                {
-                    GroupedProducts.SortDescriptions.Add(new SortDescription("Category", ListSortDirection.Ascending));
-                }
+                ApplyGrouping();
             }
             else
             {
@@ -187,9 +235,14 @@ namespace CIMS.ViewModels
 
             try
             {
-                var data = await Task.Run(() => _qrService.GetInventoryForQR(keyword?.Trim(), FilterStkId));
+                int skip = _currentOffset;
+                var paged = await Task.Run(() =>
+                {
+                    var rows = _qrService.GetInventoryForQR(keyword?.Trim(), FilterStkId).Skip(skip).Take(PageSize).ToList();
+                    Decorate(rows);
+                    return rows;
+                });
                 if (ver != _loadVer) return;
-                var paged = data.Skip(_currentOffset).Take(PageSize).ToList();
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -217,8 +270,12 @@ namespace CIMS.ViewModels
         {
             int count = Math.Max(PageSize, Products.Count);
             var ticked = new HashSet<int>(Products.Where(p => p.IsSelected && p.PtId > 0).Select(p => p.PtId));
-            var data = await Task.Run(() => _qrService.GetInventoryForQR(keyword?.Trim(), FilterStkId));
-            var paged = data.Take(count).ToList();
+            var paged = await Task.Run(() =>
+            {
+                var rows = _qrService.GetInventoryForQR(keyword?.Trim(), FilterStkId).Take(count).ToList();
+                Decorate(rows);
+                return rows;
+            });
             foreach (var p in paged) if (ticked.Contains(p.PtId)) p.IsSelected = true;
             Products.Clear();
             foreach (var item in paged) Products.Add(item);
@@ -273,7 +330,8 @@ namespace CIMS.ViewModels
                     model.PartA,
                     model.PartNo,
                     model.Model,
-                    model.PtId
+                    model.PtId,
+                    model.PartB
                 );
 
                 if (success && targetRow != null)
@@ -286,6 +344,9 @@ namespace CIMS.ViewModels
                         model.PtId = targetRow.PtId;
                         model.Stock = targetRow.Stock;
                         model.IsActive = targetRow.IsActive;
+                        model.MotherCoil = targetRow.MotherCoil;
+                        model.CoilNo = targetRow.CoilNo;
+                        model.GroupKey = GroupValue(model);
 
                         Products.RemoveAt(index);
                         Products.Insert(index, model);
@@ -312,6 +373,7 @@ namespace CIMS.ViewModels
             if (oldVal.Location != newVal.Location) diffs.Add($"BIN: {oldVal.Location}->{newVal.Location}");
             if ((oldVal.Customer ?? "") != (newVal.Customer ?? "")) diffs.Add($"CUSTOMER: {oldVal.Customer}->{newVal.Customer}");
             if ((oldVal.PartA ?? "") != (newVal.PartA ?? "")) diffs.Add($"PART A: {oldVal.PartA}->{newVal.PartA}");
+            if ((oldVal.PartB ?? "") != (newVal.PartB ?? "")) diffs.Add($"PART B: {oldVal.PartB}->{newVal.PartB}");
             if ((oldVal.PartNo ?? "") != (newVal.PartNo ?? "")) diffs.Add($"PART NO: {oldVal.PartNo}->{newVal.PartNo}");
             if ((oldVal.Model ?? "") != (newVal.Model ?? "")) diffs.Add($"MODEL: {oldVal.Model}->{newVal.Model}");
             if (oldVal.QRCodeData != newVal.QRCodeData) diffs.Add($"QR: {oldVal.QRCodeData}->{newVal.QRCodeData}");
@@ -351,7 +413,7 @@ namespace CIMS.ViewModels
 
                 int newId = await _qrService.InsertNewPartAsync(
                     model.PartCode, model.PartName, psz, model.QRCodeData, max, min, model.Category, model.ImageFileName,
-                    model.CustomerCode, model.Location, model.Customer, model.PartA, model.PartNo, model.Model
+                    model.CustomerCode, model.Location, model.Customer, model.PartA, model.PartNo, model.Model, model.PartB
                 );
                 bool success = newId > 0;
 
@@ -364,6 +426,7 @@ namespace CIMS.ViewModels
                         model.IsShowMain = true;
                         model.Stock = "0";
                         model.IsActive = true;
+                        model.GroupKey = GroupValue(model);
 
                         Products.Insert(0, model);
                     });

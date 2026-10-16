@@ -21,7 +21,8 @@ namespace CIMS.Services
         }
 
         // คืน path ของไฟล์ PDF: Desktop\CIMS_Export\Product Control\QR_<วัน-เดือน-ปี-เวลา>.pdf
-        public string GenerateA4Pdf(List<ProductControlModel> items)
+        // codeOnly: QR มีแค่ PRODUCT CODE (ตั้งต่อคลังที่ปุ่ม ADMIN หน้า Inventory Registration) / false = PRODUCT CODE|PRODUCT NAME (ค่าเดิม)
+        public string GenerateA4Pdf(List<ProductControlModel> items, bool codeOnly = false)
         {
             string fullPath = ImportTemplateService.NewPath(ImportTemplateService.Systems.Product, "QR", ".pdf");
 
@@ -44,7 +45,7 @@ namespace CIMS.Services
                                 {
                                     // QR นี้ไม่ได้บันทึกลง Database - เป็น QR เฉพาะสำหรับ "คืนเหล็กที่เหลือจากการผลิต"
                                     // เข้ารหัสแค่ Product Code | Product Name ตามที่ต้องการ
-                                    string qrContent = $"{item.PartCode ?? "N/A"}|{item.PartName ?? "N/A"}";
+                                    string qrContent = codeOnly ? (item.PartCode ?? "N/A") : $"{item.PartCode ?? "N/A"}|{item.PartName ?? "N/A"}";
 
                                     // สร้าง QR Code (ใช้ ECCLevel.M เพื่อให้สแกนง่ายในขณะที่ข้อมูลค่อนข้างยาว)
                                     QRCodeData qrCodeData = qrGenerator.CreateQrCode(qrContent, QRCodeGenerator.ECCLevel.M);

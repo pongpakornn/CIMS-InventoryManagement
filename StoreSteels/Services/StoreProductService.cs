@@ -200,7 +200,8 @@ namespace CIMS.Services
                 StringBuilder sql = new StringBuilder($"SELECT * FROM {viewName} WHERE StkId = @stk ");
 
                 if (!string.IsNullOrEmpty(searchKeyword))
-                    sql.Append("AND (PartCode LIKE @key OR PartName LIKE @key OR Customer LIKE @key OR PartA LIKE @key OR PartNo LIKE @key OR Model LIKE @key) ");
+                    sql.Append("AND (PartCode LIKE @key OR PartName LIKE @key OR Customer LIKE @key OR PartA LIKE @key OR PartNo LIKE @key OR Model LIKE @key" +
+                               (CIMS.Helpers.DbSchema.HasPartB ? " OR PartID IN (SELECT PartID FROM CIMS.Parts WHERE PartB LIKE @key)" : "") + ") ");
                 if (!string.IsNullOrEmpty(category))
                     sql.Append("AND GroupKey = @category ");
                 if (filterType == "OVER_MAX")
@@ -253,6 +254,16 @@ namespace CIMS.Services
                             GroupKey = rdr["GroupKey"]?.ToString() ?? ""
                         });
                     }
+                }
+                // PART B อยู่ที่ CIMS.Parts.PartB (View ของตาราง Store ยังไม่มีคอลัมน์นี้) -> อ่านเพิ่มเฉพาะแถวที่โหลด
+                if (CIMS.Helpers.DbSchema.HasPartB && list.Count > 0)
+                {
+                    var byId = list.GroupBy(x => x.PartId).ToDictionary(g => g.Key, g => g.ToList());
+                    using (var cb = new SqlCommand($"SELECT PartID, PartB FROM CIMS.Parts WHERE PartB IS NOT NULL AND PartID IN ({string.Join(",", byId.Keys)})", conn))
+                    using (var r = cb.ExecuteReader())
+                        while (r.Read())
+                            if (byId.TryGetValue(Convert.ToInt32(r[0]), out var rows))
+                                foreach (var x in rows) x.PartB = r[1]?.ToString() ?? "";
                 }
             }
             return list;

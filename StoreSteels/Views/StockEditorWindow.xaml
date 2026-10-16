@@ -69,6 +69,7 @@
                                 <CheckBox x:Name="chkColCustomer" Content="CUSTOMER" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColCode" Content="PD CODE" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColPartA" Content="PART A" Style="{StaticResource StkChip}"/>
+                                <CheckBox x:Name="chkColPartB" Content="PART B" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColPartNo" Content="PART NO" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColModel" Content="MODEL" Style="{StaticResource StkChip}"/>
                                 <CheckBox x:Name="chkColName" Content="PRODUCT NAME" Style="{StaticResource StkChip}"/>

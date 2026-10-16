@@ -60,6 +60,16 @@ namespace CIMS.Models
         public string Model { get => _model; set { _model = value; OnPropertyChanged(); } }   // รหัสโมเดล (Model)
         private string _partA;
         public string PartA { get => _partA; set { _partA = value; OnPropertyChanged(); } }
+        private string _partB;
+        public string PartB { get => _partB; set { _partB = value; OnPropertyChanged(); } }   // PART B (CIMS.Parts.PartB)
+
+        // 🧲 Coil ที่อยู่ในคลังตอนนี้ (ทะเบียน Coil) - แสดงอย่างเดียว: Coil แม่ / เลข Coil ลูก
+        private string _motherCoil, _coilNo;
+        public string MotherCoil { get => _motherCoil; set { _motherCoil = value; OnPropertyChanged(); } }
+        public string CoilNo { get => _coilNo; set { _coilNo = value; OnPropertyChanged(); } }
+
+        // หัวกลุ่มของตาราง (CATEGORY / CUSTOMER / SUPPLIER ตามที่ Admin ตั้งต่อคลัง) - ค่าว่าง = "-"
+        public string GroupKey { get; set; }
 
         // ชื่อไฟล์รูปภาพที่เก็บใน DB
         public string ImageFileName
