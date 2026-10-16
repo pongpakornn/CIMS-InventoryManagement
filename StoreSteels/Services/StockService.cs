@@ -104,6 +104,56 @@ namespace CIMS.Services
             }
         }
 
+        // 📊 SETUP EXCEL PATH: ไฟล์ Excel + ช่องที่ลงข้อมูลของแต่ละคลัง (CIMS.Stocks.PRExportPath / PRExcelMap / PRExcelStartRow - Update_20261017.sql)
+        public Dictionary<int, PRExcelLayout> GetPrExcelLayouts()
+        {
+            var map = new Dictionary<int, PRExcelLayout>();
+            if (!CIMS.Helpers.DbSchema.HasPrStock) return map;
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("SELECT StockID, PRExportPath, PRExcelMap, PRExcelStartRow FROM CIMS.Stocks", conn))
+            {
+                conn.Open();
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                    {
+                        string mapText = rdr[2] == DBNull.Value ? null : rdr[2].ToString();
+                        map[Convert.ToInt32(rdr[0])] = new PRExcelLayout
+                        {
+                            StockId = Convert.ToInt32(rdr[0]),
+                            Path = rdr[1] == DBNull.Value ? "" : rdr[1].ToString(),
+                            StartRow = rdr[3] == DBNull.Value ? 4 : Math.Max(1, Convert.ToInt32(rdr[3])),
+                            Entries = string.IsNullOrWhiteSpace(mapText) ? PRExcelLayout.DefaultEntries() : PRExcelLayout.Parse(mapText)
+                        };
+                    }
+            }
+            return map;
+        }
+
+        public void SavePrExcelLayout(PRExcelLayout l, string userId)
+        {
+            if (!CIMS.Helpers.DbSchema.HasPrStock)
+                throw new InvalidOperationException("ฐานข้อมูลยังไม่รองรับ SETUP EXCEL PATH กรุณารัน Database/Update_20261017.sql");
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"UPDATE CIMS.Stocks SET PRExportPath = @p, PRExcelMap = @m, PRExcelStartRow = @r, UpdatedBy = @u, UpdatedDate = GETDATE()
+                                              WHERE StockID = @id", conn))
+            {
+                cmd.Parameters.AddWithValue("@p", string.IsNullOrWhiteSpace(l.Path) ? (object)DBNull.Value : l.Path.Trim());
+                cmd.Parameters.AddWithValue("@m", l.MapText);
+                cmd.Parameters.AddWithValue("@r", l.StartRow);
+                cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@id", l.StockId);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        // คลังที่เปิดเก็บ PR (PR SETTINGS) - ตัวเลือกคลังในหน้า PR
+        public List<StockModel> GetPrStocks()
+        {
+            var auto = GetPrAutoMap();
+            return GetStocks().Where(s => auto.TryGetValue(s.StkId, out bool on) && on).ToList();
+        }
+
         public StockModel GetMainStock() => GetStocks().FirstOrDefault(s => s.IsMain);
 
         private static StockModel ReadStock(SqlDataReader rdr)

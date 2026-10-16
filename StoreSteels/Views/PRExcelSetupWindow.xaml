@@ -1,0 +1,182 @@
+﻿<Window x:Class="CIMS.Views.PRExcelSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:CIMS.Helpers"
+        Title="Setup Excel Path" Width="1180" Height="780"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" KeyDown="Window_KeyDown">
+
+    <!-- 📊 SETUP EXCEL PATH (User Management - Admin Level 1): ต่อคลัง = ไฟล์ Excel + ข้อมูล PR ช่องไหนลงเซลล์ / คอลัมน์ไหน
+         ONE CELL = ค่าเดียวลงเซลล์ (DATE = C1) / TABLE COLUMN = แถวละรายการ ลงคอลัมน์ (PRODUCT CODE = B) เริ่มแถว START ROW -->
+    <Window.Resources>
+        <Style x:Key="StockItem" TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="White" BorderBrush="#E2DEEA" BorderThickness="1.5" helpers:Motion.HoverLift="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#F3EEFB"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#6750A4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Lbl" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#6750A4"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="White" CornerRadius="22" Margin="18" BorderBrush="#ECE9F1" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.35" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="#2E7D32" CornerRadius="21,21,0,0" Padding="26,16" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="📊 SETUP EXCEL PATH" Foreground="White" FontSize="20" FontWeight="Black"/>
+                        <TextBlock Text="Choose a stock, its Excel file, and where each PR field goes  •  used by APPROVED LIST -> EXPORT -> EXPORT PATH"
+                                   Foreground="#C8E6C9" FontSize="12" FontWeight="Bold" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Cancel_Click" ToolTip="CLOSE"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="26,16,26,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="230"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Margin="0,0,18,0">
+                    <TextBlock DockPanel.Dock="Top" Text="1. STOCK" Style="{StaticResource Lbl}"/>
+                    <ListBox x:Name="lbStocks" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource StockItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Stocks_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                        <TextBlock Text="{Binding Summary}" FontSize="10.5" Foreground="#8A8490" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="●" Foreground="#E8833A" FontSize="12" VerticalAlignment="Top" ToolTip="Changed - not saved yet" Visibility="{Binding ChangedVisibility}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="spEditor">
+                        <TextBlock Text="2. EXCEL FILE" Style="{StaticResource Lbl}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="txtPath" Style="{StaticResource StkInput}" Height="42" Tag="C:\...\file.xlsx  (empty = this stock has no EXPORT PATH)" TextChanged="Any_Changed"/>
+                            <Button Grid.Column="1" Content="📂 BROWSE" Style="{StaticResource StkButton}" Background="#49454F" Margin="8,0,0,0" Click="Browse_Click"/>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                            <TextBlock Text="3. TABLE START ROW" Style="{StaticResource Lbl}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBox x:Name="txtStartRow" Style="{StaticResource StkInput}" Width="90" Height="40" TextChanged="Any_Changed" PreviewTextInput="Digits_PreviewTextInput"/>
+                            <TextBlock Text="first row of the table - the next export continues after the last row that has data" Foreground="#8A8490" FontSize="11.5" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Text="4. FIELDS  (ONE CELL = one value in a cell, e.g. DATE → C1  •  TABLE COLUMN = one row per PR, e.g. PRODUCT CODE → B)" Style="{StaticResource Lbl}" Margin="0,16,0,6"/>
+                        <Border Background="#4A148C" CornerRadius="8,8,0,0" Padding="10,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="1.4*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="50"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="FIELD" Foreground="White" FontWeight="ExtraBold" FontSize="12"/>
+                                <TextBlock Grid.Column="1" Text="PLACE" Foreground="White" FontWeight="ExtraBold" FontSize="12"/>
+                                <TextBlock Grid.Column="2" Text="CELL / COLUMN" Foreground="White" FontWeight="ExtraBold" FontSize="12"/>
+                            </Grid>
+                        </Border>
+                        <ItemsControl x:Name="icEntries">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#EEEAF4" BorderThickness="1,0,1,1" Padding="10,6">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="White"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#FAF6FF"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="1.4*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="50"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox ItemsSource="{Binding Fields}" DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Field, Mode=TwoWay}"
+                                                      Style="{StaticResource StkCombo}" Height="38" Margin="0,0,8,0" SelectionChanged="Entry_Changed"/>
+                                            <ComboBox Grid.Column="1" SelectedIndex="{Binding PlaceIndex, Mode=TwoWay}" Style="{StaticResource StkCombo}" Height="38" Margin="0,0,8,0" SelectionChanged="Entry_Changed">
+                                                <ComboBoxItem Content="ONE CELL"/>
+                                                <ComboBoxItem Content="TABLE COLUMN"/>
+                                            </ComboBox>
+                                            <TextBox Grid.Column="2" Text="{Binding Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource StkInput}" Height="38"
+                                                     CharacterCasing="Upper" TextChanged="Any_Changed" Tag="{Binding Hint}"/>
+                                            <Button Grid.Column="3" Content="✕" Width="34" Height="34" MinWidth="0" Padding="0" Style="{StaticResource StkButton}" Background="#C62828"
+                                                    HorizontalAlignment="Right" Click="Remove_Click" ToolTip="Remove this field"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="＋ ADD FIELD" Style="{StaticResource StkButton}" Background="#6750A4" Click="Add_Click"
+                                    ToolTip="Add a field (e.g. MOTHER COIL / COIL NO / BIN) and choose its cell or column"/>
+                            <Button Content="↺ DEFAULT" Style="{StaticResource StkButton}" Background="#9E9E9E" Margin="8,0,0,0" Click="Default_Click"
+                                    ToolTip="DATE = C1 · DEPARTMENT = C2 · REMARK = E1 · TARGET = E2 · table from row 4: NO = A · PRODUCT CODE = B · PRODUCT NAME = C · QTY = D"/>
+                        </StackPanel>
+
+                        <TextBlock Text="PREVIEW" FontWeight="Black" FontSize="12" Foreground="#8A8490" Margin="0,16,0,6"/>
+                        <Border Background="#F7F5FA" CornerRadius="10" Padding="14,10">
+                            <TextBlock x:Name="txtPreview" FontFamily="Consolas" FontSize="12.5" FontWeight="Bold" Foreground="#4A148C" TextWrapping="Wrap"/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="26,12,26,20">
+                <TextBlock x:Name="txtStatus" VerticalAlignment="Center" FontWeight="Bold" FontSize="12" Foreground="#8A8490"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Cancel_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="btnSave" Content="💾 SAVE" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Save_Click" IsEnabled="False"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

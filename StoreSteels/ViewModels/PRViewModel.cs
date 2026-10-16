@@ -20,6 +20,23 @@
 
             public ObservableCollection<PRModel> PRHistory { get; set; } = new ObservableCollection<PRModel>();
             public ObservableCollection<string> ProductSuggestions { get; set; } = new ObservableCollection<string>();
+            // 🔎 ช่อง PRODUCT CODE (รหัส + ชื่อ) / คลังที่เลือกแสดง PR (null = ทุกคลัง - ฐานที่ยังไม่รัน Update_20261017.sql)
+            public ObservableCollection<PRPartOption> PartOptions { get; } = new ObservableCollection<PRPartOption>();
+            public int? StockId { get; set; }
+
+            public async Task UpdatePartOptions(string text)
+            {
+                if (string.IsNullOrWhiteSpace(text)) { PartOptions.Clear(); return; }
+                int? stk = StockId;
+                try
+                {
+                    var data = await Task.Run(() => _prService.GetPartOptions(text, stk));
+                    if (data.Select(d => d.PartId).SequenceEqual(PartOptions.Select(p => p.PartId))) return;
+                    PartOptions.Clear();
+                    foreach (var d in data) PartOptions.Add(d);
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"PR part options: {ex.Message}"); }
+            }
 
             // ช่องที่พิมพ์เองได้ + แนะนำค่าที่เคยใช้ (CIMS.PRLookups)
             public ObservableCollection<string> RequesterSuggestions { get; } = new ObservableCollection<string>();
@@ -61,7 +78,7 @@
             private string _lastSignature;
             public async Task RefreshIfChanged(string search)
             {
-                var data = await Task.Run(() => _prService.GetPRList(search ?? ""));
+                var data = await Task.Run(() => _prService.GetPRList(search ?? "", StockId));
                 string sig = string.Join("|", data.Select(x => $"{x.PRNumber}:{x.Status}:{x.QTY}"));
                 if (sig == _lastSignature) return;
                 _lastSignature = sig;
@@ -99,7 +116,7 @@
             {
                 try
                 {
-                    var data = await Task.Run(() => _prService.GetPRList(search));
+                    var data = await Task.Run(() => _prService.GetPRList(search, StockId));
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         PRHistory.Clear();
@@ -146,7 +163,7 @@
                     {
                         finalPRNo = _prService.GetNextPRNo();
                         item.PRDate = DateTime.Now;
-                        bool ok = _prService.InsertPR(finalPRNo, CurrentUser.UserId, useDept, item.PartName, item.QTY, useRemark, useTarget, reqName);
+                        bool ok = _prService.InsertPR(finalPRNo, CurrentUser.UserId, useDept, item.PartName, item.QTY, useRemark, useTarget, reqName, item.PartId, StockId);
                         if (ok)
                         {
                             // จำค่าที่พิมพ์ไว้แนะนำครั้งต่อไป

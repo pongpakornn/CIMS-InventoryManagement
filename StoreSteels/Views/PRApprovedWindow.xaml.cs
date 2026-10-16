@@ -1,4 +1,4 @@
-using CIMS.Helpers;
+﻿using CIMS.Helpers;
 using CIMS.Models;
 using CIMS.Services;
 using System;
@@ -29,11 +29,18 @@ namespace CIMS.Views
         public Visibility EditVisibility => _session?.CanEditPR == true ? Visibility.Visible : Visibility.Collapsed;
         public Visibility DeleteVisibility => _session?.CanDeletePR == true ? Visibility.Visible : Visibility.Collapsed;
 
-        public PRApprovedWindow(UserSession session)
+        // คลังที่เลือกในหน้า PR (null = ทุกคลัง) + คลังที่เปิดเก็บ PR (ตัวเลือกของ EXPORT PATH EXCEL)
+        private readonly StockModel _stock;
+        private readonly List<StockModel> _prStocks;
+
+        public PRApprovedWindow(UserSession session, StockModel stock = null, List<StockModel> prStocks = null)
         {
             _session = session;
+            _stock = stock;
+            _prStocks = prStocks ?? new List<StockModel>();
             InitializeComponent();
             btnExport.Visibility = _session?.CanApprovePR == true ? Visibility.Visible : Visibility.Collapsed;
+            if (_stock != null) txtSubtitle.Text = $"STOCK : {_stock.Code}  •  Search, pick a date range, tick the items and export / edit / delete";
             var owner = Application.Current?.Windows.OfType<MainView>().FirstOrDefault();
             if (owner != null) { Owner = owner; WindowStartupLocation = WindowStartupLocation.CenterOwner; }
             dgApproved.ItemsSource = _rows;
@@ -52,7 +59,8 @@ namespace CIMS.Views
             txtStatus.Text = "⏳ LOADING...";
             try
             {
-                var list = await Task.Run(() => _service.GetApprovedList(key, from, to));
+                int? stk = _stock?.StkId;
+                var list = await Task.Run(() => _service.GetApprovedList(key, from, to, stk));
                 if (ver != _version) return;   // พิมพ์ต่อแล้ว -> ผลนี้เก่า ทิ้งไป
                 var picked = new HashSet<string>(_rows.Where(r => r.IsSelected).Select(r => r.PRNumber));
                 _rows.Clear();
@@ -95,36 +103,82 @@ namespace CIMS.Views
 
         private void Row_Checked(object sender, RoutedEventArgs e) => UpdateStatus();
 
+        // 📤 EXPORT: เลือกแบบ (EXPORT = ไฟล์ใหม่ / EXPORT PATH = ต่อข้อมูลลงไฟล์ Excel ของคลัง) -> เลือกคลัง -> บันทึกแล้วเปิดไฟล์
         private async void Export_Click(object sender, RoutedEventArgs e)
         {
             if (_session?.CanApprovePR != true) return;
             var selected = _rows.Where(r => r.IsSelected).ToList();
             if (selected.Count == 0) { DialogHelper.ShowWarning("กรุณาติ๊กเลือกรายการที่ต้องการ Export ก่อนครับ"); return; }
-            int again = selected.Count(r => r.IsExported);
-            if (!DialogHelper.ShowConfirm($"Export PR ที่เลือก {selected.Count:N0} รายการ" + (again > 0 ? $"\n(เคย Export แล้ว {again:N0} รายการ จะถูก Export ซ้ำ)" : "") + "\n\nยืนยันหรือไม่?", "EXPORT PR")) return;
 
+            Dictionary<int, PRExcelLayout> layouts = new Dictionary<int, PRExcelLayout>();
+            try { layouts = new StockService().GetPrExcelLayouts(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"PR layouts: {ex.Message}"); }
+            var pathStocks = _prStocks.Where(s => layouts.TryGetValue(s.StkId, out var l) && l.HasPath).ToList();
+
+            string mode = TemplateChoiceWindow.ChooseWithTitle("📤 EXPORT PR", "เลือกแบบการ Export PR ที่ติ๊กไว้ " + selected.Count.ToString("N0") + " รายการ", new[]
+            {
+                new TemplateChoiceWindow.Option { Key = "FILE", Title = "📤 EXPORT", Detail = "สร้างไฟล์ใหม่ PR-" + DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".xlsx", UseWith = "Desktop\\CIMS_Export\\PR Management\\<คลัง>\\" },
+                new TemplateChoiceWindow.Option { Key = "PATH", Title = "📥 EXPORT PATH", Detail = pathStocks.Count == 0 ? "ยังไม่มีคลังที่ตั้งไฟล์ Excel (User Management -> SETUP EXCEL PATH)" : "ต่อข้อมูลลงไฟล์ Excel ของคลัง ตามช่องที่ตั้งไว้ แล้วเปิดไฟล์ให้ตรวจ", UseWith = string.Join("  •  ", pathStocks.Select(s => s.Code)) }
+            });
+            if (mode == null) return;
+            if (mode == "PATH" && pathStocks.Count == 0) { DialogHelper.ShowWarning("ยังไม่มีคลังที่ตั้งไฟล์ Excel\nตั้งได้ที่ User Management -> 📊 SETUP EXCEL PATH (Admin)"); return; }
+
+            // คลังของรายการ: EXPORT = คลังที่เปิดเก็บ PR / EXPORT PATH = คลังที่ตั้งไฟล์ไว้
+            var candidates = mode == "PATH" ? pathStocks : (_prStocks.Count > 0 ? _prStocks : new List<StockModel>());
+            StockModel stock = null;
+            if (candidates.Count > 0)
+            {
+                stock = StockPickerWindow.ShowChoose(candidates, mode == "PATH" ? "EXPORT PATH" : "EXPORT",
+                                                     mode == "PATH" ? "เลือกคลัง: ระบบต่อรายการที่ติ๊กลงไฟล์ Excel ของคลังนั้น" : "เลือกคลัง: ระบบสร้างไฟล์ในโฟลเดอร์ของคลังนั้น");
+                if (stock == null) return;
+            }
+            var items = stock == null ? selected : selected.Where(r => r.StockID == null || r.StockID == stock.StkId).ToList();
+            if (items.Count == 0) { DialogHelper.ShowWarning($"ไม่มีรายการที่ติ๊กของคลัง {stock?.Code}"); return; }
+
+            int again = items.Count(r => r.IsExported);
+            string uid = _session?.UserId;
             btnExport.IsEnabled = false;
             try
             {
-                string uid = _session?.UserId;
-                await Task.Run(() => _export.ExportPRToExcel(selected));
-                await Task.Run(() =>
+                if (mode == "FILE")
                 {
-                    foreach (var item in selected)
-                        if (_service.UpdateAfterExport(item.PRNumber, uid))
-                            LogService.WriteLog(uid, "EXPORT_PR", $"Exported PR No: {item.PRNumber}", item.PRNumber);
-                });
-                NotificationManager.Show("Export complete", $"Export PR แล้ว {selected.Count:N0} รายการ", true);
+                    if (!DialogHelper.ShowConfirm($"Export PR {items.Count:N0} รายการ ของ {stock?.Code ?? "ทุกคลัง"}" + (again > 0 ? $"\n(เคย Export แล้ว {again:N0} รายการ จะถูก Export ซ้ำ)" : "") + "\n\nยืนยันหรือไม่?", "EXPORT PR")) return;
+                    string code = stock?.Code;
+                    string path = await Task.Run(() => _export.ExportPRFile(items, code));
+                    await MarkExported(items, uid, "EXPORT_PR", System.IO.Path.GetFileName(path));
+                    NotificationManager.Show("Export complete", $"Export PR แล้ว {items.Count:N0} รายการ\n{ImportTemplateService.ShortPath(path)}", true);
+                    ImportTemplateService.OpenFile(path);
+                }
+                else
+                {
+                    var layout = layouts[stock.StkId];
+                    string fields = string.Join("  •  ", layout.Entries.Select(x => $"{PRExcelFields.Label(x.Field)} = {x.Target}"));
+                    if (!DialogHelper.ShowConfirm($"ต่อข้อมูล PR {items.Count:N0} รายการ ลงไฟล์ของ {stock.Code}" + (again > 0 ? $"\n(เคย Export แล้ว {again:N0} รายการ)" : "") +
+                                                  $"\n\n{layout.Path}\n\n{fields}\nเริ่มแถว {layout.StartRow} (มีข้อมูลแล้ว = ต่อจากแถวสุดท้าย)\n\nยืนยันหรือไม่?", "EXPORT PATH")) return;
+                    var rows = await Task.Run(() => _export.ExportPRToPath(items, layout));
+                    await MarkExported(items, uid, "EXPORT_PR_PATH", $"{stock.Code} -> {System.IO.Path.GetFileName(layout.Path)}" + (rows.First > 0 ? $" rows {rows.First}-{rows.Last}" : ""));
+                    NotificationManager.Show("Export complete", $"ต่อข้อมูลลงไฟล์ {stock.Code} แล้ว {items.Count:N0} รายการ" + (rows.First > 0 ? $" (แถว {rows.First} - {rows.Last})" : ""), true);
+                    ImportTemplateService.OpenFile(layout.Path);   // เปิดไฟล์ให้ตรวจข้อมูล
+                }
                 foreach (var r in _rows) r.IsSelected = false;
                 Changed = true;
                 await LoadAsync();
             }
             catch (Exception ex)
             {
-                string msg = ex.Message.Contains("being used") ? "กรุณาปิดไฟล์ Excel ก่อน Export รายการ" : ex.Message;
+                string msg = ex.Message.Contains("being used") ? "ไฟล์ Excel ถูกเปิดค้างอยู่ กรุณาปิดไฟล์ก่อน Export" : ex.Message;
                 DialogHelper.ShowError("Export ไม่สำเร็จ: " + msg);
             }
             finally { btnExport.IsEnabled = true; }
+        }
+
+        private async Task MarkExported(List<PRModel> items, string uid, string action, string target)
+        {
+            await Task.Run(() =>
+            {
+                foreach (var item in items)
+                    if (_service.UpdateAfterExport(item.PRNumber, uid))
+                        LogService.WriteLog(uid, action, $"Exported PR No: {item.PRNumber} | {target}", item.PRNumber);
+            });
         }
 
         private async void Edit_Click(object sender, RoutedEventArgs e)

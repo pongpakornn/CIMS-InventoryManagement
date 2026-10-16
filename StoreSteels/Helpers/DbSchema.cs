@@ -81,6 +81,27 @@ namespace CIMS.Helpers
                 return _partB.Value;
             }
         }
+        // Update_20261017.sql: PR ตามคลัง (CIMS.PRHeaders.StockID / PRDetails.PartID / Stocks.PRExportPath)
+        private static bool? _prStock;
+        public static bool HasPrStock
+        {
+            get
+            {
+                if (_prStock.HasValue) return _prStock.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH('CIMS.PRHeaders', 'StockID') IS NOT NULL AND COL_LENGTH('CIMS.PRDetails', 'PartID') IS NOT NULL AND COL_LENGTH('CIMS.Stocks', 'PRExportPath') IS NOT NULL AND COL_LENGTH('CIMS.Stocks', 'PRExcelMap') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _prStock = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _prStock.Value;
+            }
+        }
+
         public static bool HasProductControlSettings => _pcSettings ?? (_pcSettings = TableExists("CIMS.ProductControlSettings")) ?? false;
 
         private static bool? TableExists(string name)

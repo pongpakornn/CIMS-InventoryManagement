@@ -63,7 +63,8 @@ namespace CIMS.Models
         public bool CanEditPR => CanViewPR && P("PR", p => p.CanEdit);
         public bool CanDeletePR => CanViewPR && P("PR", p => p.CanDelete);
         public bool CanApprovePR => CanViewPR && P("PR", p => p.CanApprove);
-        public bool CanManagePrSettings => CanEditPR;
+        // ⚙ PR SETTINGS (คลังที่เก็บ PR + Export Path) อยู่หน้า User Management - Admin (Level 1) เท่านั้น
+        public bool CanManagePrSettings => UserLevel == 1;
 
         // 📐 Max-Min Calculator: VIEW / EDIT (แก้ไข / Import / คำนวณ / สูตร)
         public bool CanViewMaxMinCalc => P("MAXMINCALC", p => p.CanView);

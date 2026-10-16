@@ -287,11 +287,21 @@
             <!-- Container : Scrop Body -->
             <StackPanel Grid.Row="0">
 
-                <!-- TextHeader : PURCHASE REQUISITION -->
-                <TextBlock Text="PURCHASE REQUISITION" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,20"/>
+                <!-- TextHeader : PURCHASE REQUISITION + 🏬 คลังที่แสดง PR (เฉพาะคลังที่เปิดเก็บ PR ใน PR SETTINGS) -->
+                <Grid Margin="5,0,8,20">
+                    <TextBlock Text="PURCHASE REQUISITION" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="STOCK" FontWeight="UltraBold" Foreground="{StaticResource AccentPurple}" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ComboBox x:Name="cbPrStock" Width="230" Style="{StaticResource CyberComboBox}" FontWeight="Bold" FontSize="14"
+                                  DisplayMemberPath="DisplayName" SelectionChanged="cbPrStock_SelectionChanged"
+                                  ToolTip="Show the PR of this stock - stocks switched ON in PR SETTINGS (User Management)"/>
+                    </StackPanel>
+                    <TextBlock x:Name="txtNoPrStock" Text="⚠ No stock keeps PR yet - ask the Admin to switch it on in User Management → PR SETTINGS"
+                               Foreground="#C62828" FontWeight="Bold" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"/>
+                </Grid>
 
                 <!-- Grid Control 1 : Group InputBox -->
-                <UniformGrid Columns="4">
+                <UniformGrid Columns="5">
                     
                     <!-- StackPanel : Date & TextBox Date -->
                     <StackPanel Margin="8">
@@ -308,25 +318,41 @@
                                   FontWeight="SemiBold" FontSize="13"/>
                     </StackPanel>
 
-                    <!-- StackPanel : Product Name & TextBox Product Name -->
+                    <!-- 🔎 Product Code: พิมพ์แล้วขึ้นรหัสที่ตรงให้เลือก (สินค้าในคลังที่เลือกขึ้นก่อน) -> Product Name ใส่ให้เอง -->
                     <StackPanel Margin="8">
-                        <TextBlock Text="Product Name" FontWeight="UltraBold" Foreground="{StaticResource AccentPurple}" Margin="5,0,0,6" FontSize="14"/>
-                        <ComboBox x:Name="txtProductName" 
-                          Style="{StaticResource CyberComboBox}" 
-                          IsEditable="True" 
+                        <TextBlock Text="Product Code" FontWeight="UltraBold" Foreground="{StaticResource AccentPurple}" Margin="5,0,0,6" FontSize="14"/>
+                        <ComboBox x:Name="txtProductCode"
+                          Style="{StaticResource CyberComboBox}"
+                          IsEditable="True"
                           IsTextSearchEnabled="False"
-                          ItemsSource="{Binding ProductSuggestions}"
-                          KeyUp="txtProductName_KeyUp"
-                          FontWeight="Bold" 
-                          FontSize="13"
-                          Tag="Type to search (top 5)...">
-
+                          TextSearch.TextPath="Code"
+                          ItemsSource="{Binding PartOptions}"
+                          KeyUp="txtProductCode_KeyUp"
+                          SelectionChanged="txtProductCode_SelectionChanged"
+                          LostKeyboardFocus="txtProductCode_LostKeyboardFocus"
+                          FontWeight="Bold"
+                          FontSize="13">
                             <ComboBox.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <VirtualizingStackPanel />
                                 </ItemsPanelTemplate>
                             </ComboBox.ItemsPanel>
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="2,3">
+                                        <TextBlock Text="{Binding Code}" FontWeight="ExtraBold" FontSize="13" Foreground="{StaticResource MainPurple}"/>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis" MaxWidth="320"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
                         </ComboBox>
+                    </StackPanel>
+
+                    <!-- Product Name: แสดงตาม Product Code ที่เลือก (อ่านอย่างเดียว) -->
+                    <StackPanel Margin="8">
+                        <TextBlock Text="Product Name" FontWeight="UltraBold" Foreground="{StaticResource AccentPurple}" Margin="5,0,0,6" FontSize="14"/>
+                        <TextBox x:Name="txtProductName" Style="{StaticResource CyberInput}" IsReadOnly="True" Background="#F0F0F0" FontSize="13"
+                                 Tag="Choose a product code..." ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
 
                     <!-- StackPanel : Qty & TextBox Qty -->
@@ -339,7 +365,7 @@
                 <!-- End : GridControl 1 -->
 
                 <!-- Grid Control 2 : Group InputBox -->
-                <UniformGrid Columns="4" Margin="0,5,0,0">
+                <UniformGrid Columns="5" Margin="0,5,0,0">
 
                     <!-- StackPanel : Department & TextBox Department -->
                     <StackPanel Margin="8">
@@ -392,11 +418,8 @@
                         Width="160" Height="48" FontSize="13" Margin="12,0,0,0" Click="DeleteAllPR_Click" Visibility="Collapsed"
                         ToolTip="Delete every PR shown in the table (admin only)"/>
 
-                <!-- Function : TextBox SearchPR -->
-                <!-- ⚙ PR SETTINGS: เลือกคลังที่แสกนออกแล้วสร้าง PR อัตโนมัติ (ผู้ดูแลระบบ / ผู้อนุมัติ PR เท่านั้น) -->
-                <Button x:Name="btnPrSettings" Grid.Column="2" Content="⚙ PR SETTINGS" Style="{StaticResource AnimatedButton}"
-                        Width="160" Height="48" FontSize="13" Margin="12,0,0,0" Click="PrSettings_Click" Visibility="Collapsed"/>
-                <TextBox x:Name="txtSearchPR" Style="{StaticResource CyberInput}" Tag="Search by product name or status..." Height="48" FontSize="14" KeyDown="txtSearchPR_KeyDown" TextChanged="txtSearchPR_TextChanged"/>
+                <!-- Function : TextBox SearchPR (⚙ PR SETTINGS ย้ายไปหน้า User Management - Admin เท่านั้น) -->
+                <TextBox x:Name="txtSearchPR" Style="{StaticResource CyberInput}" Tag="Search by PR no, product code, product name or status..." Height="48" FontSize="14" KeyDown="txtSearchPR_KeyDown" TextChanged="txtSearchPR_TextChanged"/>
                 
                 <!-- Function : Button SearchPR -->
                 <Button Grid.Column="1" 
@@ -472,6 +495,20 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
                     <!-- End : Function REQUESTER -->
+
+                    <!-- DataGridHeader : PRODUCT CODE -->
+                    <DataGridTextColumn Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.4*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="FontWeight" Value="ExtraBold"/>
+                                <Setter Property="FontSize" Value="13"/>
+                                <Setter Property="TextWrapping" Value="Wrap"/>
+                                <Setter Property="TextAlignment" Value="Center"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
 
                     <!-- DataGridHeader : Function PRODUCT NAME -->
                     <DataGridTemplateColumn Header="PRODUCT NAME" Width="2.5*">

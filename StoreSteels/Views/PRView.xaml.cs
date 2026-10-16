@@ -34,7 +34,7 @@ namespace CIMS.Views
             ApplyPermission(session);
             SetDefaultLookupTexts();
             _ = _viewModel.LoadAllLookups();
-            _ = _viewModel.LoadAllPR(); // โหลดข้อมูลเริ่มต้น
+            LoadPrStocks();   // เลือกคลังที่จำไว้ แล้วโหลด PR ของคลังนั้น
 
             // 🔄 รายการที่แสกนออก (สร้าง PR อัตโนมัติจาก Trigger) ขึ้นตารางเองทุก 5 วินาที ระหว่างเปิดหน้านี้อยู่
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -43,6 +43,107 @@ namespace CIMS.Views
             Unloaded += (s, e) => _refreshTimer.Stop();
         }
 
+        #endregion
+
+        #region === [ 🏬 คลังที่แสดง PR (เฉพาะคลังที่เปิดเก็บ PR ใน PR SETTINGS) ] ===
+        private const string KeyPrStock = "PR.Stock";
+        private List<StockModel> _prStocks = new List<StockModel>();
+        private bool _loadingStocks;
+
+        private void LoadPrStocks()
+        {
+            if (!DbSchema.HasPrStock) { cbPrStock.Visibility = Visibility.Collapsed; _ = _viewModel.LoadAllPR(); return; }   // ฐานเดิม = ทุกคลังเหมือนเดิม
+            try { _prStocks = new StockService().GetPrStocks(); }
+            catch (Exception ex) { _prStocks = new List<StockModel>(); System.Diagnostics.Debug.WriteLine($"PR stocks: {ex.Message}"); }
+
+            _loadingStocks = true;
+            cbPrStock.ItemsSource = _prStocks;
+            string saved = UserSettings.Get(_viewModel.CurrentUser?.UserId, KeyPrStock, "");
+            cbPrStock.SelectedItem = _prStocks.FirstOrDefault(s => s.StkId.ToString() == saved) ?? _prStocks.FirstOrDefault();
+            _loadingStocks = false;
+
+            txtNoPrStock.Visibility = _prStocks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            cbPrStock.Visibility = _prStocks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            ApplyStock();
+        }
+
+        private StockModel CurrentStock => cbPrStock.SelectedItem as StockModel;
+
+        private void ApplyStock()
+        {
+            // ไม่มีคลังที่เปิดเก็บ PR -> ตารางว่าง (StockID -1) / มี = PR ของคลังนั้น
+            _viewModel.StockId = CurrentStock?.StkId ?? -1;
+            btnSubmitPR.IsEnabled = CurrentStock != null;
+            _ = _viewModel.LoadAllPR(txtSearchPR.Text.Trim());
+        }
+
+        private void cbPrStock_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loadingStocks || _viewModel == null) return;
+            if (CurrentStock != null) UserSettings.Set(_viewModel.CurrentUser?.UserId, KeyPrStock, CurrentStock.StkId.ToString());   // จำคลังตาม UserID
+            ClearInputs();
+            ApplyStock();
+        }
+        #endregion
+
+        #region === [ 🔎 Product Code -> Product Name ] ===
+        private PRPartOption _pickedPart;
+        private int _codeVer, _lookupVer;
+
+        private async void txtProductCode_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Down || e.Key == System.Windows.Input.Key.Up ||
+                e.Key == System.Windows.Input.Key.Enter || e.Key == System.Windows.Input.Key.Escape ||
+                e.Key == System.Windows.Input.Key.Tab) return;
+
+            // พิมพ์แล้วหารหัสที่ตรง (คงข้อความ / ตำแหน่งเคอร์เซอร์ที่พิมพ์อยู่ไว้)
+            string text = txtProductCode.Text ?? "";
+            var editor = txtProductCode.Template.FindName("PART_EditableTextBox", txtProductCode) as TextBox;
+            int caret = editor?.CaretIndex ?? text.Length;
+
+            if (_pickedPart != null && !string.Equals(_pickedPart.Code, text.Trim(), StringComparison.OrdinalIgnoreCase)) SetPart(null);
+            int ver = ++_codeVer;
+            await _viewModel.UpdatePartOptions(text.Trim());
+            // พิมพ์ต่อระหว่างรอผลค้นหา (พิมพ์เร็ว / สแกนเนอร์) -> ผลนี้เก่าแล้ว ไม่แตะข้อความ (กันตัวอักษรหาย)
+            if (ver != _codeVer) return;
+
+            if (txtProductCode.Text != text) txtProductCode.Text = text;
+            if (editor != null) { editor.SelectionLength = 0; editor.CaretIndex = Math.Min(caret, text.Length); }
+
+            // พิมพ์ตรงกับรหัสที่มีตัวเดียวพอดี -> เลือกให้เลย
+            var exact = _viewModel.PartOptions.Where(o => string.Equals(o.Code, text.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+            if (exact.Count == 1) SetPart(exact[0]);
+            bool open = text.Trim().Length > 0 && txtProductCode.IsKeyboardFocusWithin && _viewModel.PartOptions.Any() && _pickedPart == null;
+            if (open != txtProductCode.IsDropDownOpen) txtProductCode.IsDropDownOpen = open;
+            // เปิดรายการแล้ว ComboBox เลือกข้อความทั้งหมด -> ตัวต่อไปที่พิมพ์จะทับ: วางเคอร์เซอร์ไว้ท้ายข้อความ
+            if (editor != null)
+            {
+                editor.SelectionLength = 0; editor.CaretIndex = editor.Text.Length;
+                Dispatcher.BeginInvoke(new Action(() => { if (editor.SelectionLength > 0) { editor.SelectionLength = 0; editor.CaretIndex = editor.Text.Length; } }),
+                                       System.Windows.Threading.DispatcherPriority.Input);
+            }
+        }
+
+        private void txtProductCode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (txtProductCode.SelectedItem is PRPartOption o) SetPart(o);
+        }
+
+        // ออกจากช่องแล้วพิมพ์ตรงกับรหัสในรายการ -> เลือกให้
+        private void txtProductCode_LostKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e)
+        {
+            if (_pickedPart != null) return;
+            string t = (txtProductCode.Text ?? "").Trim();
+            var m = _viewModel.PartOptions.FirstOrDefault(o => string.Equals(o.Code, t, StringComparison.OrdinalIgnoreCase));
+            if (m != null) SetPart(m);
+        }
+
+        private void SetPart(PRPartOption o)
+        {
+            _pickedPart = o;
+            txtProductName.Text = o?.Name ?? "";
+            if (o != null && !string.Equals(txtProductCode.Text, o.Code, StringComparison.Ordinal)) txtProductCode.Text = o.Code;
+        }
         #endregion
 
         #region === [ Auto Refresh (Scan Out -> PR) ] ===
@@ -83,7 +184,9 @@ namespace CIMS.Views
             var editor = cb.Template.FindName("PART_EditableTextBox", cb) as TextBox;
             int caret = editor?.CaretIndex ?? text.Length;
 
+            int ver = ++_lookupVer;
             await _viewModel.UpdateLookup(field, text);
+            if (ver != _lookupVer) return;   // พิมพ์ต่อแล้ว -> ผลเก่า ไม่แตะข้อความ
 
             if (cb.Text != text) cb.Text = text;
             if (editor != null) { editor.SelectionLength = 0; editor.CaretIndex = Math.Min(caret, text.Length); }
@@ -110,7 +213,6 @@ namespace CIMS.Views
         {
             btnSubmitPR.Visibility = user?.CanSubmitPR == true ? Visibility.Visible : Visibility.Collapsed;
             btnExport.Visibility = user?.CanViewPR == true ? Visibility.Visible : Visibility.Collapsed;
-            btnPrSettings.Visibility = user?.CanManagePrSettings == true ? Visibility.Visible : Visibility.Collapsed;
             btnDeleteAllPR.Visibility = user?.UserLevel == 1 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -140,68 +242,28 @@ namespace CIMS.Views
             finally { btnDeleteAllPR.IsEnabled = true; }
         }
 
-        // ⚙ เลือกคลังที่แสกนออกแล้วสร้าง PR อัตโนมัติ (การ์ดคลัง ติ๊กเปิด/ปิด)
-        private void PrSettings_Click(object sender, RoutedEventArgs e)
-        {
-            var user = _viewModel.CurrentUser;
-            if (user == null || !user.CanManagePrSettings)
-            {
-                DialogHelper.ShowWarning("คุณไม่มีสิทธิ์ตั้งค่า PR อัตโนมัติ", "ACCESS DENIED");
-                return;
-            }
-
-            var service = new StockService();
-            List<StockModel> stocks;
-            Dictionary<int, bool> current;
-            try
-            {
-                stocks = service.GetStocks();
-                current = service.GetPrAutoMap();
-            }
-            catch (Exception ex)
-            {
-                DialogHelper.ShowError("โหลดการตั้งค่า PR ไม่สำเร็จ\n" + ex.Message);
-                return;
-            }
-
-            var result = StockPickerWindow.ShowPrSettings(stocks, current);
-            if (result == null) return;
-
-            var changed = result.Where(kv => !current.TryGetValue(kv.Key, out bool old) || old != kv.Value)
-                                .ToDictionary(kv => kv.Key, kv => kv.Value);
-            if (changed.Count == 0) return;
-
-            try
-            {
-                service.SetPrAuto(changed, user.UserId);
-                string on = string.Join(", ", stocks.Where(s => result.TryGetValue(s.StkId, out bool v) && v).Select(s => s.Code));
-                LogService.WritePRLog(user.UserId, "PR_SETTINGS", $"AUTO PR stocks: {(on.Length == 0 ? "-" : on)}", "PR_SETTINGS");
-                DialogHelper.ShowSuccess("บันทึกการตั้งค่า PR อัตโนมัติเรียบร้อยแล้ว\n\nคลังที่สร้าง PR เมื่อแสกนออก: " + (on.Length == 0 ? "ไม่มี" : on));
-            }
-            catch (Exception ex)
-            {
-                DialogHelper.ShowError("บันทึกการตั้งค่า PR ไม่สำเร็จ\n" + ex.Message);
-            }
-        }
-
         #endregion
 
         #region === [ Event Submit PR ] ===
 
         private async void SubmitPR_Click(object sender, RoutedEventArgs e)
         {
-            string partName = txtProductName.Text.Trim();
-            if (string.IsNullOrEmpty(partName) || !int.TryParse(txtQTY.Text, out int q))
+            if (DbSchema.HasPrStock && CurrentStock == null)
             {
-                DialogHelper.ShowWarning("ข้อมูลไม่ครบถ้วน");
+                DialogHelper.ShowWarning("กรุณาเลือกคลัง (STOCK) ก่อนครับ");
                 return;
             }
-
-            // ตรวจสอบสินค้าใน CIMS.Parts
-            bool exists = await Task.Run(() => _prService.IsProductExists(partName));
-            if (!exists)
+            // สินค้าต้องเลือกจาก Product Code (Product Name ใส่ให้เอง)
+            if (_pickedPart == null)
             {
-                DialogHelper.ShowWarning("ไม่พบสินค้าลำดับนี้ในระบบ");
+                DialogHelper.ShowWarning("กรุณาเลือก Product Code ที่มีในระบบ (พิมพ์รหัสแล้วเลือกจากรายการ)");
+                txtProductCode.Focus();
+                return;
+            }
+            string partName = _pickedPart.Name;
+            if (!int.TryParse(txtQTY.Text, out int q) || q <= 0)
+            {
+                DialogHelper.ShowWarning("กรุณาใส่ QTY เป็นตัวเลขมากกว่า 0");
                 return;
             }
 
@@ -212,7 +274,7 @@ namespace CIMS.Views
                 return;
             }
 
-            var newItem = new PRModel { PartName = partName, QTY = q };
+            var newItem = new PRModel { PartName = partName, PartCode = _pickedPart.Code, PartId = _pickedPart.PartId, QTY = q };
             if (await _viewModel.SavePRToDb(newItem, txtRequester.Text, txtDept.Text, txtRemark.Text, txtTargetDept.Text))
             {
                 DialogHelper.ShowSuccess("บันทึกสำเร็จ");
@@ -227,7 +289,7 @@ namespace CIMS.Views
         // 📋 รายการที่ Approve แล้ว (ค้นหา / ช่วงวันที่ / ติ๊กเลือก Export / EDIT / DEL)
         private async void ApprovedList_Click(object sender, RoutedEventArgs e)
         {
-            var w = new PRApprovedWindow(_viewModel.CurrentUser);
+            var w = new PRApprovedWindow(_viewModel.CurrentUser, CurrentStock, _prStocks);
             w.ShowDialog();
             if (w.Changed) await _viewModel.LoadAllPR(txtSearchPR.Text);
         }
@@ -284,6 +346,8 @@ namespace CIMS.Views
                 else
                 {
                     _currentViewingId = selected.ID;
+                    _pickedPart = null;
+                    txtProductCode.Text = selected.PartCode == "N/A" ? "" : selected.PartCode;
                     txtProductName.Text = selected.PartName;
                     txtQTY.Text = selected.QTY.ToString();
                     btnSubmitPR.Visibility = Visibility.Collapsed;
@@ -297,6 +361,8 @@ namespace CIMS.Views
         private void ClearInputs()
         {
             _currentViewingId = -1;
+            SetPart(null);
+            txtProductCode.Text = "";
             txtProductName.Text = "";
             txtQTY.Clear();
             // คืนค่า Binding ให้ชื่อคนทำรายการและวันที่กลับมาเป็นปัจจุบัน (ของเก่าที่หายไป)
@@ -306,28 +372,7 @@ namespace CIMS.Views
             if (_viewModel.CurrentUser.CanSubmitPR)
                 btnSubmitPR.Visibility = Visibility.Visible;
             dgPR.SelectedItem = null;
-            txtProductName.IsReadOnly = false;
-            txtQTY.IsReadOnly = false;
-        }
-        #endregion
-
-        #region === [ Event txtProductName KeyUp ] ===
-        private async void txtProductName_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            if (e.Key == System.Windows.Input.Key.Down || e.Key == System.Windows.Input.Key.Up ||
-                e.Key == System.Windows.Input.Key.Enter || e.Key == System.Windows.Input.Key.Escape ||
-                e.Key == System.Windows.Input.Key.Tab) return;
-
-            // พิมพ์แล้วระบบหาสินค้าที่ใกล้เคียงที่สุด 5 รายการ (ทุกคลัง) - คงข้อความ/ตำแหน่งเคอร์เซอร์ที่พิมพ์อยู่ไว้
-            string text = txtProductName.Text ?? "";
-            var editor = txtProductName.Template.FindName("PART_EditableTextBox", txtProductName) as TextBox;
-            int caret = editor?.CaretIndex ?? text.Length;
-
-            await _viewModel.UpdateSuggestions(text.Trim());
-
-            if (txtProductName.Text != text) txtProductName.Text = text;
-            if (editor != null) { editor.SelectionLength = 0; editor.CaretIndex = Math.Min(caret, text.Length); }
-            txtProductName.IsDropDownOpen = text.Trim().Length > 0 && txtProductName.IsKeyboardFocusWithin && _viewModel.ProductSuggestions.Any();
+            txtQTY.IsReadOnly = false;   // Product Name อ่านอย่างเดียวเสมอ (มาจาก Product Code)
         }
         #endregion
 

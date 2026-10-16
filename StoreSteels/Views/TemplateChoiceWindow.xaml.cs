@@ -34,6 +34,14 @@ namespace CIMS.Views
             return w.ShowDialog() == true ? w.Chosen : null;
         }
 
+        // หัวหน้าต่างอื่น (เช่น 📤 EXPORT PR) - ใช้หน้าต่างเลือกแบบเดียวกัน
+        public static string ChooseWithTitle(string title, string subtitle, params Option[] options)
+        {
+            var w = new TemplateChoiceWindow(subtitle, options);
+            w.txtTitle.Text = title;
+            return w.ShowDialog() == true ? w.Chosen : null;
+        }
+
         private void Option_Click(object sender, RoutedEventArgs e)
         {
             Chosen = (sender as FrameworkElement)?.Tag as string;

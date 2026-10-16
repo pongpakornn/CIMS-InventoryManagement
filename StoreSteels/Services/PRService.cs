@@ -12,7 +12,8 @@ namespace CIMS.Services
     {
         private readonly string _connectionString = GlobalConfig.ConnStr;
 
-        public List<PRModel> GetPRList(string searchText = "")
+        // stkId: คลังที่เลือกในหน้า PR (null = ทุกคลัง) - ฐานที่ยังไม่รัน Update_20261017.sql = ทุกคลังเหมือนเดิม
+        public List<PRModel> GetPRList(string searchText = "", int? stkId = null)
         {
             var list = new List<PRModel>();
             using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -21,6 +22,7 @@ namespace CIMS.Services
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@SearchText", searchText ?? "");
+                    if (CIMS.Helpers.DbSchema.HasPrStock) cmd.Parameters.AddWithValue("@StkId", (object)stkId ?? DBNull.Value);
 
                     conn.Open();
                     using (SqlDataReader reader = cmd.ExecuteReader())
@@ -39,7 +41,10 @@ namespace CIMS.Services
                                 Status = reader["Status"].ToString(),
                                 PRDate = Convert.ToDateTime(reader["PRDate"]),
                                 Remark = reader["Remark"]?.ToString(),
-                                Unit = reader["Unit"]?.ToString()
+                                Unit = reader["Unit"]?.ToString(),
+                                StockID = IntOrNull(Col(reader, "StockID")),
+                                StockCode = Col(reader, "StockCode")?.ToString(),
+                                PartId = IntOrNull(Col(reader, "PartID"))
                             });
                         }
                     }
@@ -47,6 +52,14 @@ namespace CIMS.Services
             }
             return list;
         }
+
+        // คอลัมน์ที่อาจยังไม่มี (ฐานที่ยังไม่รัน Update_20261017.sql) -> null
+        private static object Col(SqlDataReader r, string name)
+        {
+            for (int i = 0; i < r.FieldCount; i++) if (string.Equals(r.GetName(i), name, StringComparison.OrdinalIgnoreCase)) return r[i];
+            return null;
+        }
+        private static int? IntOrNull(object v) => v == null || v == DBNull.Value ? (int?)null : Convert.ToInt32(v);
 
         public string GetNextPRNo()
         {
@@ -129,8 +142,11 @@ namespace CIMS.Services
         }
 
         // requesterName: ชื่อผู้ขอที่พิมพ์เอง (ว่าง = ใช้ชื่อผู้ใช้ที่ Login) - UserID ยังเป็นคนที่ทำรายการเหมือนเดิม
-        public bool InsertPR(string prNo, string userId, string dept, string partDesc, int qty, string remark, string targetDept, string requesterName = null)
+        // partId / stockId = สินค้าที่เลือกจาก PRODUCT CODE + คลังที่เลือกในหน้า PR (Update_20261017.sql)
+        public bool InsertPR(string prNo, string userId, string dept, string partDesc, int qty, string remark, string targetDept, string requesterName = null,
+                             int? partId = null, int? stockId = null)
         {
+            bool hasStock = CIMS.Helpers.DbSchema.HasPrStock;
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
@@ -139,11 +155,18 @@ namespace CIMS.Services
                     try
                     {
                         // เปลี่ยน 'Waiting' เป็น @Status เพื่อให้ตรงกับ Parameters.Add ด้านล่าง
-                        string sqlHeader = @"INSERT INTO CIMS.PRHeaders (PRNumber, PRDate, UserID, RequestDepartment, TargetDepartment, Status, Remark, RequesterName, Source)
-                                   VALUES (@PrNo, GETDATE(), @UserId, @Dept, @TrgDept, @Status, @Remark, @ReqName, 'MANUAL')";
+                        string sqlHeader = hasStock
+                            ? @"INSERT INTO CIMS.PRHeaders (PRNumber, PRDate, UserID, RequestDepartment, TargetDepartment, Status, Remark, RequesterName, Source, StockID)
+                                VALUES (@PrNo, GETDATE(), @UserId, @Dept, @TrgDept, @Status, @Remark, @ReqName, 'MANUAL', @Stk)"
+                            : @"INSERT INTO CIMS.PRHeaders (PRNumber, PRDate, UserID, RequestDepartment, TargetDepartment, Status, Remark, RequesterName, Source)
+                                VALUES (@PrNo, GETDATE(), @UserId, @Dept, @TrgDept, @Status, @Remark, @ReqName, 'MANUAL')";
 
-                        string sqlDetail = @"INSERT INTO CIMS.PRDetails (PRNumber, Description, RequestQuantity) 
-                                   VALUES (@PrNo, @PartDesc, @Qty)";
+                        // หน่วย = หน่วยของคลัง (เหมือน PR ที่สร้างจากการแสกนออก)
+                        string sqlDetail = hasStock
+                            ? @"INSERT INTO CIMS.PRDetails (PRNumber, Description, RequestQuantity, PartID, Unit)
+                                VALUES (@PrNo, @PartDesc, @Qty, @Pt, (SELECT Unit FROM CIMS.Stocks WHERE StockID = @Stk))"
+                            : @"INSERT INTO CIMS.PRDetails (PRNumber, Description, RequestQuantity)
+                                VALUES (@PrNo, @PartDesc, @Qty)";
 
                         using (SqlCommand cmdH = new SqlCommand(sqlHeader, conn, trans))
                         {
@@ -154,6 +177,7 @@ namespace CIMS.Services
                             cmdH.Parameters.AddWithValue("@Remark", remark ?? "");
                             cmdH.Parameters.AddWithValue("@Status", "Waiting"); //
                             cmdH.Parameters.AddWithValue("@ReqName", string.IsNullOrWhiteSpace(requesterName) ? (object)DBNull.Value : requesterName.Trim());
+                            if (hasStock) cmdH.Parameters.AddWithValue("@Stk", (object)stockId ?? DBNull.Value);
                             cmdH.ExecuteNonQuery();
                         }
 
@@ -162,6 +186,11 @@ namespace CIMS.Services
                             cmdD.Parameters.AddWithValue("@PrNo", prNo);
                             cmdD.Parameters.AddWithValue("@PartDesc", partDesc);
                             cmdD.Parameters.AddWithValue("@Qty", qty);
+                            if (hasStock)
+                            {
+                                cmdD.Parameters.AddWithValue("@Pt", (object)partId ?? DBNull.Value);
+                                cmdD.Parameters.AddWithValue("@Stk", (object)stockId ?? DBNull.Value);
+                            }
                             cmdD.ExecuteNonQuery();
                         }
 
@@ -255,6 +284,34 @@ namespace CIMS.Services
                 }
             }
             return suggestions;
+        }
+
+        // 🔎 ช่อง PRODUCT CODE: รหัสที่ตรง / ขึ้นต้น / มีคำที่พิมพ์ (ทุกสินค้าในระบบ - สินค้าในคลังที่เลือกขึ้นก่อน) สูงสุด top รายการ
+        public List<PRPartOption> GetPartOptions(string text, int? stkId, int top = 12)
+        {
+            var list = new List<PRPartOption>();
+            using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand(@"
+                DECLARE @isMain BIT = ISNULL((SELECT IsMain FROM CIMS.Stocks WHERE StockID = @stk), 0);
+                SELECT TOP (@top) p.PartID, p.PartCode, p.Description,
+                       CASE WHEN @stk IS NULL THEN 0
+                            WHEN @isMain = 1 AND p.IsShowInMaster = 1 THEN 1
+                            WHEN EXISTS (SELECT 1 FROM CIMS.PartStocks ps WHERE ps.StockID = @stk AND ps.PartID = p.PartID) THEN 1 ELSE 0 END AS InStock
+                FROM CIMS.Parts p
+                WHERE p.IsActive = 1 AND p.PartCode LIKE '%' + @t + '%'
+                ORDER BY InStock DESC,
+                         CASE WHEN p.PartCode = @t THEN 0 WHEN p.PartCode LIKE @t + '%' THEN 1 ELSE 2 END,
+                         LEN(p.PartCode), p.PartCode", conn))
+            {
+                cmd.Parameters.AddWithValue("@t", (text ?? "").Trim());
+                cmd.Parameters.AddWithValue("@stk", (object)stkId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@top", top);
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read())
+                        list.Add(new PRPartOption { PartId = r.GetInt32(0), Code = r[1].ToString(), Name = r[2]?.ToString() ?? "", InStock = Convert.ToInt32(r[3]) == 1 });
+            }
+            return list;
         }
 
         // ตรวจสอบว่าสินค้ามีอยู่ใน CIMS.Parts หรือไม่
@@ -367,13 +424,14 @@ namespace CIMS.Services
         }
 
         // 📋 รายการที่ Approve แล้ว: ช่วงวันที่ Approve + คำค้น (ค้นทุกช่อง เรียงตัวที่ใกล้เคียงที่สุดก่อน)
-        public List<PRModel> GetApprovedList(string keyword, DateTime from, DateTime to)
+        public List<PRModel> GetApprovedList(string keyword, DateTime from, DateTime to, int? stkId = null)
         {
+            bool byStock = stkId.HasValue && CIMS.Helpers.DbSchema.HasPrStock;
             var list = new List<PRModel>();
             using (var conn = new SqlConnection(_connectionString))
             using (var cmd = new SqlCommand(@"
                 SELECT * FROM CIMS.vw_PRReady
-                WHERE Status = 'Approved' AND ISNULL(ApprovedDate, PRDate) >= @from AND ISNULL(ApprovedDate, PRDate) < @to
+                WHERE Status = 'Approved'" + (byStock ? " AND StockID = @stk" : "") + @" AND ISNULL(ApprovedDate, PRDate) >= @from AND ISNULL(ApprovedDate, PRDate) < @to
                   AND (@k = '' OR PRNumber LIKE '%' + @k + '%' OR Description LIKE '%' + @k + '%' OR PartCode LIKE '%' + @k + '%'
                        OR REQUESTER LIKE '%' + @k + '%' OR ISNULL(RequestDepartment, '') LIKE '%' + @k + '%' OR ISNULL(TargetDepartment, '') LIKE '%' + @k + '%'
                        OR ISNULL(Remark, '') LIKE '%' + @k + '%')
@@ -386,6 +444,7 @@ namespace CIMS.Services
                 cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = from.Date;
                 cmd.Parameters.Add("@to", SqlDbType.DateTime).Value = to.Date.AddDays(1);
                 cmd.Parameters.Add("@k", SqlDbType.NVarChar, 200).Value = (keyword ?? "").Trim();
+                if (byStock) cmd.Parameters.AddWithValue("@stk", stkId.Value);
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
                     while (r.Read())
@@ -404,7 +463,19 @@ namespace CIMS.Services
                             PRDate = Convert.ToDateTime(r["PRDate"]),
                             Remark = r["Remark"]?.ToString(),
                             AppDate = r["ApprovedDate"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["ApprovedDate"]),
-                            ExportDate = r["ExportDate"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["ExportDate"])
+                            ExportDate = r["ExportDate"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(r["ExportDate"]),
+                            StockID = IntOrNull(Col(r, "StockID")),
+                            StockCode = Col(r, "StockCode")?.ToString(),
+                            Bin = Col(r, "Bin")?.ToString(),
+                            PartA = Col(r, "PartA")?.ToString(),
+                            PartB = Col(r, "PartB")?.ToString(),
+                            PartNo = Col(r, "PartNumber")?.ToString(),
+                            Model = Col(r, "Model")?.ToString(),
+                            Supplier = Col(r, "Supplier")?.ToString(),
+                            Customer = Col(r, "Customer")?.ToString(),
+                            Category = Col(r, "Category")?.ToString(),
+                            CoilNo = Col(r, "CoilNo")?.ToString(),
+                            MotherCoil = Col(r, "MotherCoil")?.ToString()
                         });
             }
             return list;

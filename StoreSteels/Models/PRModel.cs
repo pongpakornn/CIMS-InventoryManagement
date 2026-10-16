@@ -81,9 +81,36 @@ namespace CIMS.Models
         public string ExportDisplay => ExportDate?.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "NOT YET";
         public bool IsExported => ExportDate.HasValue;
 
+        // คลังของ PR (Update_20261017.sql) + สินค้าที่เลือกจาก PRODUCT CODE
+        public int? StockID { get; set; }
+        public string StockCode { get; set; }
+        public int? PartId { get; set; }
+
+        // ข้อมูลเสริมสำหรับ SETUP EXCEL PATH (สินค้าของ PR / Coil ที่แสกนออก)
+        public string Bin { get; set; }
+        public string PartA { get; set; }
+        public string PartB { get; set; }
+        public string PartNo { get; set; }
+        public string Model { get; set; }
+        public string Supplier { get; set; }
+        public string Customer { get; set; }
+        public string Category { get; set; }
+        public string CoilNo { get; set; }
+        public string MotherCoil { get; set; }
+
         // 3. ส่วนสำคัญ: Event และ Method สำหรับแจ้งเตือน UI
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    // ตัวเลือกช่อง PRODUCT CODE หน้า PR: พิมพ์รหัสแล้วขึ้นสินค้าที่ตรงให้เลือก -> PRODUCT NAME ใส่ให้เอง
+    public class PRPartOption
+    {
+        public int PartId { get; set; }
+        public string Code { get; set; }
+        public string Name { get; set; }
+        public bool InStock { get; set; }   // อยู่ในคลังที่เลือก (ขึ้นก่อน)
+        public override string ToString() => Code;
     }
 }

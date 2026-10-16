@@ -28,6 +28,8 @@ namespace CIMS.Views
             btnImport.Visibility = session?.CanAddUser == true && session.CanEditUser ? Visibility.Visible : Visibility.Collapsed;
             btnTemplate.Visibility = btnImport.Visibility;
             btnContact.Visibility = session?.CanSetPermissions == true && DbSchema.HasAdminContacts ? Visibility.Visible : Visibility.Collapsed;
+            btnPrSettings.Visibility = session?.CanManagePrSettings == true ? Visibility.Visible : Visibility.Collapsed;
+            btnPrExcel.Visibility = btnPrSettings.Visibility;
             Loaded += async (s, e) => await ReloadAsync();
 
             // ⚡ เรียลไทม์: เครื่องอื่นเพิ่ม / แก้ / ล็อกผู้ใช้ / สิทธิ์ / ออนไลน์ -> อัพเดทเอง (คงคำค้นไว้)
@@ -75,6 +77,20 @@ namespace CIMS.Views
         }
 
         private static UserAccount Of(object sender) => (sender as FrameworkElement)?.Tag as UserAccount;
+
+        // 🧾 PR SETTINGS (Admin Level 1): คลังที่เก็บ PR + Export Path
+        private void PrSettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session?.CanManagePrSettings != true) { DialogHelper.ShowWarning("เฉพาะ Admin (Level 1) เท่านั้น", "ACCESS DENIED"); return; }
+            new PRSettingsWindow(_session).ShowDialog();
+        }
+
+        // 📊 SETUP EXCEL PATH (Admin Level 1): ไฟล์ Excel + ช่องที่ลงข้อมูล PR ของแต่ละคลัง
+        private void PrExcel_Click(object sender, RoutedEventArgs e)
+        {
+            if (_session?.CanManagePrSettings != true) { DialogHelper.ShowWarning("เฉพาะ Admin (Level 1) เท่านั้น", "ACCESS DENIED"); return; }
+            new PRExcelSetupWindow(_session).ShowDialog();
+        }
 
         private void EditBtn_Loaded(object sender, RoutedEventArgs e) => ((Button)sender).Visibility = _session?.CanEditUser == true ? Visibility.Visible : Visibility.Collapsed;
         private void PermBtn_Loaded(object sender, RoutedEventArgs e) => ((Button)sender).Visibility = _session?.CanSetPermissions == true ? Visibility.Visible : Visibility.Collapsed;

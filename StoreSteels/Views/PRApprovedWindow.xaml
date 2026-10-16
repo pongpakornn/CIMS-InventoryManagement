@@ -22,7 +22,7 @@
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="📋 APPROVED PR LIST" Foreground="White" FontSize="20" FontWeight="Black"/>
-                        <TextBlock Text="Search, pick a date range, tick the items and export / edit / delete" Foreground="#C8E6C9" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
+                        <TextBlock x:Name="txtSubtitle" Text="Search, pick a date range, tick the items and export / edit / delete" Foreground="#C8E6C9" FontSize="12" FontWeight="Bold" Margin="0,3,0,0"/>
                     </StackPanel>
                     <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource StkCardButton}" Click="Close_Click" ToolTip="CLOSE"/>
                 </Grid>
@@ -39,7 +39,9 @@
                     <DatePicker x:Name="dpFrom" Width="150" SelectedDateChanged="Date_Changed"/>
                     <TextBlock Text="TO" FontWeight="Bold" Foreground="#8A8490" VerticalAlignment="Center" Margin="10,0,6,0"/>
                     <DatePicker x:Name="dpTo" Width="150" SelectedDateChanged="Date_Changed"/>
-                    <Button x:Name="btnExport" Content="📤 EXPORT" Style="{StaticResource StkButton}" Background="#1976D2" Margin="12,0,0,0" Click="Export_Click"/>
+                    <!-- 📤 EXPORT: เลือก EXPORT (ไฟล์ใหม่) หรือ EXPORT PATH (ต่อข้อมูลลงไฟล์ของคลัง) -> เลือกคลัง -> บันทึกแล้วเปิดไฟล์ -->
+                    <Button x:Name="btnExport" Content="📤 EXPORT" Style="{StaticResource StkButton}" Background="#1976D2" Margin="12,0,0,0" Click="Export_Click"
+                            ToolTip="EXPORT = new file in Desktop\CIMS_Export\PR Management\(stock)  •  EXPORT PATH = add to the stock's Excel file (User Management -> SETUP EXCEL PATH)"/>
                 </StackPanel>
             </Grid>
 

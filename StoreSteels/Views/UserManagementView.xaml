@@ -57,6 +57,12 @@
                     </Border>
                     <Button x:Name="btnContact" Content="🔔 ALERT CONTACT" Style="{StaticResource StkButton}" Background="#C62828" Click="Contact_Click" Margin="0,0,8,0"
                             ToolTip="Who users should contact for help (name - phone (nickname)), e.g. a user with no scan stock"/>
+                    <!-- 🧾 PR SETTINGS: คลังที่เก็บ PR + Export Path ของแต่ละคลัง (Admin Level 1 เท่านั้น - ย้ายมาจากหน้า PR) -->
+                    <Button x:Name="btnPrSettings" Content="🧾 PR SETTINGS" Style="{StaticResource StkButton}" Background="#6750A4" Click="PrSettings_Click" Margin="0,0,8,0"
+                            Visibility="Collapsed" ToolTip="Stocks that keep PR (scan OUT creates a PR + shown in the PR page)"/>
+                    <!-- 📊 SETUP EXCEL PATH: ไฟล์ Excel + ช่องที่ลงข้อมูล PR ของแต่ละคลัง (Admin Level 1 เท่านั้น) -->
+                    <Button x:Name="btnPrExcel" Content="📊 SETUP EXCEL PATH" Style="{StaticResource StkButton}" Background="#2E7D32" Click="PrExcel_Click" Margin="0,0,8,0"
+                            Visibility="Collapsed" ToolTip="Excel file of each stock + which cell / column each PR field goes to (EXPORT PATH)"/>
                     <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource StkButton}" Background="#49454F" Click="Template_Click" Margin="0,0,8,0" ToolTip="Excel template for importing users and permissions"/>
                     <Button x:Name="btnImport" Content="📥 IMPORT USER / PERMISSION" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,0,8,0"/>
                     <Button x:Name="btnAdd" Content="＋ ADD USER" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Add_Click"/>
