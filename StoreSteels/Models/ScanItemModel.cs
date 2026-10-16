@@ -39,6 +39,8 @@ namespace CIMS.Models
         public string PartNumber { get; set; }
         public string Model { get; set; }
         public string RefNo { get; set; }
+        // แถว OUT ของคลังต้นทางที่ถูกตัดตอนสแกนรับเข้าคลังอื่น (เช่น STOCK-PANTA ถูกตัดตอนรับเข้า STOCK-MAT) - แสดงในโหมด IN ด้วย
+        public bool IsDeductOut { get; set; }
 
         // เปลี่ยนมารับเป็น ImageSource เพื่อรองรับภาพจาก UI Thread โดยตรง
         public System.Windows.Media.ImageSource ProductImagePath

@@ -883,7 +883,9 @@ namespace CIMS.ViewModels
             // ตารางวันนี้โหลดตอนเลือกคลัง (SelectedStock) ใน ApplyPermissions -> LoadStocks
 
             // 🔀 แสดงเฉพาะรายการของโหมดที่กดอยู่: รับเข้า = IN / สแกนออก = OUT / คืนเหล็ก = RETURN
-            System.Windows.Data.CollectionViewSource.GetDefaultView(ScannedItems).Filter = o => o is ScanItemModel s && s.Status == ModeStatus;
+            //    + โหมด IN แสดงแถว OUT ที่คลังนี้ถูกตัดตอนสแกนรับเข้าคลังอื่นด้วย (เช่น STOCK-PANTA ถูกตัดตอนรับเข้า STOCK-MAT)
+            System.Windows.Data.CollectionViewSource.GetDefaultView(ScannedItems).Filter = o => o is ScanItemModel s &&
+                (s.Status == ModeStatus || (s.IsDeductOut && ModeStatus == "IN"));
             // 📊 ตารางสรุปวันนี้: แสดงทุกรายการเสมอ (รับเข้า / คืน / สแกนออก) ไม่ขึ้นกับโหมดที่กด - เลือกดูทีละคลังได้ (SummaryStkId)
             System.Windows.Data.CollectionViewSource.GetDefaultView(HistoryItems).Filter = o => o is ScanItemModel s &&
                 (SummaryStkId == null || s.StkId == SummaryStkId);
