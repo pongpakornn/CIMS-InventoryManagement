@@ -55,6 +55,9 @@ namespace CIMS.Views
             UpdateSummary();
         }
 
+        // ✨ เปิดแผง = การ์ดคลังไหลเข้าทีละใบ
+        private void Panel_Loaded(object sender, RoutedEventArgs e) => Dispatcher.BeginInvoke(new Action(() => Motion.Stagger(icStocks, 40)), System.Windows.Threading.DispatcherPriority.Loaded);
+
         private void Card_Click(object sender, MouseButtonEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is StockCard c) { c.IsChecked = !c.IsChecked; UpdateSummary(); }

@@ -60,6 +60,9 @@ namespace CIMS.Views
             if (!DbSchema.HasProductControlSettings) txtStatus.Text = "⚠ Run Database/Update_20261016c.sql first - settings cannot be saved yet.";
         }
 
+        // ✨ เปิดแผง = แถวคลังไหลเข้าทีละแถว
+        private void Panel_Loaded(object sender, RoutedEventArgs e) => Dispatcher.BeginInvoke(new Action(() => Motion.Stagger(icRows, 30)), System.Windows.Threading.DispatcherPriority.Loaded);
+
         private void Option_Checked(object sender, RoutedEventArgs e)
         {
             int n = _rows.Count(r => r.Changed);

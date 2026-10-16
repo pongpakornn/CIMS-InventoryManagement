@@ -1,6 +1,8 @@
 ﻿<UserControl x:Class="CIMS.Views.QrFormatPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:CIMS.Helpers"
+             Loaded="Panel_Loaded">
 
     <!-- ▣ QR CODE (หน้าต่าง ADMIN): QR ที่ EXPORT QR SELECT สร้างออกมา ต่อคลัง = PRODUCT CODE อย่างเดียว / PRODUCT CODE|PRODUCT NAME -->
     <Grid>
@@ -33,6 +35,16 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="#F2F0F5" BorderThickness="0,0,0,1" Padding="0,8">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="White"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#FAF6FF"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="200"/>

@@ -58,6 +58,9 @@ namespace CIMS.Views
             lbStocks.SelectedIndex = 0;
         }
 
+        // ✨ เปิดแผง = รายชื่อคลังไหลเข้าทีละแถว
+        private void Panel_Loaded(object sender, RoutedEventArgs e) => Dispatcher.BeginInvoke(new Action(() => Motion.Stagger(lbStocks, 30)), System.Windows.Threading.DispatcherPriority.Loaded);
+
         private void Stocks_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _cur = lbStocks.SelectedItem as StockRow;
@@ -119,7 +122,9 @@ namespace CIMS.Views
                 sp.Children.Add(new TextBlock { Text = $"{i + 1}. {ProductControlColumns.Label(cols[i])}", Foreground = Brushes.White, FontWeight = FontWeights.Bold, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 4, 0) });
                 sp.Children.Add(right);
                 sp.Children.Add(del);
-                wpOrder.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(0x67, 0x50, 0xA4)), CornerRadius = new CornerRadius(8), Padding = new Thickness(4, 3, 4, 3), Margin = new Thickness(0, 0, 8, 8), Child = sp });
+                var chip = new Border { Background = new SolidColorBrush(Color.FromRgb(0x67, 0x50, 0xA4)), CornerRadius = new CornerRadius(8), Padding = new Thickness(4, 3, 4, 3), Margin = new Thickness(0, 0, 8, 8), Child = sp };
+                Motion.SetHoverLift(chip, true);
+                wpOrder.Children.Add(chip);
             }
             if (cols.Count == 0)
                 wpOrder.Children.Add(new TextBlock { Text = "No columns - tick at least 1 column.", Foreground = Brushes.IndianRed, FontWeight = FontWeights.Bold });

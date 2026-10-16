@@ -50,6 +50,20 @@ namespace CIMS
 
             // 📐 หน้าต่าง Popup ที่ใหญ่กว่าจอ (เช่น HISTORY 1320 x 820 บนจอ 1366 x 768) -> ย่อให้พอดีจอ + กลางจอ
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(FitWindowToScreen));
+            // ✨ เปิดหน้าต่าง Popup = จางเข้า + ขยายขึ้นเล็กน้อย (หน้าต่างที่มีแอนิเมชันของตัวเองอยู่แล้วไม่ยุ่ง)
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(PopInWindow));
+        }
+
+        private static readonly Type[] OwnAnimation =
+        {
+            typeof(Views.MainView), typeof(Views.LoginView), typeof(Views.NotificationView), typeof(Views.CustomDialogView), typeof(Views.CustomErrorView),
+            typeof(Views.CustomWarningView), typeof(Views.PrintProgressView), typeof(Views.QuantityInputDialog), typeof(Views.TextInputDialog), typeof(Views.UserDetailWindow)
+        };
+
+        private static void PopInWindow(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is Window w) || !(w.Content is FrameworkElement content) || Array.IndexOf(OwnAnimation, w.GetType()) >= 0) return;
+            Motion.PopIn(content);
         }
 
         private static void FitWindowToScreen(object sender, RoutedEventArgs e)

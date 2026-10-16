@@ -9,6 +9,9 @@
     using System.Windows.Media.Imaging;
     using System.Windows.Media.Animation;
     using System.Windows.Media;
+    using Brush = System.Windows.Media.Brush;
+    using Brushes = System.Windows.Media.Brushes;
+    using Color = System.Windows.Media.Color;
     using System.Threading.Tasks; // ใส่เพิ่มเพื่อให้รองรับ Task.Run สวยๆ ครับ
     using CIMS.Helpers;
     using CIMS.Services;
@@ -200,6 +203,9 @@
                 order.Add(colAction);
                 for (int i = 0; i < order.Count; i++) order[i].DisplayIndex = i;
                 foreach (var kv in map) kv.Value.Visibility = layout.Columns.Contains(kv.Key) ? Visibility.Visible : Visibility.Collapsed;
+                // 🧲 คลังที่นับ Coil + เปิดแถว Coil ย่อย (ตั้งที่ EDIT STOCK) -> กด PRODUCT CODE ดู Coil แม่ / Coil ลูกได้
+                var coilStock = _stocks.FirstOrDefault(s => s.StkId == _viewModel.FilterStkId);
+                _viewModel.CoilStockId = coilStock != null && coilStock.ShowCoilRows && DbSchema.HasCoilRegister ? coilStock.StkId : (int?)null;
                 _viewModel.Layout = layout;
                 ResetWidthsLater();
             }
@@ -221,6 +227,122 @@
                 {
                     foreach (var kv in _widths) { kv.Key.Width = new DataGridLength(0); kv.Key.Width = kv.Value; }
                 }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            #endregion
+
+            #region === [ 🧲 แถว Coil แม่ / Coil ลูก (คลังที่นับ Coil) - แบบหน้า Store (Max-Min) ] ===
+            // แถวถูกใช้ซ้ำ (Recycling) -> เปิด / ปิดแถวย่อยตามสินค้าของแถวนั้น
+            private void dgQRHistory_LoadingRow(object sender, DataGridRowEventArgs e)
+            {
+                e.Row.DetailsVisibility = e.Row.Item is ProductControlModel p && p.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // กด PRODUCT CODE (มีป้าย ▸ n COIL) -> เปิด / ปิด Coil ของสินค้านั้น
+            private async void dgQRHistory_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+            {
+                if (!_viewModel.CoilStockId.HasValue) return;
+                // DataGrid จับเมาส์ไว้ตอนเลือกเซลล์ -> หาเซลล์จากจุดที่กด
+                DependencyObject dep = VisualTreeHelper.HitTest(dgQRHistory, e.GetPosition(dgQRHistory))?.VisualHit;
+                while (dep != null && !(dep is DataGridCell) && !(dep is System.Windows.Controls.Primitives.DataGridDetailsPresenter))
+                    dep = dep is Visual || dep is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(dep) : LogicalTreeHelper.GetParent(dep);
+                if (!(dep is DataGridCell cell) || cell.Column != colCode || !(cell.DataContext is ProductControlModel p) || p.CoilCount <= 0) return;
+
+                if (p.IsCoilOpen)
+                {
+                    p.IsCoilOpen = false; _viewModel.OpenCoilParts.Remove(p.PtId); ShowCoilRows(p);
+                    return;
+                }
+                int stk = _viewModel.CoilStockId.Value, ptId = p.PtId;
+                try
+                {
+                    p.CoilRows = await Task.Run(() => new CoilService().GetCoilRows(stk, ptId));
+                    p.IsCoilOpen = true; _viewModel.OpenCoilParts.Add(ptId);
+                    ShowCoilRows(p);
+                }
+                catch (Exception ex) { NotificationManager.Show("COIL", "โหลดรายการ Coil ไม่สำเร็จ\n" + ex.Message, false); }
+            }
+
+            private void ShowCoilRows(ProductControlModel p)
+            {
+                if (dgQRHistory.ItemContainerGenerator.ContainerFromItem(p) is DataGridRow row)
+                    row.DetailsVisibility = p.IsCoilOpen ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            private void CoilDetails_Loaded(object sender, RoutedEventArgs e)
+            {
+                if (!(sender is StackPanel sp)) return;
+                if (sp.Tag == null) { sp.Tag = "hooked"; sp.DataContextChanged += (s, a) => BuildCoilRows(sp); sp.IsVisibleChanged += (s, a) => { if (sp.IsVisible) BuildCoilRows(sp); }; }
+                BuildCoilRows(sp);
+            }
+
+            private static readonly double[] CoilCols = { 0.5, 1.4, 1.3, 1, 1, 1.3 };
+            private static readonly string[] CoilHeads = { "NO.", "COIL NO.", "MOTHER COIL", "WEIGHT (KG.)", "WEIGHT (TON)", "RECEIVED" };
+
+            private Grid CoilLine(string[] cells, Brush fg, FontWeight weight, double size)
+            {
+                var g = new Grid();
+                for (int i = 0; i < CoilCols.Length; i++)
+                {
+                    g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CoilCols[i], GridUnitType.Star) });
+                    var tb = new TextBlock { Text = cells[i], Foreground = fg, FontWeight = weight, FontSize = size, TextAlignment = TextAlignment.Center,
+                                             TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0) };
+                    Grid.SetColumn(tb, i);
+                    g.Children.Add(tb);
+                }
+                return g;
+            }
+
+            // Coil แม่ = แถบหัวกลุ่ม (จำนวน + น้ำหนักรวม) / Coil ลูก = แถวละ 1 ม้วน (เลข Coil · Coil แม่ · KG · TON · วันที่รับ)
+            private void BuildCoilRows(StackPanel sp)
+            {
+                sp.Children.Clear();
+                if (!(sp.DataContext is ProductControlModel p) || !p.IsCoilOpen) return;
+                var rows = p.CoilRows ?? new List<CoilRowModel>();
+                var purple = (Brush)FindResource("MainPurple");
+                var line = new SolidColorBrush(Color.FromRgb(0xEE, 0xEA, 0xF4));
+                var box = new StackPanel();
+                var frame = new Border
+                {
+                    Margin = new Thickness(60, 0, 20, 12), BorderBrush = purple, BorderThickness = new Thickness(3, 0, 0, 0),
+                    CornerRadius = new CornerRadius(0, 0, 10, 10), Background = new SolidColorBrush(Color.FromRgb(0xFC, 0xFA, 0xFF)), ClipToBounds = true, Child = box
+                };
+                sp.Children.Add(frame);
+
+                if (!rows.Any(r => !r.IsMother))
+                {
+                    box.Children.Add(new TextBlock { Text = "ยังไม่มี Coil ในคลังของสินค้านี้", Margin = new Thickness(0, 14, 0, 14), FontWeight = FontWeights.Bold,
+                                                     Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center });
+                    Motion.SlideIn(frame, 0, 220, false, 8);
+                    return;
+                }
+
+                box.Children.Add(new Border { Background = purple, Height = 40, Child = CoilLine(CoilHeads, Brushes.White, FontWeights.Bold, 12.5) });
+                int n = 0;
+                foreach (var r in rows)
+                {
+                    Border b;
+                    if (r.IsMother)
+                    {
+                        var t = new TextBlock { FontSize = 13, FontWeight = FontWeights.ExtraBold, Foreground = purple, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0) };
+                        t.Inlines.Add(new System.Windows.Documents.Run("🧲 MOTHER COIL : " + r.MotherCoil));
+                        t.Inlines.Add(new System.Windows.Documents.Run($"     {r.CoilNo}  •  {r.WeightKGText} KG  •  {r.WeightTonText} TON") { FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray });
+                        b = new Border { Height = 36, Background = new SolidColorBrush(Color.FromRgb(0xF1, 0xE8, 0xF8)), BorderBrush = line, BorderThickness = new Thickness(0, 0, 0, 1), Child = t };
+                    }
+                    else
+                    {
+                        b = new Border
+                        {
+                            Height = 46, BorderBrush = line, BorderThickness = new Thickness(0, 0, 0, 1),
+                            Child = CoilLine(new[] { r.NoText, r.CoilNo, string.IsNullOrWhiteSpace(r.MotherCoil) ? "-" : r.MotherCoil, r.WeightKGText, r.WeightTonText, r.DateText },
+                                             Brushes.Black, FontWeights.Bold, 13)
+                        };
+                        b.Background = Brushes.Transparent;
+                        b.MouseEnter += (s, a) => ((Border)s).Background = new SolidColorBrush(Color.FromRgb(0xF4, 0xEE, 0xFC));
+                        b.MouseLeave += (s, a) => ((Border)s).Background = Brushes.Transparent;
+                    }
+                    box.Children.Add(b);
+                    if (n++ < 14) Motion.SlideIn(b, n * 25, 240, false, 8);   // แถวแรก ๆ ไหลลงทีละแถว
+                }
             }
             #endregion
 

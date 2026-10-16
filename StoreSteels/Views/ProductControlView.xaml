@@ -120,7 +120,19 @@
                                 </ControlTemplate>
                             </Expander.Template>
                             <Expander.Header>
-                                <Border Background="#F3E5F5" CornerRadius="5" Height="38" BorderBrush="{StaticResource MainPurple}" BorderThickness="2,0,0,0">
+                                <Border CornerRadius="5" Height="38" BorderBrush="{StaticResource MainPurple}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#F3E5F5"/>
+                                            <Setter Property="BorderThickness" Value="2,0,0,0"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#EADCF3"/>
+                                                    <Setter Property="BorderThickness" Value="5,0,0,0"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
                                         <TextBlock Text="{Binding DataContext.GroupLabel, RelativeSource={RelativeSource AncestorType=DataGrid}, StringFormat='{}{0} : '}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource MainPurple}" FontSize="14"/>
                                         <TextBlock Text="{Binding Name}" FontWeight="ExtraBold" VerticalAlignment="Center" Foreground="{StaticResource MainPurple}" FontSize="15" Margin="5,0,0,0"/>
@@ -345,6 +357,9 @@
                           ScrollViewer.CanContentScroll="True"
                           ScrollViewer.ScrollChanged="dgQRHistory_ScrollChanged"
                           VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                          RowDetailsVisibilityMode="Collapsed"
+                          LoadingRow="dgQRHistory_LoadingRow"
+                          PreviewMouseLeftButtonUp="dgQRHistory_PreviewMouseLeftButtonUp"
                           ItemsSource="{Binding Products}"
                           HeadersVisibility="Column" IsReadOnly="True" 
                           AutoGenerateColumns="False" 
@@ -368,6 +383,25 @@
                             <Setter Property="HorizontalContentAlignment" Value="Center"/>
                         </Style>
                     </DataGrid.ColumnHeaderStyle>
+
+                    <!-- ✨ เมาส์ชี้แถว = พื้นม่วงอ่อน -->
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="White"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#FAF6FF"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+
+                    <!-- 🧲 แถว Coil แม่ / Coil ลูก ใต้สินค้า (สร้างในโค้ด BuildCoilRows) -->
+                    <DataGrid.RowDetailsTemplate>
+                        <DataTemplate>
+                            <StackPanel Loaded="CoilDetails_Loaded" Background="White"/>
+                        </DataTemplate>
+                    </DataGrid.RowDetailsTemplate>
 
                     <!-- หัวกลุ่ม (CATEGORY / CUSTOMER / SUPPLIER ตามที่ตั้งต่อคลัง) แบบเดียวกับหน้า Store (Max-Min) - คลิกเพื่อพับ / ขยาย -->
                     <DataGrid.GroupStyle>
@@ -410,7 +444,39 @@
                         <DataGridTextColumn x:Name="colPartA" Header="PART A" Binding="{Binding PartA}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
                         <DataGridTextColumn x:Name="colPartB" Header="PART B" Binding="{Binding PartB}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
                         <DataGridTextColumn x:Name="colModel" Header="MODEL" Binding="{Binding Model}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
-                        <DataGridTextColumn x:Name="colCode" Header="PRODUCT CODE" Binding="{Binding PartCode}" Width="1.2*" ElementStyle="{StaticResource WrapCell}"/>
+                        <!-- คลังที่นับ Coil: มีป้าย ▸ n = กด PRODUCT CODE เปิด / ปิดแถว Coil แม่ / Coil ลูก -->
+                        <DataGridTemplateColumn x:Name="colCode" Header="PRODUCT CODE" Width="1.2*" SortMemberPath="PartCode">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel x:Name="codeBox" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0" Background="Transparent">
+                                        <TextBlock x:Name="codeText" Text="{Binding PartCode}" TextWrapping="Wrap" TextAlignment="Center" FontWeight="Bold"/>
+                                        <Border x:Name="coilBadge" Visibility="{Binding CoilBadgeVisibility}" HorizontalAlignment="Center" Margin="0,5,0,0"
+                                                CornerRadius="9" Padding="8,2" Background="#EDE7F6" ToolTip="Click to show / hide the coils of this product">
+                                            <TextBlock x:Name="badgeText" FontSize="11" FontWeight="ExtraBold" Foreground="{StaticResource MainPurple}">
+                                                <Run Text="{Binding CoilArrow, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding CoilCount, Mode=OneWay}"/><Run Text=" COIL"/>
+                                            </TextBlock>
+                                        </Border>
+                                    </StackPanel>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding CoilBadgeVisibility}" Value="Visible">
+                                            <Setter TargetName="codeBox" Property="Cursor" Value="Hand"/>
+                                            <Setter TargetName="codeText" Property="Foreground" Value="{StaticResource MainPurple}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCoilOpen}" Value="True">
+                                            <Setter TargetName="coilBadge" Property="Background" Value="{StaticResource MainPurple}"/>
+                                            <Setter TargetName="badgeText" Property="Foreground" Value="White"/>
+                                        </DataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding CoilBadgeVisibility}" Value="Visible"/>
+                                                <Condition Binding="{Binding IsMouseOver, ElementName=codeBox}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter TargetName="codeText" Property="TextDecorations" Value="Underline"/>
+                                        </MultiDataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn x:Name="colPartNo" Header="PART NO" Binding="{Binding PartNo}" Width="1*" ElementStyle="{StaticResource WrapCell}"/>
                         <DataGridTextColumn x:Name="colName" Header="PRODUCT NAME" Binding="{Binding PartName}" Width="2*" ElementStyle="{StaticResource WrapCell}"/>
                         <DataGridTextColumn x:Name="colPackSize" Header="PACKSIZE" Binding="{Binding PackSize}" Width="0.8*"/>

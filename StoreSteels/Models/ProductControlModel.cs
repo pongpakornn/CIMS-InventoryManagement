@@ -71,6 +71,15 @@ namespace CIMS.Models
         // หัวกลุ่มของตาราง (CATEGORY / CUSTOMER / SUPPLIER ตามที่ Admin ตั้งต่อคลัง) - ค่าว่าง = "-"
         public string GroupKey { get; set; }
 
+        // 🧲 คลังที่นับ Coil (STOCK-MAT / STOCK-PANTA / STOCK-MSH): กด PRODUCT CODE -> แถวย่อย Coil แม่ / Coil ลูก (แบบหน้า Store)
+        private int _coilCount;
+        public int CoilCount { get => _coilCount; set { _coilCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(CoilBadgeVisibility)); } }
+        public System.Windows.Visibility CoilBadgeVisibility => CoilCount > 0 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        private bool _isCoilOpen;
+        public bool IsCoilOpen { get => _isCoilOpen; set { _isCoilOpen = value; OnPropertyChanged(); OnPropertyChanged(nameof(CoilArrow)); } }
+        public string CoilArrow => IsCoilOpen ? "▾" : "▸";
+        public System.Collections.Generic.List<CoilRowModel> CoilRows { get; set; }
+
         // ชื่อไฟล์รูปภาพที่เก็บใน DB
         public string ImageFileName
         {

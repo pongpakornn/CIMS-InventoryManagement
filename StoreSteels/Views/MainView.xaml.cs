@@ -28,7 +28,8 @@ namespace CIMS.Views
         {
             InitializeComponent();
             // หน้าใหม่ (ทั้งจากเมนูและจากในหน้า เช่น การ์ดคลัง -> ตาราง) เริ่มที่มุมซ้ายบนเสมอ (จอเล็กที่เลื่อนหน้าได้)
-            MainFrame.Navigated += (s, e) => { PageScroll.ScrollToHome(); ApplyPageScale(); };   // แต่ละหน้าแคบได้ไม่เท่ากัน (MinWidth)
+            // ✨ เลือกเมนูแล้วหน้าใหม่จางเข้า + เลื่อนขึ้น (ทุกหน้า)
+            MainFrame.Navigated += (s, e) => { PageScroll.ScrollToHome(); ApplyPageScale(); CIMS.Helpers.Motion.SlideIn(MainFrame, 0, 320, false, 22); };   // แต่ละหน้าแคบได้ไม่เท่ากัน (MinWidth)
             this.CurrentUser = session;             // เก็บข้อมูลคน Login
             this.DataContext = this;                // ทำให้ Binding {Binding CurrentUser.UserLevel} ทำงานได้
             this.Closing += MainView_Closing;       // [เพิ่ม] ดักจับการปิด Window ทุกกรณีรวมถึงกด X เพื่อให้ UserID อัพเดทสถานะเป็น Offline เสมอ

@@ -47,6 +47,9 @@ namespace CIMS.Views
                 if (sender == navDelete) { host.Content = _delete ??= new StockDeletePanel(_session, _stocks, _ticked); txtTitle.Text = "STOCK DELETE"; }
                 else if (sender == navColumns) { host.Content = _columns ??= new TableLayoutPanel(_session, _stocks); txtTitle.Text = "TABLE COLUMNS"; }
                 else if (sender == navQr) { host.Content = _qr ??= new QrFormatPanel(_session, _stocks); txtTitle.Text = "QR CODE"; }
+                // ✨ เปลี่ยนเมนู = หน้าใหม่เลื่อนเข้าจากขวา + หัวข้อจางเข้า
+                Motion.SlideIn(host.Content as UIElement, 0, 300, true, 26);
+                Motion.SlideIn(txtTitle, 60, 260, false, 8);
             }
             catch (Exception ex) { DialogHelper.ShowError("เปิดหน้าไม่สำเร็จ\n" + ex.Message); }
         }

@@ -141,7 +141,17 @@ namespace CIMS.ViewModels
             set { _layout = value ?? ProductControlColumns.Default(0); ApplyGrouping(); OnPropertyChanged(); OnPropertyChanged(nameof(GroupLabel)); }
         }
         public string GroupLabel => _layout.GroupBy;
-        private bool NeedsCoils => _layout.Columns.Contains("MOTHER") || _layout.Columns.Contains("COILNO");
+        private bool NeedsCoils => CoilStockId.HasValue || _layout.Columns.Contains("MOTHER") || _layout.Columns.Contains("COILNO");
+
+        // 🧲 คลังในช่องกรองที่นับ Coil + เปิดแถว Coil ย่อย (STOCK-MAT / STOCK-PANTA / STOCK-MSH) - null = ไม่มีแถวย่อย
+        private int? _coilStockId;
+        public int? CoilStockId
+        {
+            get => _coilStockId;
+            set { if (_coilStockId != value) OpenCoilParts.Clear(); _coilStockId = value; }
+        }
+        // สินค้าที่เปิดแถว Coil ไว้ (คงเปิดไว้หลังตารางโหลดใหม่ / อัพเดทเรียลไทม์)
+        public HashSet<int> OpenCoilParts { get; } = new HashSet<int>();
 
         private string GroupValue(ProductControlModel p)
         {
@@ -153,9 +163,11 @@ namespace CIMS.ViewModels
         private void Decorate(List<ProductControlModel> rows)
         {
             Dictionary<int, (List<string> Mothers, List<string> Coils)> coils = null;
+            int? coilStk = CoilStockId;
             if (NeedsCoils)
                 try { coils = new ProductControlLayoutService().GetCoils(FilterStkId); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GetCoils: {ex.Message}"); }
+            var open = OpenCoilParts.ToList();
             foreach (var p in rows)
             {
                 p.GroupKey = GroupValue(p);
@@ -163,8 +175,14 @@ namespace CIMS.ViewModels
                 {
                     p.MotherCoil = Short(c.Mothers, 3);
                     p.CoilNo = c.Coils.Count == 0 ? "" : $"{c.Coils.Count:N0} COIL\n" + Short(c.Coils, 2);
+                    p.CoilCount = coilStk.HasValue ? c.Coils.Count : 0;
                 }
-                else if (coils != null) { p.MotherCoil = ""; p.CoilNo = ""; }
+                else if (coils != null) { p.MotherCoil = ""; p.CoilNo = ""; p.CoilCount = 0; }
+
+                // เปิดแถว Coil ค้างไว้ -> โหลด Coil ใหม่ให้ด้วย
+                if (coilStk.HasValue && p.CoilCount > 0 && open.Contains(p.PtId))
+                    try { p.CoilRows = new CoilService().GetCoilRows(coilStk.Value, p.PtId); p.IsCoilOpen = true; }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GetCoilRows: {ex.Message}"); }
             }
         }
 
@@ -346,6 +364,9 @@ namespace CIMS.ViewModels
                         model.IsActive = targetRow.IsActive;
                         model.MotherCoil = targetRow.MotherCoil;
                         model.CoilNo = targetRow.CoilNo;
+                        model.CoilCount = targetRow.CoilCount;
+                        model.CoilRows = targetRow.CoilRows;
+                        model.IsCoilOpen = targetRow.IsCoilOpen;
                         model.GroupKey = GroupValue(model);
 
                         Products.RemoveAt(index);

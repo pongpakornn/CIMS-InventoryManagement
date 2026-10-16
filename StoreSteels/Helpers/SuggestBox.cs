@@ -49,6 +49,7 @@ namespace CIMS.Helpers
                 Placement = PlacementMode.Bottom,
                 StaysOpen = false,
                 AllowsTransparency = true,
+                PopupAnimation = PopupAnimation.Slide,   // ✨ รายการเลื่อนลงมา
                 Child = new Border
                 {
                     Background = Brushes.White,
