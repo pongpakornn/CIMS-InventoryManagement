@@ -223,6 +223,66 @@ namespace CIMS.Views
             RunPrintFlow(selected);
         }
 
+        // 📤 EXPORT EXCEL: รายการที่ติ๊ก -> Desktop\CIMS_Export\Pick List\PickList_<วันเวลา>.xlsx (รูปแบบ Export เดียวกันทั้งระบบ) แล้วเปิดไฟล์
+        private async void ExportExcel_Click(object sender, RoutedEventArgs e)
+        {
+            var selected = _viewModel.GetSelectedItems();
+            if (selected.Count == 0)
+            {
+                DialogHelper.ShowWarning("กรุณาติ๊กเลือกรายการที่ต้องการ Export อย่างน้อย 1 รายการครับ");
+                return;
+            }
+            btnExportExcel.IsEnabled = false;
+            try
+            {
+                string path = ImportTemplateService.NewPath(ImportTemplateService.Systems.PickList, "PickList");
+                var items = selected.ToList();
+                await System.Threading.Tasks.Task.Run(() => ExportPickList(items, path));
+                LogService.WriteLog(_viewModel.CurrentUser?.UserId, "EXPORT_PICKLIST", $"File: {System.IO.Path.GetFileName(path)} | Items: {items.Count} | Bills: {string.Join(", ", items.Select(i => i.TicketNo).Distinct().Take(30))}", "");
+                NotificationManager.Show("Export complete", $"Export Pick List แล้ว {items.Count:N0} รายการ\n{ImportTemplateService.ShortPath(path)}", true);
+                ImportTemplateService.OpenFile(path);
+            }
+            catch (Exception ex)
+            {
+                DialogHelper.ShowError("Export ไม่สำเร็จ\n" + (ex.Message.Contains("being used") ? "กรุณาปิดไฟล์ Excel ก่อน" : ex.Message));
+            }
+            finally { btnExportExcel.IsEnabled = true; }
+        }
+
+        private static void ExportPickList(List<PackingCardModel> items, string path)
+        {
+            string[] heads = { "NO", "BILL NO.", "ITEM NO", "GROUP", "PD CODE", "PRODUCT NAME", "QTY", "UNIT", "WORKORDER", "LOT", "PART NAME", "DATE", "PRINTED", "REPRINT" };
+            using (var wb = new ClosedXML.Excel.XLWorkbook())
+            {
+                var ws = wb.AddWorksheet("PICK LIST");
+                ImportTemplateService.Header(ws, heads, new double[] { 6.4, 16, 9, 10, 18, 40, 10, 8, 18, 10, 40, 13, 24, 24 });
+                int r = 2;
+                foreach (var x in items)
+                {
+                    ws.Cell(r, 1).Value = r - 1;
+                    ws.Cell(r, 2).Value = x.TicketNo ?? "";
+                    ws.Cell(r, 3).Value = x.ItemNo ?? "";
+                    ws.Cell(r, 4).Value = x.GroupCode ?? "";
+                    ws.Cell(r, 5).Value = x.MaterialCode ?? "";
+                    ws.Cell(r, 6).Value = x.ProductName ?? "";
+                    ws.Cell(r, 7).Value = x.Qty; ws.Cell(r, 7).Style.NumberFormat.Format = "#,##0.##";
+                    ws.Cell(r, 8).Value = x.Unit ?? "";
+                    ws.Cell(r, 9).Value = x.WorkOrder ?? "";
+                    ws.Cell(r, 10).Value = x.LotNo ?? "";
+                    ws.Cell(r, 11).Value = x.FgName ?? "";
+                    ws.Cell(r, 12).Value = x.TicketDate; ws.Cell(r, 12).Style.DateFormat.Format = "dd/MM/yyyy";
+                    ws.Cell(r, 13).Value = x.PrintedText ?? "";
+                    ws.Cell(r, 14).Value = x.ReprintText ?? "";
+                    r++;
+                }
+                ImportTemplateService.Body(ws, r - 1, heads.Length);
+                ImportTemplateService.LeftAlign(ws, r - 1, 6, 11);
+                ws.Column(1).Style.Font.Bold = true;
+                ws.SheetView.FreezeRows(1);
+                wb.SaveAs(path);
+            }
+        }
+
         private void RunPrintFlow(List<PackingCardModel> items)
         {
             // 🖨 เลือกเครื่องพิมพ์ก่อน: QL-800 = ฉลากทีละดวงแบบเดิม / เครื่องอื่น (Fuji ApeosPort ฯลฯ) = A4 หลายใบต่อแผ่น

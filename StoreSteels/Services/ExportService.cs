@@ -18,7 +18,18 @@ namespace CIMS.Services
         static ExportService()
         {
             QuestPDF.Settings.License = LicenseType.Community;
+            // 🔤 ฟอนต์ภาษาไทย: ฟอนต์ที่มากับ QuestPDF (Lato) ไม่มีตัวอักษรไทย -> ชื่อสินค้าภาษาไทย Export ไม่ได้
+            //    ลงทะเบียนฟอนต์ไทยของ Windows (Leelawadee UI / Tahoma) แล้วใช้เป็นฟอนต์ของ PDF
+            foreach (var f in new[] { "LeelawUI.ttf", "LeelaUIb.ttf", "tahoma.ttf", "tahomabd.ttf" })
+            {
+                string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), f);
+                try { if (File.Exists(path)) using (var s = File.OpenRead(path)) QuestPDF.Drawing.FontManager.RegisterFont(s); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"PDF font {f}: {ex.Message}"); }
+            }
         }
+
+        // Leelawadee UI ก่อน (อ่านง่าย) ไม่มี = Tahoma / Lato (ตัวอักษรอังกฤษ)
+        private static readonly string[] PdfFonts = { "Leelawadee UI", "Tahoma", "Lato" };
 
         // คืน path ของไฟล์ PDF: Desktop\CIMS_Export\Product Control\QR_<วัน-เดือน-ปี-เวลา>.pdf
         // codeOnly: QR มีแค่ PRODUCT CODE (ตั้งต่อคลังที่ปุ่ม ADMIN หน้า Inventory Registration) / false = PRODUCT CODE|PRODUCT NAME (ค่าเดิม)
@@ -34,6 +45,7 @@ namespace CIMS.Services
                     {
                         page.Size(PageSizes.A4);
                         page.Margin(1, Unit.Centimetre);
+                        page.DefaultTextStyle(x => x.FontFamily(PdfFonts));   // ชื่อสินค้าภาษาไทยแสดงได้
                         page.Content().Grid(grid =>
                         {
                             grid.Columns(4);

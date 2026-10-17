@@ -306,7 +306,12 @@
 
                 <TextBlock x:Name="txtItemCount" Grid.Column="0" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#888"/>
 
-                <Button Grid.Column="1" Content="PRINT SELECTED" Style="{StaticResource CyberButton}" Width="220" Height="45" FontSize="13" FontWeight="ExtraBold" Click="PrintSelected_Click"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- 📤 Export รายการที่ติ๊กเป็น Excel (Desktop\CIMS_Export\Pick List) -->
+                    <Button x:Name="btnExportExcel" Content="📤 EXPORT EXCEL" Style="{StaticResource CyberButton}" Background="#2E7D32" Width="190" Height="45" FontSize="13" FontWeight="ExtraBold"
+                            Margin="0,0,10,0" Click="ExportExcel_Click" ToolTip="Export the ticked items to Excel"/>
+                    <Button Content="PRINT SELECTED" Style="{StaticResource CyberButton}" Width="220" Height="45" FontSize="13" FontWeight="ExtraBold" Click="PrintSelected_Click"/>
+                </StackPanel>
             </Grid>
 
             <Border Grid.Row="3" CornerRadius="20" Background="#FDFDFD" BorderBrush="#F0F0F0" BorderThickness="1" ClipToBounds="True">
