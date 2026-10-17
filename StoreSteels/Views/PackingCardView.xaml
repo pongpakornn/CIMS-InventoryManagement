@@ -179,7 +179,13 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5,0,0,20">
-                <TextBlock Text="🖨️ PICK LIST" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                <!-- ไอคอน Pick List (ไฟล์สีขาว เดียวกับ Sidebar) ระบายเป็นสีม่วงของหัวหน้า -->
+                <Rectangle Width="40" Height="40" Fill="{StaticResource MainPurple}" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush ImageSource="/Assets/Icons/PickList.png" Stretch="Uniform"/>
+                    </Rectangle.OpacityMask>
+                </Rectangle>
+                <TextBlock Text="PICK LIST" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
             </StackPanel>
 
             <!-- Responsive: ค้นหา (ซ้าย) + พรีวิวการ์ด (ขวา) ยืดหด/ตกบรรทัดตามความกว้างหน้าจอ -->
