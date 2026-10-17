@@ -256,7 +256,7 @@
                 try
                 {
                     p.CoilRows = await Task.Run(() => new CoilService().GetCoilRows(stk, ptId));
-                    p.IsCoilOpen = true; _viewModel.OpenCoilParts.Add(ptId);
+                    p.IsCoilOpen = true; _viewModel.OpenCoilParts.Add(ptId); _justOpened.Add(ptId);
                     ShowCoilRows(p);
                 }
                 catch (Exception ex) { NotificationManager.Show("COIL", "โหลดรายการ Coil ไม่สำเร็จ\n" + ex.Message, false); }
@@ -275,74 +275,16 @@
                 BuildCoilRows(sp);
             }
 
-            private static readonly double[] CoilCols = { 0.5, 1.4, 1.3, 1, 1, 1.3 };
-            private static readonly string[] CoilHeads = { "NO.", "COIL NO.", "MOTHER COIL", "WEIGHT (KG.)", "WEIGHT (TON)", "RECEIVED" };
+            // 🧲 แบบเดียวกับหน้า Store (Max-Min) - Helpers/CoilRowsView: เต็มความกว้างตาราง แถบ Coil แม่ -> Coil ลูก ตามคอลัมน์ที่คลังตั้งไว้
+            //    แอนิเมชันเฉพาะตอนกดเปิด (ตารางอัพเดทเอง = ไม่เล่นซ้ำ)
+            private readonly HashSet<int> _justOpened = new HashSet<int>();
 
-            private Grid CoilLine(string[] cells, Brush fg, FontWeight weight, double size)
-            {
-                var g = new Grid();
-                for (int i = 0; i < CoilCols.Length; i++)
-                {
-                    g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CoilCols[i], GridUnitType.Star) });
-                    var tb = new TextBlock { Text = cells[i], Foreground = fg, FontWeight = weight, FontSize = size, TextAlignment = TextAlignment.Center,
-                                             TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0) };
-                    Grid.SetColumn(tb, i);
-                    g.Children.Add(tb);
-                }
-                return g;
-            }
-
-            // Coil แม่ = แถบหัวกลุ่ม (จำนวน + น้ำหนักรวม) / Coil ลูก = แถวละ 1 ม้วน (เลข Coil · Coil แม่ · KG · TON · วันที่รับ)
             private void BuildCoilRows(StackPanel sp)
             {
                 sp.Children.Clear();
                 if (!(sp.DataContext is ProductControlModel p) || !p.IsCoilOpen) return;
-                var rows = p.CoilRows ?? new List<CoilRowModel>();
-                var purple = (Brush)FindResource("MainPurple");
-                var line = new SolidColorBrush(Color.FromRgb(0xEE, 0xEA, 0xF4));
-                var box = new StackPanel();
-                var frame = new Border
-                {
-                    Margin = new Thickness(60, 0, 20, 12), BorderBrush = purple, BorderThickness = new Thickness(3, 0, 0, 0),
-                    CornerRadius = new CornerRadius(0, 0, 10, 10), Background = new SolidColorBrush(Color.FromRgb(0xFC, 0xFA, 0xFF)), ClipToBounds = true, Child = box
-                };
-                sp.Children.Add(frame);
-
-                if (!rows.Any(r => !r.IsMother))
-                {
-                    box.Children.Add(new TextBlock { Text = "ยังไม่มี Coil ในคลังของสินค้านี้", Margin = new Thickness(0, 14, 0, 14), FontWeight = FontWeights.Bold,
-                                                     Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center });
-                    Motion.SlideIn(frame, 0, 220, false, 8);
-                    return;
-                }
-
-                box.Children.Add(new Border { Background = purple, Height = 40, Child = CoilLine(CoilHeads, Brushes.White, FontWeights.Bold, 12.5) });
-                int n = 0;
-                foreach (var r in rows)
-                {
-                    Border b;
-                    if (r.IsMother)
-                    {
-                        var t = new TextBlock { FontSize = 13, FontWeight = FontWeights.ExtraBold, Foreground = purple, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0) };
-                        t.Inlines.Add(new System.Windows.Documents.Run("🧲 MOTHER COIL : " + r.MotherCoil));
-                        t.Inlines.Add(new System.Windows.Documents.Run($"     {r.CoilNo}  •  {r.WeightKGText} KG  •  {r.WeightTonText} TON") { FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray });
-                        b = new Border { Height = 36, Background = new SolidColorBrush(Color.FromRgb(0xF1, 0xE8, 0xF8)), BorderBrush = line, BorderThickness = new Thickness(0, 0, 0, 1), Child = t };
-                    }
-                    else
-                    {
-                        b = new Border
-                        {
-                            Height = 46, BorderBrush = line, BorderThickness = new Thickness(0, 0, 0, 1),
-                            Child = CoilLine(new[] { r.NoText, r.CoilNo, string.IsNullOrWhiteSpace(r.MotherCoil) ? "-" : r.MotherCoil, r.WeightKGText, r.WeightTonText, r.DateText },
-                                             Brushes.Black, FontWeights.Bold, 13)
-                        };
-                        b.Background = Brushes.Transparent;
-                        b.MouseEnter += (s, a) => ((Border)s).Background = new SolidColorBrush(Color.FromRgb(0xF4, 0xEE, 0xFC));
-                        b.MouseLeave += (s, a) => ((Border)s).Background = Brushes.Transparent;
-                    }
-                    box.Children.Add(b);
-                    if (n++ < 14) Motion.SlideIn(b, n * 25, 240, false, 8);   // แถวแรก ๆ ไหลลงทีละแถว
-                }
+                var stock = _stocks.FirstOrDefault(s => s.StkId == _viewModel.CoilStockId);
+                CoilRowsView.Build(sp, p.CoilRows, stock, (Brush)FindResource("MainPurple"), _justOpened.Remove(p.PtId));
             }
             #endregion
 

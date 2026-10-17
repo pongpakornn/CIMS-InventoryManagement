@@ -932,115 +932,15 @@ namespace CIMS.Views
             foreach (var sp in _coilPanels.ToList()) BuildCoilRows(sp);
         }
 
+        // 🧲 แถว Coil แบบเดียวกับหน้า Inventory Registration (Helpers/CoilRowsView): เต็มความกว้างตาราง แถบ Coil แม่ -> Coil ลูก
+        //    แอนิเมชันเฉพาะตอนกดเปิด (สร้างใหม่ตอนตารางอัพเดท / ปรับขนาดจอ = ไม่เล่นซ้ำ)
+        private readonly HashSet<StoreProductModel> _justOpened = new HashSet<StoreProductModel>();
+
         private void BuildCoilRows(StackPanel sp)
         {
             sp.Children.Clear();
             if (!(sp.DataContext is StoreProductModel p) || !p.IsCoilOpen) return;
-            var cols = dgStore.Columns.Where(c => c.Visibility == Visibility.Visible).OrderBy(c => c.DisplayIndex).ToList();
-            var coils = (p.CoilRows ?? new List<CoilRowModel>()).Where(r => !r.IsMother).ToList();
-
-            if (coils.Count == 0)
-            {
-                sp.Children.Add(new Border
-                {
-                    Height = 50, BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Background = Brushes.White,
-                    Child = new TextBlock { Text = "ยังไม่มี Coil ที่ลงทะเบียนของสินค้านี้ (สแกนรับเข้า หรือ Import COIL LIST)", FontSize = 13, FontWeight = FontWeights.Bold,
-                                            Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
-                });
-                return;
-            }
-
-            // หัวคอลัมน์ของแถว Coil = รูปแบบเดียวกับหัวตาราง (พื้น MainPurple ตัวขาวหนา กึ่งกลาง)
-            var head = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var col in cols)
-                head.Children.Add(FollowWidth(col, new TextBlock
-                {
-                    Text = CoilHeadText(col),
-                    FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White,
-                    TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
-                    VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0)
-                }));
-            sp.Children.Add(new Border { Height = 44, Background = (Brush)FindResource("MainPurple"), BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Child = head });
-
-            int n = 0;
-            foreach (var c in coils)
-            {
-                n++;
-                var line = new StackPanel { Orientation = Orientation.Horizontal };
-                foreach (var col in cols)
-                    line.Children.Add(FollowWidth(col, new TextBlock
-                    {
-                        Text = CoilCellText(col, c, n),
-                        FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.Black,
-                        TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
-                        VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 0, 4, 0)
-                    }));
-                sp.Children.Add(new Border { Height = 60, Background = Brushes.White, BorderBrush = CoilLine, BorderThickness = new Thickness(0, 0, 0, 1), Child = line });
-            }
-        }
-
-        // ความกว้างช่อง = ความกว้างคอลัมน์จริงตลอดเวลา (ผูก ActualWidth) - ตอนเปิดหน้าตารางยังคำนวณคอลัมน์ไม่เสร็จ
-        // ถ้าอ่านค่าครั้งเดียวจะได้ช่องแคบผิด (หัว KG / TON ตัวอักษรเรียงลงทีละตัว)
-        private static TextBlock FollowWidth(DataGridColumn col, TextBlock tb)
-        {
-            tb.SetBinding(FrameworkElement.WidthProperty, new System.Windows.Data.Binding(nameof(DataGridColumn.ActualWidth)) { Source = col });
-            return tb;
-        }
-
-        // คอลัมน์ของแถว Coil ตามที่คลังตั้งไว้ (EDIT STOCK -> COIL SUB ROW COLUMNS)
-        private bool Sub(string key) => _stock?.CoilRowShows(key) ?? true;
-
-        // ลำดับที่ผู้ใช้เลือกเอง (EDIT STOCK -> COIL SUB ROW COLUMNS ติ๊กไม่ตรงลำดับเริ่มต้น):
-        //   ช่องของตาราง (ยกเว้น NO. / IMAGE) ใส่คอลัมน์ย่อยทีละช่องจากซ้ายไปขวาตามลำดับนั้น - ช่องไม่พอ = รวมในช่องสุดท้าย
-        private List<string> CustomSubKeys(DataGridColumn col)
-        {
-            var cols = dgStore.Columns.Where(c => c.Visibility == Visibility.Visible && c != colNo && c != colImage).OrderBy(c => c.DisplayIndex).ToList();
-            int slot = cols.IndexOf(col);
-            if (slot < 0) return new List<string>();
-            var keys = _stock.CoilRowOrder();
-            return slot < cols.Count - 1 ? keys.Skip(slot).Take(1).ToList() : keys.Skip(slot).ToList();
-        }
-
-        private string SubHead(string key) => key switch
-        {
-            "COILNO" => "COIL NO.", "MOTHER" => "MOTHER COIL", "WEIGHT" => $"WEIGHT ({_stock?.Unit ?? "KG"}.)",
-            "COIL" => "STOCK (COIL)", "TON" => "WEIGHT (TON)", "RECEIVED" => "RECEIVED", _ => ""
-        };
-
-        private string SubCell(string key, CoilRowModel c) => key switch
-        {
-            "COILNO" => c.CoilNo,
-            "MOTHER" => string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil,
-            "WEIGHT" => CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true),
-            "COIL" => "1",
-            "TON" => c.WeightTonText + " TON",
-            "RECEIVED" => c.ReceivedDate?.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "-",
-            _ => ""
-        };
-
-        private string CoilHeadText(DataGridColumn col)
-        {
-            if (col == colNo) return "NO.";
-            if (_stock?.CoilRowCustomOrder == true) return string.Join("  •  ", CustomSubKeys(col).Select(SubHead));
-            if (col == colCode) return Sub("COILNO") ? "COIL NO." : "";
-            if (col == colName) return Sub("MOTHER") ? "MOTHER COIL" : "";
-            if (col == colQty) return Sub("WEIGHT") ? "WEIGHT (KG.)" : "";
-            if (col == colStockBox) return Sub("COIL") ? "STOCK (COIL)" : "";
-            if (col == colRemark) return string.Join("  •  ", new[] { Sub("TON") ? "WEIGHT (TON)" : null, Sub("RECEIVED") ? "RECEIVED" : null }.Where(x => x != null));
-            return "";
-        }
-
-        private string CoilCellText(DataGridColumn col, CoilRowModel c, int n)
-        {
-            if (col == colNo) return n.ToString();
-            if (_stock?.CoilRowCustomOrder == true) return string.Join("  •  ", CustomSubKeys(col).Select(k => SubCell(k, c)));
-            if (col == colCode) return Sub("COILNO") ? c.CoilNo : "";
-            if (col == colName) return Sub("MOTHER") ? (string.IsNullOrWhiteSpace(c.MotherCoil) || c.MotherCoil == "-" ? "-" : c.MotherCoil) : "";
-            if (col == colQty) return Sub("WEIGHT") ? CIMS.Helpers.Qty.Edit(c.WeightKG, _stock?.AllowDecimal == true) : "";
-            if (col == colStockBox) return Sub("COIL") ? "1" : "";
-            if (col == colRemark)
-                return string.Join("  •  ", new[] { Sub("TON") ? c.WeightTonText + " TON" : null, Sub("RECEIVED") ? (c.ReceivedDate?.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "-") : null }.Where(x => x != null));
-            return "";
+            CoilRowsView.Build(sp, p.CoilRows, _stock, (Brush)FindResource("MainPurple"), _justOpened.Remove(p));
         }
 
         private void dgStore_LoadingRow(object sender, DataGridRowEventArgs e)
@@ -1072,6 +972,7 @@ namespace CIMS.Views
             {
                 p.CoilRows = await Task.Run(() => new CoilService().GetCoilRows(stkId, ptId));
                 p.IsCoilOpen = true;
+                _justOpened.Add(p);   // ✨ เล่นแอนิเมชันตอนเปิดครั้งนี้
                 ShowCoilRows(p);
             }
             catch (Exception ex)
