@@ -355,8 +355,10 @@
                     <Button x:Name="btnBackToStocks" Content="←" Width="42" Height="40" FontSize="18" Margin="0,0,12,0"
                             Style="{StaticResource ModernHeaderButton}" Background="{StaticResource MainPurple}" Foreground="White"
                             ToolTip="ALL STOCKS" Click="btnBackToStocks_Click"/>
+                    <!-- ไอคอนโกดัง (Assets/Icons/StoreWarehouse.png) หน้าชื่อหน้า -->
+                    <Image Source="/Assets/Icons/StoreWarehouse.png" Width="46" Height="46" VerticalAlignment="Center" Margin="5,0,6,0" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="📦 STORE ( MAX - MIN )" FontSize="25" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,0"/>
+                        <TextBlock Text="STORE ( MAX - MIN )" FontSize="25" FontWeight="Black" Foreground="{StaticResource MainPurple}" Margin="5,0,0,0"/>
                         <TextBlock x:Name="txtStockInfo" FontSize="13" FontWeight="Bold" Foreground="#8A8490" Margin="7,2,0,0" MaxWidth="320" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </StackPanel>
