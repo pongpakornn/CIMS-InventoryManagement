@@ -40,33 +40,40 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
+            <!-- หัวหน้า: ชื่อ + สถานะ (คอลัมน์ซ้าย ไม่ถูกทับ) · ปุ่ม (คอลัมน์ขวา ที่ไม่พอ = ขึ้นแถวใหม่เอง) -->
             <Grid Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="👥 USER MANAGEMENT" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="👥 USER MANAGEMENT" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                        <Border Background="#F3E5F5" CornerRadius="12" Padding="14,6" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="txtTotal" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                        </Border>
+                        <Border Background="#E8F5E9" CornerRadius="12" Padding="14,6" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="txtOnline" FontWeight="Black" Foreground="#2E7D32"/>
+                        </Border>
+                        <Border Background="#FFEBEE" CornerRadius="12" Padding="14,6" VerticalAlignment="Center">
+                            <TextBlock x:Name="txtLocked" FontWeight="Black" Foreground="#C62828"/>
+                        </Border>
+                    </StackPanel>
                     <TextBlock Text="View, add, edit and delete users and set the permissions of every system" FontSize="12" FontWeight="Bold" Foreground="#8A8490" Margin="0,4,0,0"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Border Background="#F3E5F5" CornerRadius="12" Padding="14,6" Margin="0,0,8,0">
-                        <TextBlock x:Name="txtTotal" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
-                    </Border>
-                    <Border Background="#E8F5E9" CornerRadius="12" Padding="14,6" Margin="0,0,8,0">
-                        <TextBlock x:Name="txtOnline" FontWeight="Black" Foreground="#2E7D32"/>
-                    </Border>
-                    <Border Background="#FFEBEE" CornerRadius="12" Padding="14,6" Margin="0,0,16,0">
-                        <TextBlock x:Name="txtLocked" FontWeight="Black" Foreground="#C62828"/>
-                    </Border>
-                    <Button x:Name="btnContact" Content="🔔 ALERT CONTACT" Style="{StaticResource StkButton}" Background="#C62828" Click="Contact_Click" Margin="0,0,8,0"
+                <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="btnContact" Content="🔔 ALERT CONTACT" Style="{StaticResource StkButton}" Background="#C62828" Click="Contact_Click" Margin="0,4,8,4"
                             ToolTip="Who users should contact for help (name - phone (nickname)), e.g. a user with no scan stock"/>
                     <!-- 🧾 PR SETTINGS: คลังที่เก็บ PR + Export Path ของแต่ละคลัง (Admin Level 1 เท่านั้น - ย้ายมาจากหน้า PR) -->
-                    <Button x:Name="btnPrSettings" Content="🧾 PR SETTINGS" Style="{StaticResource StkButton}" Background="#6750A4" Click="PrSettings_Click" Margin="0,0,8,0"
+                    <Button x:Name="btnPrSettings" Content="🧾 PR SETTINGS" Style="{StaticResource StkButton}" Background="#6750A4" Click="PrSettings_Click" Margin="0,4,8,4"
                             Visibility="Collapsed" ToolTip="Stocks that keep PR (scan OUT creates a PR + shown in the PR page)"/>
                     <!-- 📊 SETUP EXCEL PATH: ไฟล์ Excel + ช่องที่ลงข้อมูล PR ของแต่ละคลัง (Admin Level 1 เท่านั้น) -->
-                    <Button x:Name="btnPrExcel" Content="📊 SETUP EXCEL PATH" Style="{StaticResource StkButton}" Background="#2E7D32" Click="PrExcel_Click" Margin="0,0,8,0"
+                    <Button x:Name="btnPrExcel" Content="📊 SETUP EXCEL PATH" Style="{StaticResource StkButton}" Background="#2E7D32" Click="PrExcel_Click" Margin="0,4,8,4"
                             Visibility="Collapsed" ToolTip="Excel file of each stock + which cell / column each PR field goes to (EXPORT PATH)"/>
-                    <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource StkButton}" Background="#49454F" Click="Template_Click" Margin="0,0,8,0" ToolTip="Excel template for importing users and permissions"/>
-                    <Button x:Name="btnImport" Content="📥 IMPORT USER / PERMISSION" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,0,8,0"/>
-                    <Button x:Name="btnAdd" Content="＋ ADD USER" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Add_Click"/>
-                </StackPanel>
+                    <Button x:Name="btnTemplate" Content="📄 TEMPLATE" Style="{StaticResource StkButton}" Background="#49454F" Click="Template_Click" Margin="0,4,8,4" ToolTip="Excel template for importing users and permissions"/>
+                    <Button x:Name="btnImport" Content="📥 IMPORT USER / PERMISSION" Style="{StaticResource StkButton}" Background="#1976D2" Click="Import_Click" Margin="0,4,8,4"/>
+                    <Button x:Name="btnAdd" Content="＋ ADD USER" Style="{StaticResource StkButton}" Background="#2E7D32" Click="Add_Click" Margin="0,4,0,4"/>
+                </WrapPanel>
             </Grid>
 
             <TextBox x:Name="txtSearch" Grid.Row="1" Style="{StaticResource StkInput}" Height="42" Margin="0,0,0,16"
