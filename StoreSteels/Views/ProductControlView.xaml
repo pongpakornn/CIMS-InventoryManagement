@@ -183,7 +183,13 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5,0,0,20">
-                <TextBlock Text="📥 Inventory Registration" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                <!-- ไอคอน Inventory Registration (ไฟล์สีขาว) ระบายเป็นสีม่วงของหัวหน้า -->
+                <Rectangle Width="40" Height="40" Fill="{StaticResource MainPurple}" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush ImageSource="/Assets/Icons/InventoryRegistration.png" Stretch="Uniform"/>
+                    </Rectangle.OpacityMask>
+                </Rectangle>
+                <TextBlock Text="Inventory Registration" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
             </StackPanel>
 
             <Grid Grid.Row="1" Margin="0,0,0,20">
