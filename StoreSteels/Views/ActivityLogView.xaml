@@ -16,7 +16,15 @@
 
             <Grid Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="🕘 ACTIVITY LOG" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <!-- ไอคอน Activity Log (ไฟล์สีขาว เดียวกับ Sidebar) ระบายเป็นสีม่วงของหัวหน้า -->
+                        <Rectangle Width="32" Height="32" Fill="{StaticResource MainPurple}" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <Rectangle.OpacityMask>
+                                <ImageBrush ImageSource="/Assets/Icons/ActivityLog.png" Stretch="Uniform"/>
+                            </Rectangle.OpacityMask>
+                        </Rectangle>
+                        <TextBlock Text="ACTIVITY LOG" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
+                    </StackPanel>
                     <TextBlock Text="Every action in the system: login / logout, pages opened, add / edit / delete, scans, import / export" FontSize="12" FontWeight="Bold" Foreground="#8A8490" Margin="0,4,0,0"/>
                 </StackPanel>
                 <Button x:Name="btnExport" Content="📤 EXPORT" Style="{StaticResource StkButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Export_Click"/>

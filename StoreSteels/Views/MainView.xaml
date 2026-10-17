@@ -190,7 +190,7 @@
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/historyscanner.png" Style="{StaticResource SidebarIconStyle}"/>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/ActivityLog.png" Style="{StaticResource SidebarIconStyle}"/>
                             <TextBlock Grid.Column="1" Text="Activity Log" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </Button>
