@@ -112,7 +112,7 @@
 
         <Grid Grid.Row="1" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="236"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="250"/>
             </Grid.ColumnDefinitions>
@@ -120,7 +120,7 @@
             <!-- คลัง -->
             <DockPanel Margin="0,0,16,0">
                 <TextBlock DockPanel.Dock="Top" Text="STOCK" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,8"/>
-                <ListBox x:Name="lbStocks" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource StockItem}"
+                <ListBox x:Name="lbStocks" BorderThickness="0" Background="Transparent" Padding="10,8,14,10" Margin="-10,-8,0,0" ItemContainerStyle="{StaticResource StockItem}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Stocks_SelectionChanged">
                     <ListBox.ItemTemplate>
                         <DataTemplate>

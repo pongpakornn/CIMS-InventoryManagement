@@ -99,7 +99,12 @@ namespace CIMS.Helpers
             // รายการการ์ด: เว้นขอบด้านใน 6px ให้การ์ดที่ยกขึ้น + เงา ไม่ถูกตัดที่ขอบ
             EventManager.RegisterClassHandler(typeof(System.Windows.Controls.ItemsControl), FrameworkElement.LoadedEvent, new RoutedEventHandler((s, e) =>
             {
-                if (s is System.Windows.Controls.ItemsControl ic && IsCardList(ic) && ic.Padding == default(Thickness)) ic.Padding = new Thickness(6);
+                // ListBox มี Padding 1 มาเอง = ถือว่ายังไม่ได้ตั้ง (ตั้งเองมากกว่า 1px = ใช้ค่าที่ตั้ง)
+                if (s is System.Windows.Controls.ItemsControl ic && IsCardList(ic))
+                {
+                    var p = ic.Padding;
+                    if (p.Left <= 1 && p.Top <= 1 && p.Right <= 1 && p.Bottom <= 1) ic.Padding = new Thickness(8);
+                }
             }));
         }
 
