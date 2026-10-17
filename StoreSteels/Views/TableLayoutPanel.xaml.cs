@@ -183,7 +183,7 @@ namespace CIMS.Views
                 var save = changed.Select(r =>
                 {
                     var l = r.Layout.Clone();
-                    l.QrContent = now.TryGetValue(r.Id, out var x) ? x.QrContent : l.QrContent;
+                    if (now.TryGetValue(r.Id, out var x)) { l.QrFields = x.QrFields; l.QrLabel = x.QrLabel; }
                     return l;
                 }).ToList();
                 new ProductControlLayoutService().Save(save, _session?.UserId);

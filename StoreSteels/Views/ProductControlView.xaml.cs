@@ -900,14 +900,23 @@
                 {
                     string currentUserId = _viewModel.CurrentUser?.UserId ?? "Unknown";
 
-                    // QR ตามที่ Admin ตั้งต่อคลังในช่องกรอง (ALL STOCKS = ค่าของ ALL STOCKS): PRODUCT CODE อย่างเดียว / PRODUCT CODE|PRODUCT NAME
+                    // QR ตามที่ Admin ตั้งต่อคลังในช่องกรอง (ALL STOCKS = ค่าของ ALL STOCKS) ที่ปุ่ม ADMIN > QR CODE:
+                    //   รูปแบบที่ 2 = สิ่งที่อยู่ใน QR (หน้าแสกนอ่าน) / รูปแบบที่ 1 = ข้อความใต้ QR
                     LoadLayouts();
-                    bool codeOnly = CurrentLayout().QrCodeOnly;
-                    string pdf = await Task.Run(() => new ExportService().GenerateA4Pdf(selectedItems, codeOnly));
+                    var lay = CurrentLayout();
+                    var qrFields = lay.QrFields.ToList(); var labelFields = lay.QrLabel.ToList();
+                    int? coilStk = _viewModel.FilterStkId;
+                    bool needCoils = qrFields.Concat(labelFields).Any(k => k == "MOTHER" || k == "COILNO");
+                    string pdf = await Task.Run(() =>
+                    {
+                        var coils = needCoils ? new ProductControlLayoutService().GetCoils(coilStk) : null;
+                        return new ExportService().GenerateA4Pdf(selectedItems, qrFields, labelFields, coils);
+                    });
+                    string qrText = QrFormat.Sample(qrFields);
 
                     foreach (var item in selectedItems)
                     {
-                        LogService.WriteLog(currentUserId, "EXPORT_QR_PDF", $"Exported QR Code to PDF for Part: {item.PartName} | QR: {(codeOnly ? "PRODUCT CODE" : "PRODUCT CODE|PRODUCT NAME")}", item.PartCode);
+                        LogService.WriteLog(currentUserId, "EXPORT_QR_PDF", $"Exported QR Code to PDF for Part: {item.PartName} | QR: {qrText}", item.PartCode);
                     }
 
                     DialogHelper.ShowSuccess($"ส่งออกไฟล์ QR เรียบร้อยแล้ว!\n{ImportTemplateService.ShortPath(pdf)}");

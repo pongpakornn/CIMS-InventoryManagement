@@ -1,4 +1,4 @@
-using CIMS.Core;
+﻿using CIMS.Core;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
@@ -13,11 +13,79 @@ namespace CIMS.Services
         public int StockId { get; set; }
         public List<string> Columns { get; set; } = new List<string>();
         public string GroupBy { get; set; } = "CATEGORY";    // CATEGORY / CUSTOMER / SUPPLIER / NONE
-        public string QrContent { get; set; } = "CODE_NAME"; // CODE = PRODUCT CODE อย่างเดียว / CODE_NAME = PRODUCT CODE|PRODUCT NAME
-        public bool QrCodeOnly => string.Equals(QrContent, "CODE", StringComparison.OrdinalIgnoreCase);
+        // ▣ QR รูปแบบที่ 2 = สิ่งที่อยู่ใน QR (หน้าแสกนอ่าน) คั่นด้วย | ตามลำดับ - ต้องมี PRODUCT CODE เสมอ
+        public List<string> QrFields { get; set; } = new List<string>(QrFormat.DefaultFields);
+        // ▣ QR รูปแบบที่ 1 = ข้อความใต้ QR ใน PDF บรรทัดละช่อง (บรรทัดแรกตัวหนา)
+        public List<string> QrLabel { get; set; } = new List<string>(QrFormat.DefaultLabel);
+        // ค่าเดิม (แอปเวอร์ชันเก่า): CODE = PRODUCT CODE อย่างเดียว / CODE_NAME = อย่างอื่น
+        public string QrContent => QrFields.Count == 1 && QrFields[0] == "CODE" ? "CODE" : "CODE_NAME";
 
         public ProductControlLayout Clone() =>
-            new ProductControlLayout { StockId = StockId, Columns = new List<string>(Columns), GroupBy = GroupBy, QrContent = QrContent };
+            new ProductControlLayout { StockId = StockId, Columns = new List<string>(Columns), GroupBy = GroupBy, QrFields = new List<string>(QrFields), QrLabel = new List<string>(QrLabel) };
+    }
+
+    // ▣ รูปแบบ QR ที่ EXPORT QR SELECT สร้าง (ตั้งต่อคลังที่ปุ่ม ADMIN > QR CODE)
+    public static class QrFormat
+    {
+        public const char Sep = '|';
+        public static readonly string[] DefaultFields = { "CODE", "NAME" };
+        public static readonly string[] DefaultLabel = { "CODE", "NAME" };
+
+        // ช่องที่เลือกได้ = คอลัมน์ของตาราง Inventory Registration (ไม่รวม IMAGE / QR CODE)
+        public static IEnumerable<(string Key, string Label)> Fields => ProductControlColumns.All.Where(c => c.Key != "IMAGE" && c.Key != "QRCODE");
+
+        public static List<string> Parse(string csv, string[] fallback)
+        {
+            var list = ProductControlColumns.Parse(csv).Where(k => k != "IMAGE" && k != "QRCODE").ToList();
+            return list.Count > 0 ? list : fallback.ToList();
+        }
+
+        // ค่าของช่องจากสินค้า (ไม่มี = ว่าง) - ตัด | ในค่าออก กันตำแหน่งช่องเลื่อนตอนแสกน
+        //   coils = Coil ที่อยู่ในคลัง (MOTHER COIL / COIL NO) จาก GetCoils - มี = ใช้เลข Coil ทั้งหมดคั่นด้วย ,
+        public static string Value(CIMS.Models.ProductControlModel m, string key, IDictionary<int, (List<string> Mothers, List<string> Coils)> coils = null)
+        {
+            if ((key == "MOTHER" || key == "COILNO") && coils != null && coils.TryGetValue(m.PtId, out var cl))
+                return string.Join(",", key == "MOTHER" ? cl.Mothers : cl.Coils).Replace(Sep, '/');
+            string v;
+            switch (key)
+            {
+                case "SUPPLIER": v = m.CustomerCode; break;
+                case "CUSTOMER": v = m.Customer; break;
+                case "CATEGORY": v = m.Category; break;
+                case "PARTA": v = m.PartA; break;
+                case "PARTB": v = m.PartB; break;
+                case "MODEL": v = m.Model; break;
+                case "CODE": v = m.PartCode; break;
+                case "PARTNO": v = m.PartNo; break;
+                case "NAME": v = m.PartName; break;
+                case "PACKSIZE": v = m.PackSize; break;
+                case "BIN": v = m.Location; break;
+                case "MOTHER": v = m.MotherCoil; break;
+                case "COILNO": v = m.CoilNo; break;
+                default: v = null; break;
+            }
+            v = (v ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
+            return v == "-" ? "" : v.Replace(Sep, '/');
+        }
+
+        // ข้อความใน QR เช่น CODE,NAME,PACKSIZE -> I2AB-01002|ถุงพลาสติก ...|100 (ช่องเดียว = ค่าอย่างเดียว ไม่มี |)
+        public static string Content(CIMS.Models.ProductControlModel m, IList<string> fields, IDictionary<int, (List<string> Mothers, List<string> Coils)> coils = null)
+        {
+            IEnumerable<string> f = (fields == null || fields.Count == 0) ? DefaultFields : fields;
+            string s = string.Join(Sep.ToString(), f.Select(k => Value(m, k, coils)));
+            return s.Replace(Sep.ToString(), "").Length == 0 ? (m.PartCode ?? "N/A") : s;
+        }
+
+        // ตัวอย่างในหน้าตั้งค่า: แสดงชื่อช่องแทนค่า
+        public static string Sample(IList<string> fields) =>
+            string.Join(Sep.ToString(), fields.Select(k => ProductControlColumns.Label(k)));
+
+        // ตำแหน่ง PRODUCT CODE ใน QR (เริ่ม 0) - ไม่มี = 0 (QR เดิม)
+        public static int CodeIndex(IList<string> fields)
+        {
+            int i = fields == null ? -1 : fields.IndexOf("CODE");
+            return i < 0 ? 0 : i;
+        }
     }
 
     public static class ProductControlColumns
@@ -49,7 +117,7 @@ namespace CIMS.Services
         }
 
         public static ProductControlLayout Default(int stockId) =>
-            new ProductControlLayout { StockId = stockId, Columns = DefaultOrder.ToList(), GroupBy = "CATEGORY", QrContent = "CODE_NAME" };
+            new ProductControlLayout { StockId = stockId, Columns = DefaultOrder.ToList(), GroupBy = "CATEGORY" };
     }
 
     public class ProductControlLayoutService
@@ -61,8 +129,9 @@ namespace CIMS.Services
         {
             var map = new Dictionary<int, ProductControlLayout>();
             if (!CIMS.Helpers.DbSchema.HasProductControlSettings) return map;
+            bool qf = CIMS.Helpers.DbSchema.HasQrFields;
             using (var conn = new SqlConnection(_cs))
-            using (var cmd = new SqlCommand("SELECT StockID, ColumnOrder, GroupBy, QrContent FROM CIMS.ProductControlSettings", conn))
+            using (var cmd = new SqlCommand("SELECT StockID, ColumnOrder, GroupBy, QrContent" + (qf ? ", QrFields, QrLabel" : "") + " FROM CIMS.ProductControlSettings", conn))
             {
                 conn.Open();
                 using (var r = cmd.ExecuteReader())
@@ -77,7 +146,9 @@ namespace CIMS.Services
                             StockId = id,
                             Columns = cols.Count > 0 ? cols : ProductControlColumns.DefaultOrder.ToList(),
                             GroupBy = ProductControlColumns.Groups.Contains(grp) ? grp : "CATEGORY",
-                            QrContent = qr == "CODE" ? "CODE" : "CODE_NAME"
+                            QrFields = qf && r[4] != DBNull.Value ? QrFormat.Parse(r[4].ToString(), QrFormat.DefaultFields)
+                                     : (qr == "CODE" ? new List<string> { "CODE" } : QrFormat.DefaultFields.ToList()),
+                            QrLabel = qf && r[5] != DBNull.Value ? QrFormat.Parse(r[5].ToString(), QrFormat.DefaultLabel) : QrFormat.DefaultLabel.ToList()
                         };
                     }
             }
@@ -94,21 +165,28 @@ namespace CIMS.Services
         {
             if (!CIMS.Helpers.DbSchema.HasProductControlSettings)
                 throw new InvalidOperationException("ฐานข้อมูลยังไม่รองรับการตั้งค่านี้ กรุณารัน Database/Update_20261016c.sql");
+            bool qf = CIMS.Helpers.DbSchema.HasQrFields;
+            string upd = qf ? ", QrFields = @qf, QrLabel = @ql" : "", insCols = qf ? ", QrFields, QrLabel" : "", insVals = qf ? ", @qf, @ql" : "";
             using (var conn = new SqlConnection(_cs))
             {
                 conn.Open();
                 using (var trans = conn.BeginTransaction())
                 {
                     foreach (var l in layouts)
-                        using (var cmd = new SqlCommand(@"
-                            UPDATE CIMS.ProductControlSettings SET ColumnOrder = @c, GroupBy = @g, QrContent = @q, UpdatedBy = @u, UpdatedDate = GETDATE() WHERE StockID = @id;
+                        using (var cmd = new SqlCommand($@"
+                            UPDATE CIMS.ProductControlSettings SET ColumnOrder = @c, GroupBy = @g, QrContent = @q{upd}, UpdatedBy = @u, UpdatedDate = GETDATE() WHERE StockID = @id;
                             IF @@ROWCOUNT = 0
-                                INSERT INTO CIMS.ProductControlSettings (StockID, ColumnOrder, GroupBy, QrContent, UpdatedBy) VALUES (@id, @c, @g, @q, @u);", conn, trans))
+                                INSERT INTO CIMS.ProductControlSettings (StockID, ColumnOrder, GroupBy, QrContent{insCols}, UpdatedBy) VALUES (@id, @c, @g, @q{insVals}, @u);", conn, trans))
                         {
                             cmd.Parameters.AddWithValue("@id", l.StockId);
                             cmd.Parameters.AddWithValue("@c", string.Join(",", l.Columns));
                             cmd.Parameters.AddWithValue("@g", l.GroupBy ?? "CATEGORY");
-                            cmd.Parameters.AddWithValue("@q", l.QrCodeOnly ? "CODE" : "CODE_NAME");
+                            cmd.Parameters.AddWithValue("@q", l.QrContent);
+                            if (qf)
+                            {
+                                cmd.Parameters.AddWithValue("@qf", string.Join(",", l.QrFields));
+                                cmd.Parameters.AddWithValue("@ql", string.Join(",", l.QrLabel));
+                            }
                             cmd.Parameters.AddWithValue("@u", (object)userId ?? DBNull.Value);
                             cmd.ExecuteNonQuery();
                         }
@@ -142,6 +220,25 @@ namespace CIMS.Services
                     }
             }
             return map;
+        }
+
+        // ▣ หน้าแสกน: รหัสไหนเป็น PRODUCT CODE ที่มีอยู่จริง (QR ระบบที่คลังตั้งรูปแบบต่างกัน)
+        public HashSet<string> ExistingCodes(IEnumerable<string> codes)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var list = codes.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (list.Count == 0) return set;
+            using (var conn = new SqlConnection(_cs))
+            using (var cmd = new SqlCommand("", conn))
+            {
+                var names = new List<string>();
+                for (int i = 0; i < list.Count; i++) { names.Add("@c" + i); cmd.Parameters.AddWithValue("@c" + i, list[i]); }
+                cmd.CommandText = $"SELECT DISTINCT PartCode FROM CIMS.Parts WHERE PartCode IN ({string.Join(",", names)})";
+                conn.Open();
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read()) if (r[0] != DBNull.Value) set.Add(r[0].ToString().Trim());
+            }
+            return set;
         }
 
         // 🔎 ค่าที่มีในระบบแล้ว สำหรับช่อง SUPPLIER / CUSTOMER / CATEGORY (พิมพ์แล้วขึ้นให้เลือก)

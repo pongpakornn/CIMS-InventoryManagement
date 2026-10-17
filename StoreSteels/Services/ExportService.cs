@@ -32,8 +32,12 @@ namespace CIMS.Services
         private static readonly string[] PdfFonts = { "Leelawadee UI", "Tahoma", "Lato" };
 
         // คืน path ของไฟล์ PDF: Desktop\CIMS_Export\Product Control\QR_<วัน-เดือน-ปี-เวลา>.pdf
-        // codeOnly: QR มีแค่ PRODUCT CODE (ตั้งต่อคลังที่ปุ่ม ADMIN หน้า Inventory Registration) / false = PRODUCT CODE|PRODUCT NAME (ค่าเดิม)
-        public string GenerateA4Pdf(List<ProductControlModel> items, bool codeOnly = false)
+        // ตั้งต่อคลังที่ปุ่ม ADMIN > QR CODE หน้า Inventory Registration:
+        //   qrFields = รูปแบบที่ 2 สิ่งที่อยู่ใน QR (คั่นด้วย |) / labelFields = รูปแบบที่ 1 ข้อความใต้ QR บรรทัดละช่อง (บรรทัดแรกตัวหนา)
+        //   ไม่ส่งมา = PRODUCT CODE|PRODUCT NAME และพิมพ์รหัส + ชื่อใต้ QR (ค่าเดิม)
+        //   coils = Coil ในคลังต่อสินค้า (ใช้เมื่อเลือกช่อง MOTHER COIL / COIL NO)
+        public string GenerateA4Pdf(List<ProductControlModel> items, IList<string> qrFields = null, IList<string> labelFields = null,
+                                    IDictionary<int, (List<string> Mothers, List<string> Coils)> coils = null)
         {
             string fullPath = ImportTemplateService.NewPath(ImportTemplateService.Systems.Product, "QR", ".pdf");
 
@@ -57,7 +61,7 @@ namespace CIMS.Services
                                 {
                                     // QR นี้ไม่ได้บันทึกลง Database - เป็น QR เฉพาะสำหรับ "คืนเหล็กที่เหลือจากการผลิต"
                                     // เข้ารหัสแค่ Product Code | Product Name ตามที่ต้องการ
-                                    string qrContent = codeOnly ? (item.PartCode ?? "N/A") : $"{item.PartCode ?? "N/A"}|{item.PartName ?? "N/A"}";
+                                    string qrContent = QrFormat.Content(item, qrFields, coils);
 
                                     // สร้าง QR Code (ใช้ ECCLevel.M เพื่อให้สแกนง่ายในขณะที่ข้อมูลค่อนข้างยาว)
                                     QRCodeData qrCodeData = qrGenerator.CreateQrCode(qrContent, QRCodeGenerator.ECCLevel.M);
@@ -67,9 +71,16 @@ namespace CIMS.Services
                                     // 1. แสดงรูป QR Code (ขนาดเท่าเดิม จัดกึ่งกลาง)
                                     col.Item().Width(85).AlignCenter().Image(qrBytes);
 
-                                    // 2. แสดง Product Code แล้วตามด้วย Product Name บรรทัดถัดไป จัดกึ่งกลางใต้ QR พอดี
-                                    col.Item().Width(85).AlignCenter().PaddingTop(2).Text(item.PartCode).Bold().FontSize(9);
-                                    col.Item().Width(85).AlignCenter().Text(item.PartName).FontSize(7).FontColor(Colors.Grey.Medium);
+                                    // 2. ข้อความใต้ QR ตามรูปแบบที่ 1: บรรทัดแรกตัวหนา บรรทัดต่อไปตัวเล็กสีเทา จัดกึ่งกลางใต้ QR พอดี
+                                    bool first = true;
+                                    foreach (string key in (labelFields == null || labelFields.Count == 0) ? (IList<string>)QrFormat.DefaultLabel : labelFields)
+                                    {
+                                        string v = QrFormat.Value(item, key, coils);
+                                        if (v.Length == 0) continue;
+                                        if (first) col.Item().Width(85).AlignCenter().PaddingTop(2).Text(v).Bold().FontSize(9);
+                                        else col.Item().Width(85).AlignCenter().Text(v).FontSize(7).FontColor(Colors.Grey.Medium);
+                                        first = false;
+                                    }
 
                                     col.Item().PaddingBottom(15);
                                 });

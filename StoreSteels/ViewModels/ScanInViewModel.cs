@@ -1155,21 +1155,9 @@ namespace CIMS.ViewModels
             }
             else
             {
-                var parts = finalSearchCode.Split(new[] { '|', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-
-                if (parts.Length > 0)
-                {
-                    string firstChunk = parts[0].Trim();
-
-                    if (firstChunk.Length > 2 && char.IsDigit(firstChunk[0]) && char.IsLetter(firstChunk[1]))
-                    {
-                        finalSearchCode = firstChunk.Substring(1);
-                    }
-                    else
-                    {
-                        finalSearchCode = firstChunk;
-                    }
-                }
+                // ▣ QR ระบบ (EXPORT QR SELECT): PRODUCT CODE อยู่ช่องไหนตามรูปแบบที่ 2 ของคลัง (ADMIN > QR CODE)
+                string raw = finalSearchCode; var stk = multiScope ? null : stock;
+                finalSearchCode = await Task.Run(() => SysQrCode(raw, stk));
             }
 
             // ⏸ ป้ายที่ต้องตัดคลังต้นทาง (เช่น Panta -> STOCK-PANTA): ค้างอยู่ใน NOT DEDUCTED แล้ว = ไม่รับซ้ำ /
@@ -1481,8 +1469,58 @@ namespace CIMS.ViewModels
             matchedFmt = MatchSupplier(raw, SelectedStock, out List<string> codes, out _);
             if (matchedFmt != null) return codes;
             string trimmed = raw.Trim();
-            int pipeIndex = trimmed.IndexOf('|');
-            return new List<string> { pipeIndex >= 0 ? trimmed.Substring(0, pipeIndex).Trim() : trimmed };
+            return new List<string> { trimmed.IndexOf(QrFormat.Sep) >= 0 ? SysQrCode(trimmed, SelectedStock) : trimmed };
+        }
+
+        // ▣ QR ระบบ: รูปแบบที่ 2 ต่อคลัง (CIMS.ProductControlSettings.QrFields) โหลดใหม่ทุก 30 วินาที
+        private Dictionary<int, ProductControlLayout> _qrLayouts;
+        private DateTime _qrLayoutsAt;
+        private Dictionary<int, ProductControlLayout> QrLayouts()
+        {
+            if (_qrLayouts == null || (DateTime.Now - _qrLayoutsAt).TotalSeconds > 30)
+            {
+                try { _qrLayouts = new ProductControlLayoutService().GetAll(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"QrLayouts: {ex.Message}"); _qrLayouts = _qrLayouts ?? new Dictionary<int, ProductControlLayout>(); }
+                _qrLayoutsAt = DateTime.Now;
+            }
+            return _qrLayouts;
+        }
+
+        // ▣ PRODUCT CODE จาก QR ระบบ เช่น CODE|NAME|PACKSIZE หรือ NAME|CODE ตามที่คลังตั้งไว้
+        //   ช่องของ PRODUCT CODE: คลังที่เลือก (สแกนร่วม = ทุกคลังในขอบเขต) แล้วค่อย ALL STOCKS / ช่องแรก (QR เดิม)
+        //   หลายคลังตั้งตำแหน่งต่างกัน = ใช้ช่องที่เป็น PRODUCT CODE มีอยู่จริง
+        //   ไม่มี | = รหัสอย่างเดียว (ตัดส่วนหลังช่องว่าง และหัวรหัสแบบ 2A250-... เหมือนเดิม)
+        private string SysQrCode(string raw, StockModel stock)
+        {
+            string t = (raw ?? "").Trim();
+            string Legacy(string s)
+            {
+                var parts = s.Split(new[] { '|', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0) return s;
+                string first = parts[0].Trim();
+                return first.Length > 2 && char.IsDigit(first[0]) && char.IsLetter(first[1]) ? first.Substring(1) : first;
+            }
+            if (t.IndexOf(QrFormat.Sep) < 0) return Legacy(t);
+
+            var fields = t.Split(QrFormat.Sep).Select(x => x.Trim()).ToArray();
+            var lay = QrLayouts();
+            var ids = stock != null ? new List<int> { stock.StkId } : ScopeStocks.Select(s => s.StkId).ToList();
+            ids.Add(0);
+            var idx = new List<int>();
+            foreach (int id in ids)
+                if (lay.TryGetValue(id, out var l)) { int i = QrFormat.CodeIndex(l.QrFields); if (!idx.Contains(i)) idx.Add(i); }
+            if (!idx.Contains(0)) idx.Add(0);
+            idx = idx.Where(i => i < fields.Length && fields[i].Length > 0).ToList();
+            if (idx.Count == 0) return Legacy(t);
+            if (idx.Count == 1) return idx[0] == 0 ? Legacy(t) : fields[idx[0]];
+
+            try
+            {
+                var found = new ProductControlLayoutService().ExistingCodes(idx.Select(i => fields[i]));
+                foreach (int i in idx) if (found.Contains(fields[i])) return fields[i];
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"SysQrCode: {ex.Message}"); }
+            return idx[0] == 0 ? Legacy(t) : fields[idx[0]];
         }
 
         // 🚦 ตรวจว่าคลังนี้เปิดช่องทางที่แสกนมาหรือไม่ - คืนข้อความแจ้งเตือน (ไทย) หรือ null ถ้าผ่าน

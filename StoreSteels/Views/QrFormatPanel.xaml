@@ -4,40 +4,96 @@
              xmlns:helpers="clr-namespace:CIMS.Helpers"
              Loaded="Panel_Loaded">
 
-    <!-- ▣ QR CODE (หน้าต่าง ADMIN): QR ที่ EXPORT QR SELECT สร้างออกมา ต่อคลัง = PRODUCT CODE อย่างเดียว / PRODUCT CODE|PRODUCT NAME -->
+    <!-- ▣ QR CODE (หน้าต่าง ADMIN): เลือกคลัง -> รูปแบบที่ 1 ข้อความใต้ QR ใน PDF / รูปแบบที่ 2 สิ่งที่อยู่ใน QR (หน้าแสกนอ่าน) + ตัวอย่าง -->
     <UserControl.Resources>
-        <!-- ตัวเลือกแบบการ์ด: ไอคอน + ชื่อ · เลือกอยู่ = พื้นม่วง ตัวขาว · เมาส์ชี้ = ขอบม่วง -->
-        <Style x:Key="QrOption" TargetType="RadioButton">
+        <Style x:Key="StockItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="bd" CornerRadius="12" Padding="12,8" Background="#F7F5FA" BorderBrush="#E2DEEA" BorderThickness="1.5">
-                            <StackPanel Orientation="Horizontal">
-                                <Border x:Name="dot" Width="22" Height="22" CornerRadius="11" Background="White" BorderBrush="#CFC6DE" BorderThickness="2" VerticalAlignment="Center">
-                                    <TextBlock x:Name="tick" Text="" Foreground="#6750A4" FontSize="12" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <TextBlock x:Name="icon" Text="{TemplateBinding Tag}" FontSize="16" Foreground="#6750A4" Margin="10,0,6,0" VerticalAlignment="Center"/>
-                                <ContentPresenter x:Name="txt" VerticalAlignment="Center" TextElement.FontWeight="ExtraBold" TextElement.FontSize="12" TextElement.Foreground="#2D2A32"/>
-                            </StackPanel>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="#FFFFFF" BorderBrush="#E2DEEA" BorderThickness="1.5">
+                            <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#F3EEFB"/>
                                 <Setter TargetName="bd" Property="BorderBrush" Value="#6750A4"/>
-                                <Setter TargetName="bd" Property="Background" Value="#F1EAFB"/>
                             </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#6750A4"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#6750A4"/>
-                                <Setter TargetName="dot" Property="BorderBrush" Value="White"/>
-                                <Setter TargetName="tick" Property="Text" Value="✓"/>
-                                <Setter TargetName="icon" Property="Foreground" Value="White"/>
-                                <Setter TargetName="txt" Property="TextElement.Foreground" Value="White"/>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#B9A9DD"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+        <Style x:Key="SmallBtn" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="#00000000" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- + ช่องที่ยังไม่ได้เลือก: ขอบประ · เมาส์ชี้ = พื้นม่วงอ่อน -->
+        <Style x:Key="AddChip" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#6750A4"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="White" CornerRadius="8" Padding="10,5">
+                            <Grid>
+                                <Rectangle x:Name="r" RadiusX="8" RadiusY="8" Stroke="#B9A9DD" StrokeThickness="1.3" StrokeDashArray="3 2" Margin="-10,-5"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="#F1EAFB"/>
+                                <Setter TargetName="r" Property="Stroke" Value="#6750A4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Section" TargetType="Border">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Background" Value="#FBFAFD"/>
+            <Setter Property="BorderBrush" Value="#ECE9F1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,12,16,10"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+        <Style x:Key="Step" TargetType="Border">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="CornerRadius" Value="13"/>
+            <Setter Property="Background" Value="#6750A4"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
     </UserControl.Resources>
 
@@ -50,68 +106,113 @@
 
         <StackPanel>
             <TextBlock Text="▣ QR CODE" FontSize="20" FontWeight="Black" Foreground="#6750A4"/>
-            <TextBlock Text="What the QR code made by EXPORT QR SELECT holds, per stock. The stock in the stock filter decides (ALL STOCKS uses its own setting). The code and name printed under the QR stay the same."
+            <TextBlock Text="Choose a stock, then set both formats of the QR that EXPORT QR SELECT makes. FORMAT 1 = the text printed under the QR in the PDF. FORMAT 2 = what the QR holds (what Multi-Scanner reads), joined by | in the order you pick. The stock in the stock filter decides (ALL STOCKS uses its own setting)."
                        Foreground="#8A8490" FontSize="12" FontWeight="SemiBold" Margin="0,3,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
-        <Border Grid.Row="1" Margin="0,16,0,0" CornerRadius="12" BorderBrush="#ECE9F1" BorderThickness="1" ClipToBounds="True">
-            <DockPanel>
-                <Grid DockPanel.Dock="Top" Background="#4A148C">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="STOCK" Foreground="White" FontWeight="ExtraBold" FontSize="12" Margin="16,12"/>
-                    <TextBlock Grid.Column="1" Text="QR HOLDS" Foreground="White" FontWeight="ExtraBold" FontSize="12" Margin="10,12"/>
-                    <TextBlock Grid.Column="2" Text="EXAMPLE (what the scanner reads)" Foreground="White" FontWeight="ExtraBold" FontSize="12" Margin="10,12"/>
-                </Grid>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="icRows" helpers:Motion.NoLift="True">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="#F2F0F5" BorderThickness="0,0,0,1" Padding="0,8">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="White"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#FAF6FF"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
-                                            <TextBlock Text="● changed" FontSize="10.5" Foreground="#E8833A" FontWeight="Bold" Visibility="{Binding ChangedVisibility}"/>
-                                        </StackPanel>
-                                        <UniformGrid Grid.Column="1" Columns="2" Margin="10,0" VerticalAlignment="Center">
-                                            <RadioButton Style="{StaticResource QrOption}" Tag="▣" Content="PRODUCT CODE" ToolTip="QR holds the product code only"
-                                                         IsChecked="{Binding CodeOnly, Mode=TwoWay}" GroupName="{Binding Group}" Margin="0,0,8,0" Checked="Option_Checked"/>
-                                            <RadioButton Style="{StaticResource QrOption}" Tag="▤" Content="CODE | NAME" ToolTip="QR holds product code | product name"
-                                                         IsChecked="{Binding CodeAndName, Mode=TwoWay}" GroupName="{Binding Group}" Checked="Option_Checked"/>
-                                        </UniformGrid>
-                                        <Border Grid.Column="2" Margin="10,0,16,0" Background="#F7F5FA" CornerRadius="8" Padding="10,6" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Example}" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="#4A148C" TextWrapping="Wrap"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="250"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- คลัง -->
+            <DockPanel Margin="0,0,16,0">
+                <TextBlock DockPanel.Dock="Top" Text="STOCK" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,8"/>
+                <ListBox x:Name="lbStocks" BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource StockItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Stocks_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                    <TextBlock Text="{Binding Summary}" FontSize="10.5" Foreground="#8A8490" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <Border Background="{Binding SysQrBrush}" CornerRadius="6" Padding="6,1" Margin="0,4,0,0" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding SysQrText}" FontSize="9.5" FontWeight="Black" Foreground="White"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="●" Foreground="#E8833A" FontSize="12" VerticalAlignment="Top" ToolTip="Changed - not saved yet"
+                                           Visibility="{Binding ChangedVisibility}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </DockPanel>
-        </Border>
+
+            <!-- รูปแบบที่ 1 / 2 -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="0,0,10,0">
+                    <Border Style="{StaticResource Section}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Border Style="{StaticResource Step}" DockPanel.Dock="Left"><TextBlock Text="1" Foreground="White" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <StackPanel>
+                                    <TextBlock Text="FORMAT 1 · TEXT UNDER THE QR (PDF)" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                    <TextBlock Text="One line per field, in this order. The first line is bold, the rest small and grey." FontSize="11" Foreground="#8A8490" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Text="ORDER  (◀ ▶ to move · ✕ to remove)" FontWeight="Black" FontSize="11" Foreground="#6750A4" Margin="0,12,0,6"/>
+                            <WrapPanel x:Name="wpLabelOrder"/>
+                            <TextBlock Text="ADD A FIELD" FontWeight="Black" FontSize="11" Foreground="#6750A4" Margin="0,6,0,6"/>
+                            <WrapPanel x:Name="wpLabelAdd"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Section}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Border Style="{StaticResource Step}" DockPanel.Dock="Left"><TextBlock Text="2" Foreground="White" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                <StackPanel>
+                                    <TextBlock Text="FORMAT 2 · WHAT THE QR HOLDS (SCAN)" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
+                                    <TextBlock Text="Fields joined by | in this order. PRODUCT CODE is always in - Multi-Scanner finds the product by it." FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Text="ORDER  (◀ ▶ to move · ✕ to remove)" FontWeight="Black" FontSize="11" Foreground="#6750A4" Margin="0,12,0,6"/>
+                            <WrapPanel x:Name="wpQrOrder"/>
+                            <TextBlock Text="ADD A FIELD" FontWeight="Black" FontSize="11" Foreground="#6750A4" Margin="0,6,0,6"/>
+                            <WrapPanel x:Name="wpQrAdd"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ตัวอย่าง -->
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Text="EXAMPLE" FontWeight="Black" FontSize="13" Foreground="#6750A4" Margin="0,0,0,8"/>
+                <StackPanel>
+                    <Border Background="White" CornerRadius="14" BorderBrush="#ECE9F1" BorderThickness="1" Padding="16,18" helpers:Motion.HoverLift="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.10" Color="#4A148C"/>
+                        </Border.Effect>
+                        <StackPanel HorizontalAlignment="Center" Width="150">
+                            <Image x:Name="imgQr" Width="110" Height="110" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                            <StackPanel x:Name="spLabel" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="PDF LABEL (sample product)" FontSize="10.5" Foreground="#8A8490" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+
+                    <TextBlock Text="SCANNER READS" FontWeight="Black" FontSize="11" Foreground="#6750A4" Margin="0,16,0,6"/>
+                    <Border Background="#F7F5FA" CornerRadius="10" Padding="10,8">
+                        <TextBlock x:Name="txtRaw" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="#4A148C" TextWrapping="Wrap"/>
+                    </Border>
+                    <TextBlock x:Name="txtFields" FontFamily="Consolas" FontSize="10.5" Foreground="#8A8490" TextWrapping="Wrap" Margin="2,6,0,0"/>
+                    <TextBlock x:Name="txtSysQrNote" FontSize="11" FontWeight="Bold" Foreground="#E8833A" TextWrapping="Wrap" Margin="2,10,0,0"/>
+                </StackPanel>
+            </DockPanel>
+        </Grid>
 
         <Grid Grid.Row="2" Margin="0,14,0,0">
             <TextBlock x:Name="txtStatus" VerticalAlignment="Center" FontWeight="Bold" FontSize="12" Foreground="#8A8490"/>
-            <Button x:Name="btnSave" HorizontalAlignment="Right" Content="💾 SAVE" Style="{StaticResource StkButton}" Background="#6750A4" Click="Save_Click" IsEnabled="False"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="↺ DEFAULT" Style="{StaticResource StkButton}" Background="#9E9E9E" Click="Default_Click" Margin="0,0,10,0"
+                        ToolTip="Back to the original: QR = PRODUCT CODE|PRODUCT NAME, under the QR = PRODUCT CODE + PRODUCT NAME"/>
+                <Button x:Name="btnSave" Content="💾 SAVE" Style="{StaticResource StkButton}" Background="#6750A4" Click="Save_Click" IsEnabled="False"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </UserControl>

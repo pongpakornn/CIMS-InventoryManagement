@@ -104,6 +104,27 @@ namespace CIMS.Helpers
 
         public static bool HasProductControlSettings => _pcSettings ?? (_pcSettings = TableExists("CIMS.ProductControlSettings")) ?? false;
 
+        // Update_20261017b.sql: CIMS.ProductControlSettings.QrFields / QrLabel (QR รูปแบบที่ 1 ข้อความใต้ QR / รูปแบบที่ 2 สิ่งที่อยู่ใน QR)
+        private static bool? _qrFields;
+        public static bool HasQrFields
+        {
+            get
+            {
+                if (_qrFields.HasValue) return _qrFields.Value;
+                try
+                {
+                    using (var conn = new SqlConnection(GlobalConfig.ConnStr))
+                    using (var cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH('CIMS.ProductControlSettings', 'QrFields') IS NOT NULL AND COL_LENGTH('CIMS.ProductControlSettings', 'QrLabel') IS NOT NULL THEN 1 ELSE 0 END", conn))
+                    {
+                        conn.Open();
+                        _qrFields = Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+                    }
+                }
+                catch { return false; }
+                return _qrFields.Value;
+            }
+        }
+
         private static bool? TableExists(string name)
         {
             try
