@@ -1,7 +1,7 @@
 ﻿<Window x:Class="CIMS.Views.PrinterChoiceWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Select Printer" Width="1040" Height="700"
+        Title="Select Printer" Width="1320" Height="880"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen" ShowInTaskbar="False" KeyDown="Window_KeyDown">
 
@@ -12,7 +12,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="bd" Background="#F7F5FA" CornerRadius="12" Padding="12,9" BorderBrush="#E4DDF0" BorderThickness="1.5">
+                        <Border x:Name="bd" Background="#F7F5FA" CornerRadius="14" Padding="16,12" BorderBrush="#E4DDF0" BorderThickness="1.5">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -52,39 +52,39 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" Margin="26,18,26,8">
+            <Grid Grid.Row="1" Margin="32,24,32,10">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="420"/>
+                    <ColumnDefinition Width="480"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ซ้าย: รายชื่อเครื่องพิมพ์ + รูปแบบ A4 -->
-                <DockPanel Grid.Column="0" Margin="0,0,18,0">
-                    <TextBlock DockPanel.Dock="Top" Text="PRINTER" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
+                <DockPanel Grid.Column="0" Margin="0,0,26,0">
+                    <TextBlock DockPanel.Dock="Top" Text="PRINTER" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,10"/>
 
-                    <StackPanel x:Name="pnlLayout" DockPanel.Dock="Bottom" Margin="0,14,0,0">
-                        <TextBlock Text="A4 LAYOUT" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
-                        <UniformGrid Columns="2">   <!-- 2 × 2: 4 ปุ่มเรียงแถวเดียวแคบจนตัวหนังสือโดนตัด -->
-                            <RadioButton x:Name="rb10" GroupName="layout" Checked="Layout_Checked" Margin="0,0,5,5" Style="{StaticResource LayoutOption}">
+                    <StackPanel x:Name="pnlLayout" DockPanel.Dock="Bottom" Margin="0,18,0,0">
+                        <TextBlock Text="A4 LAYOUT" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,10"/>
+                        <UniformGrid Columns="2" Margin="0,0,0,4">   <!-- 2 × 2: 4 ปุ่มเรียงแถวเดียวแคบจนตัวหนังสือโดนตัด -->
+                            <RadioButton x:Name="rb10" GroupName="layout" Checked="Layout_Checked" Margin="0,0,7,7" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="10 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="2 × 5 • large" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="rb12" GroupName="layout" Checked="Layout_Checked" Margin="5,0,0,5" Style="{StaticResource LayoutOption}">
+                            <RadioButton x:Name="rb12" GroupName="layout" Checked="Layout_Checked" Margin="7,0,0,7" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="12 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="2 × 6 • medium" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="rb14" GroupName="layout" Checked="Layout_Checked" Margin="0,5,5,0" Style="{StaticResource LayoutOption}">
+                            <RadioButton x:Name="rb14" GroupName="layout" Checked="Layout_Checked" Margin="0,7,7,0" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="14 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="2 × 7 • compact" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
                                 </StackPanel>
                             </RadioButton>
                             <!-- 21 ใบ (3 × 7): การ์ดขนาดเกือบเท่าแบบ 14 ใบ ขอบกระดาษ 5 มม. -->
-                            <RadioButton x:Name="rb21" GroupName="layout" Checked="Layout_Checked" Margin="5,5,0,0" Style="{StaticResource LayoutOption}">
+                            <RadioButton x:Name="rb21" GroupName="layout" Checked="Layout_Checked" Margin="7,7,0,0" Style="{StaticResource LayoutOption}">
                                 <StackPanel>
                                     <TextBlock Text="21 / PAGE" FontSize="15" FontWeight="Black"/>
                                     <TextBlock Text="3 × 7 • small" FontSize="11" FontWeight="Bold" Foreground="#6F6878"/>
@@ -93,16 +93,16 @@
                         </UniformGrid>
                     </StackPanel>
 
-                    <ListBox x:Name="lbPrinters" SelectionChanged="Printers_SelectionChanged" BorderThickness="0" Background="Transparent"
+                    <ListBox x:Name="lbPrinters" SelectionChanged="Printers_SelectionChanged" BorderThickness="0" Background="Transparent" Padding="8,6,10,6" Margin="-8,-6,-10,0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
-                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="Margin" Value="0,0,0,12"/>
                                 <Setter Property="Cursor" Value="Hand"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="bd" Background="#F7F5FA" CornerRadius="12" Padding="14,10" BorderBrush="#E4DDF0" BorderThickness="1.5">
+                                            <Border x:Name="bd" Background="#F7F5FA" CornerRadius="14" Padding="18,14" BorderBrush="#E4DDF0" BorderThickness="1.5">
                                                 <ContentPresenter/>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -146,9 +146,9 @@
                 </DockPanel>
 
                 <!-- ขวา: ตัวอย่างหน้าแรกที่จะพิมพ์ -->
-                <Border Grid.Column="1" Background="#F4F2F7" CornerRadius="16" Padding="14">
+                <Border Grid.Column="1" Background="#F4F2F7" CornerRadius="18" Padding="22,18">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" x:Name="txtPreviewTitle" Text="PREVIEW" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,8"/>
+                        <TextBlock DockPanel.Dock="Top" x:Name="txtPreviewTitle" Text="PREVIEW" FontSize="12" FontWeight="Black" Foreground="#6F6878" Margin="2,0,0,12"/>
                         <Viewbox Stretch="Uniform">
                             <Border x:Name="previewHost" Background="White" BorderBrush="#D6D0DE" BorderThickness="1">
                                 <Border.Effect>
@@ -160,7 +160,7 @@
                 </Border>
             </Grid>
 
-            <Grid Grid.Row="2" Margin="26,6,26,22">
+            <Grid Grid.Row="2" Margin="32,10,32,24">
                 <TextBlock x:Name="txtSummary" VerticalAlignment="Center" FontSize="14" FontWeight="Black" Foreground="{StaticResource AccentPurple}"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="CANCEL" Style="{StaticResource StkButton}" Background="#9E9E9E" Margin="0,0,10,0" Click="Cancel_Click"/>
