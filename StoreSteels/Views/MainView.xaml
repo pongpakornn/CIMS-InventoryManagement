@@ -71,7 +71,7 @@
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Width="30" Height="30" Source="/Assets/Icons/Dashboard.png" Style="{StaticResource SidebarIconStyle}"  Margin="-1,0,0,0"/>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/Dashboard.png" Style="{StaticResource SidebarIconStyle}"/>
                             <TextBlock Grid.Column="1" Text="Dashboard" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </Button>
@@ -84,7 +84,7 @@
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Width="35" Height="32" Source="/Assets/Icons/StoreMaxMin.png" Style="{StaticResource SidebarIconStyle}"/>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/StoreMaxMin.png" Style="{StaticResource SidebarIconStyle}"/>
                             <TextBlock Grid.Column="1" Text="Store ( Max - Min )" Style="{StaticResource SidebarTextStyle}"/>
                         </Grid>
                     </Button>
@@ -92,7 +92,7 @@
 
 
                     <!-- Function Button : Multi-Scanner (หน้าเดียว: เริ่มที่สแกนรับเข้า, สลับสแกนออกได้ที่ปุ่มในหน้า) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnMultiScanner_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewScannerMenu, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnMultiScanner_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewScannerMenu, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
@@ -105,20 +105,20 @@
                     <!-- End Function -->
 
                     <!-- Function Button : Product Control -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnProductControl_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewProductControl, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnProductControl_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewProductControl, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Source="/Assets/Icons/registration.png" Style="{StaticResource SidebarIconStyle}" Margin="1,0,0,0"/>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/registration.png" Style="{StaticResource SidebarIconStyle}"/>
                             <TextBlock Grid.Column="1" Text="Inventory Registration" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </Button>
                     <!-- End Function -->
 
                     <!-- Function Button : Pick List (เดิมชื่อ Packing Card) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnPackingCard_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewPackingCard, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnPackingCard_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewPackingCard, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
@@ -131,7 +131,7 @@
                     <!-- End Function -->
 
                     <!-- Product Control -->
-                    <!--<Button Style="{StaticResource SidebarButtonStyle}" Margin="0,5,0,0" Click="btnProductControls_Click">
+                    <!--<Button Style="{StaticResource SidebarButtonStyle}" Margin="5,4,0,0" Click="btnProductControls_Click">
                             <Grid HorizontalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="50"/>
@@ -143,7 +143,7 @@
                         </Button>-->
 
                     <!-- Function Button : Max-Min Calculator (ย้ายมาจาก StorePC) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnMaxMinCalc_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewMaxMinCalc, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnMaxMinCalc_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewMaxMinCalc, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
@@ -156,7 +156,7 @@
                     <!-- End Function -->
 
                     <!-- Function Button : Forecast / Order / Delivery (กราฟ + TOP 5 + ตาราง / Import / Export) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnForecastOrder_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewForecastOrder, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnForecastOrder_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewForecastOrder, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
@@ -169,20 +169,20 @@
                     <!-- End Function -->
 
                     <!-- Function Button : PR (เปิดใช้งานแล้ว - เห็นได้กลุ่มเดียวกับเมนู Store) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnPR_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewPR, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnPR_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewPR, Converter={StaticResource BoolToVis}}">
                             <Grid HorizontalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Image Grid.Column="0" Source="/Assets/Icons/PR.png" Style="{StaticResource SidebarIconStyle}" Margin="1,0,0,0"/>
+                                <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/PR.png" Style="{StaticResource SidebarIconStyle}"/>
                                 <TextBlock Grid.Column="1" Text="PR Management" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                             </Grid>
                         </Button>
                     <!-- End Function -->
 
                     <!-- Function Button : Activity Log (การเคลื่อนไหวของผู้ใช้งานทั้งระบบ) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnActivityLog_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewActivityLog, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnActivityLog_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewActivityLog, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
@@ -195,13 +195,13 @@
                     <!-- End Function -->
 
                     <!-- Function Button : User Management (ผู้ใช้งาน + สิทธิ์ทุกระบบ) -->
-                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnUserMgmt_Click" Margin="0,5,0,0" Visibility="{Binding CurrentUser.CanViewUserMgmt, Converter={StaticResource BoolToVis}}">
+                    <Button Style="{StaticResource SidebarButtonStyle}" Click="BtnUserMgmt_Click" Margin="5,4,0,0" Visibility="{Binding CurrentUser.CanViewUserMgmt, Converter={StaticResource BoolToVis}}">
                         <Grid HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Width="30" Height="30" Source="/Assets/Icons/management.png" Style="{StaticResource SidebarIconStyle}"/>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/management.png" Style="{StaticResource SidebarIconStyle}"/>
                             <TextBlock Grid.Column="1" Text="User Management" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </Button>
@@ -211,7 +211,7 @@
                     <!-- Function Button : ManageUser -->
                     <!--<Button Style="{StaticResource SidebarButtonStyle}" 
                             Click="BtnManageUser_Click" 
-                            Margin="0,5,0,0">
+                            Margin="5,4,0,0">
                             <Button.Visibility>
                                 <Binding Path="CurrentUser.UserLevel" 
                                  Converter="{StaticResource PermissionToVisibilityConverter}" 
@@ -223,9 +223,7 @@
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Image Grid.Column="0" 
-                                   Source="/Assets/Icons/management.png" 
-                                   Style="{StaticResource SidebarIconStyle}"/>
+                                <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/management.png" Style="{StaticResource SidebarIconStyle}"/>
                                 <TextBlock Grid.Column="1" 
                                    Text="Manage User" 
                                    Style="{StaticResource SidebarTextStyle}"/>
