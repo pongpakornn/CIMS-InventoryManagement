@@ -32,32 +32,51 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border CornerRadius="12" BorderThickness="1.5" Padding="14,10" Margin="0,0,10,10" Width="216" Cursor="Hand" MouseLeftButtonUp="Card_Click" helpers:Motion.HoverLift="True">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="BorderBrush" Value="#E2DEEA"/>
-                                    <Setter Property="Background" Value="#FFFFFF"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
-                                            <Setter Property="BorderBrush" Value="#B3261E"/>
-                                            <Setter Property="Background" Value="#FFF4F2"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
+                        <!-- การ์ดคลังแบบเดียวกับหน้าต่างเลือกคลังของ Multi-Scanner: แถบสีด้านบน · วงกลม ✓ เมื่อเลือก · ป้ายจำนวนสินค้า -->
+                        <Border x:Name="card" Width="230" Height="112" CornerRadius="18" Margin="0,0,14,14" Background="White" BorderBrush="#ECE9F1" BorderThickness="2"
+                                Cursor="Hand" MouseLeftButtonUp="Card_Click">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.08" Color="Black"/>
+                            </Border.Effect>
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="14" Foreground="#2D2A32"/>
-                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding CountText}" FontSize="12" Foreground="#B3261E" FontWeight="Bold" Margin="0,4,0,0"/>
-                                </StackPanel>
-                                <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Top" IsHitTestVisible="False"/>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border x:Name="bar" Grid.Row="0" CornerRadius="16,16,0,0" Background="#D9D2E6"/>
+                                <Grid Grid.Row="1" Margin="16,10,12,10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <TextBlock Text="{Binding Code}" FontSize="16" FontWeight="Black" Foreground="{StaticResource MainPurple}" TextTrimming="CharacterEllipsis" Margin="0,0,36,0"/>
+                                        <Border x:Name="check" Width="26" Height="26" CornerRadius="13" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                Background="White" BorderBrush="#D9D2E6" BorderThickness="2">
+                                            <TextBlock x:Name="checkMark" Text="" Foreground="White" FontSize="14" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="11.5" FontWeight="SemiBold" Foreground="#6B6770" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                                    <Border Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Left" CornerRadius="8" Padding="8,3" Background="#FDECEA">
+                                        <TextBlock Text="{Binding CountText}" FontSize="10.5" FontWeight="Black" Foreground="#B3261E"/>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                                <Setter TargetName="card" Property="BorderBrush" Value="#B3261E"/>
+                                <Setter TargetName="card" Property="Background" Value="#FFF8F7"/>
+                                <Setter TargetName="bar" Property="Background" Value="#B3261E"/>
+                                <Setter TargetName="check" Property="Background" Value="#B3261E"/>
+                                <Setter TargetName="check" Property="BorderBrush" Value="#B3261E"/>
+                                <Setter TargetName="checkMark" Property="Text" Value="✓"/>
+                            </DataTrigger>
+                            <Trigger SourceName="card" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="card" Property="BorderBrush" Value="#E57373"/>
+                            </Trigger>
+                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

@@ -52,6 +52,8 @@ namespace CIMS
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(FitWindowToScreen));
             // ✨ เปิดหน้าต่าง Popup = จางเข้า + ขยายขึ้นเล็กน้อย (หน้าต่างที่มีแอนิเมชันของตัวเองอยู่แล้วไม่ยุ่ง)
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(PopInWindow));
+            // ✨ ทั้งระบบ: ปุ่มขยาย / ยุบตอนชี้ / กด + การ์ดในรายการยกขึ้นตอนชี้
+            Motion.InstallGlobal();
         }
 
         private static readonly Type[] OwnAnimation =
@@ -62,7 +64,9 @@ namespace CIMS
 
         private static void PopInWindow(object sender, RoutedEventArgs e)
         {
-            if (!(sender is Window w) || !(w.Content is FrameworkElement content) || Array.IndexOf(OwnAnimation, w.GetType()) >= 0) return;
+            if (!(sender is Window w) || !(w.Content is FrameworkElement content)) return;
+            Motion.RoundClip(w);   // หน้าต่างขอบโค้ง: เนื้อหาข้างในโค้งตาม ไม่มีมุมเหลี่ยม
+            if (Array.IndexOf(OwnAnimation, w.GetType()) >= 0) return;
             Motion.PopIn(content);
         }
 

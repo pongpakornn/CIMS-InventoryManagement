@@ -13,7 +13,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="#FFFFFF" BorderBrush="#E2DEEA" BorderThickness="1.5" helpers:Motion.HoverLift="True">
+                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="#FFFFFF" BorderBrush="#E2DEEA" BorderThickness="1.5">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>

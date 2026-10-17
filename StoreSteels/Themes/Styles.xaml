@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:CIMS.Helpers">
 
     <!--
         SidebarButtonStyle was referenced by every nav button in MainView.xaml's sidebar
@@ -10,6 +11,7 @@
         opacity-based hover idiom already used by the logout icon button in MainView.xaml.
     -->
     <Style x:Key="SidebarButtonStyle" TargetType="Button">
+        <Setter Property="helpers:Motion.NoLift" Value="True"/>   <!-- เมนูด้านซ้ายมีลูกเล่นของตัวเอง ไม่ขยาย -->
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>

@@ -33,7 +33,7 @@ namespace CIMS.Views
             InitializeComponent();
             _session = session;
             dgLog.ItemsSource = _shown;
-            dpFrom.SelectedDate = DateTime.Today.AddDays(-6);
+            dpFrom.SelectedDate = DateTime.Today;   // ตารางเริ่มที่วันนี้อย่างเดียว (วันอื่นเลือก FROM / TO ดูย้อนหลังได้)
             dpTo.SelectedDate = DateTime.Today;
             cbUser.Items.Add(new ComboBoxItem { Content = "ALL USERS", Tag = null });
             cbAction.Items.Add(new ComboBoxItem { Content = "ALL ACTIONS", Tag = null });

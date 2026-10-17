@@ -15,7 +15,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="White" BorderBrush="#E2DEEA" BorderThickness="1.5" helpers:Motion.HoverLift="True">
+                        <Border x:Name="bd" CornerRadius="10" Padding="12,8" Background="White" BorderBrush="#E2DEEA" BorderThickness="1.5">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -119,7 +119,7 @@
                                 <TextBlock Grid.Column="2" Text="CELL / COLUMN" Foreground="White" FontWeight="ExtraBold" FontSize="12"/>
                             </Grid>
                         </Border>
-                        <ItemsControl x:Name="icEntries">
+                        <ItemsControl x:Name="icEntries" helpers:Motion.NoLift="True">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="#EEEAF4" BorderThickness="1,0,1,1" Padding="10,6">

@@ -61,7 +61,10 @@
                         <Setter Property="VerticalAlignment" Value="Center"/>
                         <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                     </Style>
+                    <!-- DETAIL กึ่งกลางเหมือนคอลัมน์อื่น (ข้อความยาวตัด ... ชี้ดูเต็มได้) -->
                     <Style x:Key="LeftCell" TargetType="TextBlock">
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="TextAlignment" Value="Center"/>
                         <Setter Property="VerticalAlignment" Value="Center"/>
                         <Setter Property="Margin" Value="8,0"/>
                         <Setter Property="TextTrimming" Value="CharacterEllipsis"/>

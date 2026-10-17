@@ -34,7 +34,7 @@
                 <ItemsControl x:Name="icRows">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border CornerRadius="12" BorderThickness="1.5" Padding="16,10" Margin="0,0,0,10" helpers:Motion.HoverLift="True">
+                            <Border CornerRadius="12" BorderThickness="1.5" Padding="16,10" Margin="0,0,0,10">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="BorderBrush" Value="#E2DEEA"/>

@@ -5,6 +5,42 @@
              Loaded="Panel_Loaded">
 
     <!-- ▣ QR CODE (หน้าต่าง ADMIN): QR ที่ EXPORT QR SELECT สร้างออกมา ต่อคลัง = PRODUCT CODE อย่างเดียว / PRODUCT CODE|PRODUCT NAME -->
+    <UserControl.Resources>
+        <!-- ตัวเลือกแบบการ์ด: ไอคอน + ชื่อ · เลือกอยู่ = พื้นม่วง ตัวขาว · เมาส์ชี้ = ขอบม่วง -->
+        <Style x:Key="QrOption" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" CornerRadius="12" Padding="12,8" Background="#F7F5FA" BorderBrush="#E2DEEA" BorderThickness="1.5">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="dot" Width="22" Height="22" CornerRadius="11" Background="White" BorderBrush="#CFC6DE" BorderThickness="2" VerticalAlignment="Center">
+                                    <TextBlock x:Name="tick" Text="" Foreground="#6750A4" FontSize="12" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock x:Name="icon" Text="{TemplateBinding Tag}" FontSize="16" Foreground="#6750A4" Margin="10,0,6,0" VerticalAlignment="Center"/>
+                                <ContentPresenter x:Name="txt" VerticalAlignment="Center" TextElement.FontWeight="ExtraBold" TextElement.FontSize="12" TextElement.Foreground="#2D2A32"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#6750A4"/>
+                                <Setter TargetName="bd" Property="Background" Value="#F1EAFB"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#6750A4"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#6750A4"/>
+                                <Setter TargetName="dot" Property="BorderBrush" Value="White"/>
+                                <Setter TargetName="tick" Property="Text" Value="✓"/>
+                                <Setter TargetName="icon" Property="Foreground" Value="White"/>
+                                <Setter TargetName="txt" Property="TextElement.Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -31,7 +67,7 @@
                     <TextBlock Grid.Column="2" Text="EXAMPLE (what the scanner reads)" Foreground="White" FontWeight="ExtraBold" FontSize="12" Margin="10,12"/>
                 </Grid>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="icRows">
+                    <ItemsControl x:Name="icRows" helpers:Motion.NoLift="True">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="#F2F0F5" BorderThickness="0,0,0,1" Padding="0,8">
@@ -55,10 +91,12 @@
                                             <TextBlock Text="{Binding Code}" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
                                             <TextBlock Text="● changed" FontSize="10.5" Foreground="#E8833A" FontWeight="Bold" Visibility="{Binding ChangedVisibility}"/>
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
-                                            <RadioButton Content="PRODUCT CODE only" FontWeight="Bold" IsChecked="{Binding CodeOnly, Mode=TwoWay}" GroupName="{Binding Group}" Margin="0,0,0,4" Checked="Option_Checked"/>
-                                            <RadioButton Content="PRODUCT CODE | PRODUCT NAME" FontWeight="Bold" IsChecked="{Binding CodeAndName, Mode=TwoWay}" GroupName="{Binding Group}" Checked="Option_Checked"/>
-                                        </StackPanel>
+                                        <UniformGrid Grid.Column="1" Columns="2" Margin="10,0" VerticalAlignment="Center">
+                                            <RadioButton Style="{StaticResource QrOption}" Tag="▣" Content="PRODUCT CODE" ToolTip="QR holds the product code only"
+                                                         IsChecked="{Binding CodeOnly, Mode=TwoWay}" GroupName="{Binding Group}" Margin="0,0,8,0" Checked="Option_Checked"/>
+                                            <RadioButton Style="{StaticResource QrOption}" Tag="▤" Content="CODE | NAME" ToolTip="QR holds product code | product name"
+                                                         IsChecked="{Binding CodeAndName, Mode=TwoWay}" GroupName="{Binding Group}" Checked="Option_Checked"/>
+                                        </UniformGrid>
                                         <Border Grid.Column="2" Margin="10,0,16,0" Background="#F7F5FA" CornerRadius="8" Padding="10,6" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Example}" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="#4A148C" TextWrapping="Wrap"/>
                                         </Border>

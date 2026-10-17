@@ -1,6 +1,7 @@
 ﻿<Window x:Class="CIMS.Views.BarcodeFormatWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:CIMS.Helpers"
         Title="Barcode Formats" Width="1000" Height="720"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
@@ -251,7 +252,7 @@
                                     <StackPanel>
                                         <TextBlock x:Name="txtParseResult" FontSize="14" FontWeight="Black" Foreground="{StaticResource MainPurple}" TextWrapping="Wrap"/>
                                         <TextBlock x:Name="txtLookupResult" FontSize="13" FontWeight="Bold" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
-                                        <ItemsControl x:Name="icFields" Margin="0,8,0,0">
+                                        <ItemsControl x:Name="icFields" Margin="0,8,0,0" helpers:Motion.NoLift="True">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
                                                     <WrapPanel/>
