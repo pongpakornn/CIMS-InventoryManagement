@@ -80,18 +80,13 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Border Width="58" Height="58" CornerRadius="18" VerticalAlignment="Center" Margin="0,0,16,0">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Color="#6750A4" Offset="0"/>
-                        <GradientStop Color="#9C7BE0" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.3" Color="#6750A4"/>
-                </Border.Effect>
-                <TextBlock Text="📊" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            </Border>
+            <!-- ไอคอนกราฟวงกลม (Assets/Icons/DashboardChart.png) -->
+            <Image Source="/Assets/Icons/DashboardChart.png" Width="64" Height="64" VerticalAlignment="Center" Margin="0,0,16,0"
+                   RenderOptions.BitmapScalingMode="HighQuality">
+                <Image.Effect>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.22" Color="#6750A4"/>
+                </Image.Effect>
+            </Image>
 
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock x:Name="txtDashTitle" Text="DASHBOARD" FontSize="36" FontWeight="Black">
