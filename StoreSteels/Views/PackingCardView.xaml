@@ -179,12 +179,8 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5,0,0,20">
-                <!-- ไอคอน Pick List (ไฟล์สีขาว เดียวกับ Sidebar) ระบายเป็นสีม่วงของหัวหน้า -->
-                <Rectangle Width="40" Height="40" Fill="{StaticResource MainPurple}" Margin="0,0,10,0" VerticalAlignment="Center">
-                    <Rectangle.OpacityMask>
-                        <ImageBrush ImageSource="/Assets/Icons/PickList.png" Stretch="Uniform"/>
-                    </Rectangle.OpacityMask>
-                </Rectangle>
+                <!-- ไอคอนเครื่องพิมพ์สี (Assets/Icons/PickListPage.png) หน้าชื่อหน้า - Sidebar ใช้ PickList.png สีขาวเหมือนเดิม -->
+                <Image Source="/Assets/Icons/PickListPage.png" Width="44" Height="44" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
                 <TextBlock Text="PICK LIST" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
             </StackPanel>
 
