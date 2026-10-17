@@ -140,7 +140,11 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="📐 MAX-MIN CALCULATOR" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <!-- ไอคอนเครื่องคิดเลขสี (Assets/Icons/MaxMinCalcPage.png) หน้าชื่อหน้า - Sidebar ใช้ CalculatorMxMn.png สีขาวเหมือนเดิม -->
+                        <Image Source="/Assets/Icons/MaxMinCalcPage.png" Width="38" Height="38" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="MAX-MIN CALCULATOR" FontSize="24" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
+                    </StackPanel>
                     <TextBlock Text="Set MAX / MIN (DAYS) per part - the system calculates MAX / MIN of Store (Max-Min) from Order / Workdays" FontSize="12" FontWeight="SemiBold" Foreground="#8A8490" Margin="2,3,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
