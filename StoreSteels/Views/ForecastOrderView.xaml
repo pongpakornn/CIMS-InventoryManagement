@@ -51,12 +51,8 @@
             <Grid Margin="0,0,0,14">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <!-- ไอคอน Forecast (ไฟล์สีขาว เดียวกับ Sidebar) ระบายเป็นสีม่วงของหัวหน้า -->
-                        <Rectangle Width="34" Height="34" Fill="{StaticResource MainPurple}" Margin="0,0,10,0" VerticalAlignment="Center">
-                            <Rectangle.OpacityMask>
-                                <ImageBrush ImageSource="/Assets/Icons/ForecastOrder.png" Stretch="Uniform"/>
-                            </Rectangle.OpacityMask>
-                        </Rectangle>
+                        <!-- ไอคอนกราฟสี (Assets/Icons/ForecastPage.png) หน้าชื่อหน้า - Sidebar ใช้ ForecastOrder.png สีขาวเหมือนเดิม -->
+                        <Image Source="/Assets/Icons/ForecastPage.png" Width="40" Height="40" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
                         <TextBlock Text="FORECAST · ORDER · DELIVERY" FontSize="26" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock x:Name="txtSub" Text="Monthly forecast, customer orders and deliveries" FontSize="13" FontWeight="SemiBold" Foreground="#8A8490" Margin="2,2,0,0"/>
