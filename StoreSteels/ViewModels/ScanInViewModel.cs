@@ -453,7 +453,7 @@ namespace CIMS.ViewModels
 
         public Visibility ScanOutBannerVisibility => IsScanOutMode ? Visibility.Visible : Visibility.Collapsed;
 
-        public string ScanTitle => IsScanOutMode ? "║▌║║▌║ MULTI-SCANNER ( OUT )" : "║▌║║▌║ MULTI-SCANNER ( IN )";
+        public string ScanTitle => IsScanOutMode ? "MULTI-SCANNER ( OUT )" : "MULTI-SCANNER ( IN )";   // ไอคอนอยู่หน้าชื่อ (Assets/Icons/MultiScanner.png)
         public string QtyLabel => IsScanOutMode ? "QTY OUT" : "QTY IN";
 
         public ICommand ToggleScanOutModeCommand { get; }

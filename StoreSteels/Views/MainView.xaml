@@ -98,9 +98,7 @@
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Viewbox Grid.Column="0" Width="24" Height="24" HorizontalAlignment="Left" Margin="12,0,0,0">
-                                <Path Fill="White" Data="M2 4h2v16H2z M5 4h1v16H5z M7 4h3v16H7z M11 4h1v16h-1z M13 4h2v16h-2z M16 4h1v16h-1z M18 4h3v16h-3z M22 4h1v16h-1z"/>
-                            </Viewbox>
+                            <Image Grid.Column="0" Width="32" Height="32" Source="/Assets/Icons/MultiScanner.png" Style="{StaticResource SidebarIconStyle}"/>
                             <TextBlock Grid.Column="1" Text="Multi-Scanner" Style="{StaticResource SidebarTextStyle}" Visibility="{Binding IsSidebarOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </Button>
