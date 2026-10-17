@@ -105,7 +105,15 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="▣ QR CODE" FontSize="20" FontWeight="Black" Foreground="#6750A4"/>
+            <StackPanel Orientation="Horizontal">
+                <!-- ไอคอน QR (ไฟล์สีขาว เดียวกับเมนูด้านซ้าย) ระบายเป็นสีม่วงของหัวข้อ -->
+                <Rectangle Width="24" Height="24" Fill="#6750A4" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush ImageSource="/Assets/Icons/QrCode.png" Stretch="Uniform"/>
+                    </Rectangle.OpacityMask>
+                </Rectangle>
+                <TextBlock Text="QR CODE" FontSize="20" FontWeight="Black" Foreground="#6750A4" VerticalAlignment="Center"/>
+            </StackPanel>
             <TextBlock Text="Choose a stock, then set both formats of the QR that EXPORT QR SELECT makes. FORMAT 1 = the text printed under the QR in the PDF. FORMAT 2 = what the QR holds (what Multi-Scanner reads), joined by | in the order you pick. The stock in the stock filter decides (ALL STOCKS uses its own setting)."
                        Foreground="#8A8490" FontSize="12" FontWeight="SemiBold" Margin="0,3,0,0" TextWrapping="Wrap"/>
         </StackPanel>
@@ -153,7 +161,7 @@
                                 <Border Style="{StaticResource Step}" DockPanel.Dock="Left"><TextBlock Text="1" Foreground="White" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                                 <StackPanel>
                                     <TextBlock Text="FORMAT 1 · TEXT UNDER THE QR (PDF)" FontWeight="Black" FontSize="13" Foreground="#2D2A32"/>
-                                    <TextBlock Text="One line per field, in this order. The first line is bold, the rest small and grey." FontSize="11" Foreground="#8A8490" FontWeight="SemiBold"/>
+                                    <TextBlock Text="One line per field, in this order. The first line is bold, the rest small and grey." FontSize="11" Foreground="#8A8490" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </DockPanel>
                             <TextBlock Text="ORDER  (◀ ▶ to move · ✕ to remove)" FontWeight="Black" FontSize="11" Foreground="#6750A4" Margin="0,12,0,6"/>

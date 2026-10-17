@@ -125,7 +125,10 @@
                         </RadioButton>
                         <RadioButton x:Name="navQr" Style="{StaticResource NavItem}" GroupName="nav" Checked="Nav_Checked" ToolTip="QR CODE format of each stock">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="▣" Style="{StaticResource NavIcon}"/>
+                                <!-- ไอคอน QR (Assets/Icons/QrCode.png สีขาว) กว้างเท่าไอคอนตัวอื่น -->
+                                <Border Width="36" Margin="6,0,0,0" VerticalAlignment="Center">
+                                    <Image Source="/Assets/Icons/QrCode.png" Width="22" Height="22" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </Border>
                                 <TextBlock x:Name="lblQr" Text="QR CODE" Style="{StaticResource NavText}"/>
                             </StackPanel>
                         </RadioButton>
