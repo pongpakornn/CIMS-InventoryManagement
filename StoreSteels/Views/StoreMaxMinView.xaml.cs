@@ -211,7 +211,7 @@ namespace CIMS.Views
 
             btnOverMax.Visibility = Show(_stock.UseMaxMin);
             btnUnderMin.Visibility = Show(_stock.UseMaxMin);
-            btnImport.Visibility = Show(_session != null && _session.CanImportStock(_stock));
+            btnImport.Visibility = Show(_session != null && _session.CanImportStock(_stock) && !_stock.IsLiveView);   // ดูสดจาก StorePC = ไม่มี Import
             btnTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && !_stock.IsLiveView);
             btnCoilTemplate.Visibility = Show(_session != null && _session.CanImportStock(_stock) && _stock.CountCoil && DbSchema.HasCoilRegister && !_stock.IsLiveView);
 
