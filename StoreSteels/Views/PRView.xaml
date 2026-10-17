@@ -289,7 +289,11 @@
 
                 <!-- TextHeader : PURCHASE REQUISITION + 🏬 คลังที่แสดง PR (เฉพาะคลังที่เปิดเก็บ PR ใน PR SETTINGS) -->
                 <Grid Margin="5,0,8,20">
-                    <TextBlock Text="PURCHASE REQUISITION" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
+                    <!-- ไอคอนไฟล์ PR สี (Assets/Icons/PRPage.png) หน้าชื่อหน้า - Sidebar ใช้ PR.png สีขาวเหมือนเดิม -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Image Source="/Assets/Icons/PRPage.png" Width="44" Height="44" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="PURCHASE REQUISITION" FontSize="30" FontWeight="Black" Foreground="{StaticResource MainPurple}" VerticalAlignment="Center"/>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <TextBlock Text="STOCK" FontWeight="UltraBold" Foreground="{StaticResource AccentPurple}" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <ComboBox x:Name="cbPrStock" Width="230" Style="{StaticResource CyberComboBox}" FontWeight="Bold" FontSize="14"
